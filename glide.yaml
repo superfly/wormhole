@@ -1,0 +1,14 @@
+package: github.com/superfly/wormhole
+import:
+- package: github.com/xtaci/kcp-go
+  version: 2a9a3f742303ffb01acd1704d198a805238135fd
+  vcs: git
+- package: github.com/xtaci/smux
+  version: b4a6fb87c6ff61e88833b551ce9247e09c9d71d2
+  vcs: git
+- package: github.com/jpillora/backoff
+- package: github.com/garyburd/redigo
+  version: ~1.0.0
+- package: gopkg.in/vmihailenco/msgpack.v2
+  version: ~2.7.4
+- package: github.com/rs/xid

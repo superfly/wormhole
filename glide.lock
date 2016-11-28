@@ -1,0 +1,69 @@
+hash: 344e730f63d79ab1833b879682cffc2a8fa2c7f9c80765f679220aa32b45a62f
+updated: 2016-11-25T13:38:39.767286707-05:00
+imports:
+- name: github.com/garyburd/redigo
+  version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
+  subpackages:
+  - internal
+  - redis
+- name: github.com/golang/protobuf
+  version: 8ee79997227bf9b34611aee7946ae64735e6fd93
+  subpackages:
+  - proto
+- name: github.com/jpillora/backoff
+  version: a6f64285fd4072883335339357436b78d62c96a4
+- name: github.com/klauspost/crc32
+  version: cb6bfca970f6908083f26f39a79009d608efd5cd
+- name: github.com/klauspost/reedsolomon
+  version: d0a56f72c0d40a6cdde43a1575ad9686a0098b70
+- name: github.com/pkg/errors
+  version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
+- name: github.com/rs/xid
+  version: 057f3c928c207d1e7e318929eeac93bb46e319e3
+- name: github.com/Sirupsen/logrus
+  version: d26492970760ca5d33129d2d799e34be5c4782eb
+- name: github.com/xtaci/kcp-go
+  version: 2a9a3f742303ffb01acd1704d198a805238135fd
+  vcs: git
+- name: github.com/xtaci/smux
+  version: b4a6fb87c6ff61e88833b551ce9247e09c9d71d2
+  vcs: git
+- name: golang.org/x/crypto
+  version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
+  subpackages:
+  - blowfish
+  - cast5
+  - pbkdf2
+  - salsa20
+  - salsa20/salsa
+  - tea
+  - twofish
+  - xtea
+- name: golang.org/x/net
+  version: 4971afdc2f162e82d185353533d3cf16188a9f4e
+  subpackages:
+  - bpf
+  - context
+  - internal/iana
+  - internal/netreflect
+  - ipv4
+- name: golang.org/x/sys
+  version: 30237cf4eefd639b184d1f2cb77a581ea0be8947
+  subpackages:
+  - unix
+- name: google.golang.org/appengine
+  version: ca59ef35f409df61fa4a5f8290ff289b37eccfb8
+  subpackages:
+  - datastore
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
+- name: gopkg.in/vmihailenco/msgpack.v2
+  version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
+  subpackages:
+  - codes
+testImports: []
