@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"net"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -104,13 +105,23 @@ func NewSession(mux *smux.Session) *Session {
 // RequireStream ...
 func (session *Session) RequireStream() error {
 	stream, err := session.mux.AcceptStream()
-	session.setStream(stream)
+	err = session.setStream(stream)
 	return err
 }
 
-func (session *Session) setStream(stream *smux.Stream) {
+func (session *Session) setStream(stream *smux.Stream) (err error) {
+	defer func() {
+		if recover() != nil {
+			err = errors.New("stream ded?")
+		}
+	}()
 	session.stream = stream
-	session.ClientAddr = stream.RemoteAddr().String()
+	_, port, err := net.SplitHostPort(stream.RemoteAddr().String())
+	if err != nil {
+		return
+	}
+	session.ClientAddr = localhost + ":" + port
+	return
 }
 
 // RequireAuthentication ...

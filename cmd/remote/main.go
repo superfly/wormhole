@@ -30,6 +30,7 @@ var (
 	nodeID     = os.Getenv("NODE_ID")
 	redisURL   = os.Getenv("REDIS_URL")
 	logLevel   = os.Getenv("LOG_LEVEL")
+	localhost  = os.Getenv("LOCALHOST")
 	sessions   map[string]*Session
 	redisPool  *redis.Pool
 	smuxConfig *smux.Config
@@ -42,6 +43,9 @@ func init() {
 	}
 	if redisURL == "" {
 		panic("REDIS_URL is required.")
+	}
+	if localhost == "" {
+		localhost = "127.0.0.1"
 	}
 
 	redisPool = newRedisPool(redisURL)
