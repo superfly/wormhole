@@ -1,4 +1,4 @@
-package main
+package main // import "github.com/superfly/wormhole/cmd/remote"
 
 import (
 	"errors"
