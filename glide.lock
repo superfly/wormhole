@@ -1,5 +1,5 @@
 hash: 344e730f63d79ab1833b879682cffc2a8fa2c7f9c80765f679220aa32b45a62f
-updated: 2016-11-25T13:38:39.767286707-05:00
+updated: 2016-11-30T11:12:55.503765641-05:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -48,7 +48,7 @@ imports:
   - internal/netreflect
   - ipv4
 - name: golang.org/x/sys
-  version: 30237cf4eefd639b184d1f2cb77a581ea0be8947
+  version: d5645953809d8b4752afb2c3224b1f1ad73dfa70
   subpackages:
   - unix
 - name: google.golang.org/appengine

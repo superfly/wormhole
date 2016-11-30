@@ -5,6 +5,8 @@ import (
 	"io"
 	"net"
 	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
@@ -29,6 +31,7 @@ const (
 var (
 	localEndpoint = os.Getenv("LOCAL_ENDPOINT")
 	smuxConfig    *smux.Config
+	controlStream *smux.Stream
 )
 
 const (
@@ -38,7 +41,8 @@ const (
 func init() {
 	smuxConfig = smux.DefaultConfig()
 	smuxConfig.MaxReceiveBuffer = maxBuffer
-	smuxConfig.KeepAliveTimeout = 10 * time.Second
+	smuxConfig.KeepAliveInterval = 5 * time.Second
+	smuxConfig.KeepAliveTimeout = 5 * time.Second
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
 }
@@ -73,12 +77,24 @@ func handleKCPConnection(kcpconn *kcp.UDPSession) {
 		log.Fatalln(err)
 	}
 	defer mux.Close()
+	handleProgramTermination(mux)
 
-	err = authenticate(mux)
+	stream, err := connect(mux)
+	if err != nil {
+		log.Errorln("Could not connect:", err)
+		return
+	}
+	controlStream = stream
+
+	err = authenticate(stream)
 	if err != nil {
 		log.Errorln("Could not authenticate:", err)
+		return
 	}
+
 	log.Println("Authenticated.")
+
+	go wormhole.InitPong(controlStream)
 
 	for {
 		stream, err := mux.AcceptStream()
@@ -94,13 +110,27 @@ func handleKCPConnection(kcpconn *kcp.UDPSession) {
 	}
 }
 
-func authenticate(mux *smux.Session) error {
+func connect(mux *smux.Session) (*smux.Stream, error) {
 	stream, err := mux.OpenStream()
 	if err != nil {
-		return errors.New("could not open initial stream: " + err.Error())
+		return nil, errors.New("could not open initial stream: " + err.Error())
 	}
-	defer stream.Close()
+	return stream, err
+}
 
+func handleProgramTermination(mux *smux.Session) {
+	c := make(chan os.Signal, 2)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func(c <-chan os.Signal) {
+		for _ = range c {
+			log.Println("Cleaning up local agent.")
+			mux.Close()
+			os.Exit(1)
+		}
+	}(c)
+}
+
+func authenticate(stream *smux.Stream) error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		log.Debugln("Could not get hostname:", err)
@@ -183,7 +213,7 @@ func setConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetMtu(1350)
 	kcpconn.SetWindowSize(1024, 1024)
 	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(10)
+	kcpconn.SetKeepAlive(5)
 
 	if err := kcpconn.SetDSCP(0); err != nil {
 		log.Errorln("SetDSCP:", err)

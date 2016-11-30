@@ -1,0 +1,11 @@
+steps:
+  - name: ':docker: builder + push'
+    command: .buildkite/build.sh
+    branches: master
+  - wait
+  - name: ":ec2: kubernetes deploy"
+    command: .buildkite/deploy.sh
+    branches: master
+    agents:
+      queue: deploy
+      kubernetes: true
