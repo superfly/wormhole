@@ -12,3 +12,5 @@ import:
 - package: gopkg.in/vmihailenco/msgpack.v2
   version: ~2.7.4
 - package: github.com/rs/xid
+- package: github.com/klauspost/cpuid
+  version: ~1.0.0

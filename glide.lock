@@ -1,5 +1,5 @@
-hash: 344e730f63d79ab1833b879682cffc2a8fa2c7f9c80765f679220aa32b45a62f
-updated: 2016-11-30T11:12:55.503765641-05:00
+hash: 7f7e13e711fb310ac138ea6cee94fe51df691c9508c2629559ccd4241c389df2
+updated: 2016-11-30T12:26:17.756103995-05:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -12,6 +12,8 @@ imports:
   - proto
 - name: github.com/jpillora/backoff
   version: a6f64285fd4072883335339357436b78d62c96a4
+- name: github.com/klauspost/cpuid
+  version: 09cded8978dc9e80714c4d85b0322337b0a1e5e0
 - name: github.com/klauspost/crc32
   version: cb6bfca970f6908083f26f39a79009d608efd5cd
 - name: github.com/klauspost/reedsolomon
