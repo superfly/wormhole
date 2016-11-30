@@ -1,3 +1,3 @@
 FROM centurylink/ca-certs
-COPY app /
+ADD app /
 ENTRYPOINT ["/app"]
