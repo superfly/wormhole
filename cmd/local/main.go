@@ -29,9 +29,10 @@ const (
 )
 
 var (
-	localEndpoint = os.Getenv("LOCAL_ENDPOINT")
-	smuxConfig    *smux.Config
-	controlStream *smux.Stream
+	localEndpoint  = os.Getenv("LOCAL_ENDPOINT")
+	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
+	smuxConfig     *smux.Config
+	controlStream  *smux.Stream
 )
 
 const (
@@ -45,6 +46,9 @@ func init() {
 	smuxConfig.KeepAliveTimeout = 5 * time.Second
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
+	if remoteEndpoint == "" {
+		remoteEndpoint = ":10000"
+	}
 }
 
 func main() {
@@ -52,7 +56,7 @@ func main() {
 		Max: 2 * time.Minute,
 	}
 	for {
-		kcpconn, kcpconnErr := kcp.DialWithOptions(":10000", nil, 10, 3)
+		kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, nil, 10, 3)
 		if kcpconnErr != nil {
 			log.Errorln("Could not connect tunnel:", kcpconnErr)
 			d := b.Duration()
