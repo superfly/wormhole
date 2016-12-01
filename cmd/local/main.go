@@ -100,17 +100,21 @@ func handleKCPConnection(kcpconn *kcp.UDPSession) {
 
 	go wormhole.InitPong(controlStream)
 
+	b := &backoff.Backoff{
+		Max: 15 * time.Second,
+	}
 	for {
 		stream, err := mux.AcceptStream()
 		if err != nil { // Probably broken pipe...
 			log.Errorln("Error accepting stream:", err)
-			return
-		}
-
-		if err := handleStream(stream); err != nil {
-			log.Errorln(err)
+			d := b.Duration()
+			log.Println("Retrying to accept a stream in ", d)
+			time.Sleep(d)
 			continue
 		}
+		b.Reset()
+
+		go handleStream(stream)
 	}
 }
 
@@ -186,13 +190,13 @@ func waitForResponse(stream *smux.Stream) (*wormhole.Response, error) {
 	return &resp, nil
 }
 
-func handleStream(stream *smux.Stream) error {
+func handleStream(stream *smux.Stream) {
 	log.Debugln("Accepted stream")
 
 	localConn, err := net.DialTimeout("tcp", localEndpoint, 5*time.Second)
 	if err != nil {
 		localConn.Close()
-		return err
+		log.Error(err)
 	}
 
 	log.Debugln("dialed local connection")
@@ -206,9 +210,7 @@ func handleStream(stream *smux.Stream) error {
 
 	log.Debugln("local connection settings has been set...")
 
-	go handleClient(localConn, stream)
-
-	return nil
+	handleClient(localConn, stream)
 }
 
 func setConnOptions(kcpconn *kcp.UDPSession) {
