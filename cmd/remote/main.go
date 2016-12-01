@@ -185,7 +185,7 @@ func listenTCP() (*net.TCPListener, error) {
 	if err != nil {
 		return nil, errors.New("could not parse TCP addr: " + err.Error())
 	}
-	ln, err := net.ListenTCP("tcp", addr)
+	ln, err := net.ListenTCP("tcp4", addr)
 	if err != nil {
 		return nil, errors.New("could not listen on: " + err.Error())
 	}
