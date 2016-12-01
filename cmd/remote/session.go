@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"net"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -116,15 +115,9 @@ func (session *Session) setStream(stream *smux.Stream) (err error) {
 		}
 	}()
 	session.stream = stream
-	_, port, err := net.SplitHostPort(stream.RemoteAddr().String())
-	if err != nil {
-		return
-	}
-	host, _, err := net.SplitHostPort(stream.LocalAddr().String())
-	if err != nil {
-		return
-	}
-	session.ClientAddr = host + ":" + port
+	log.Println("stream local", stream.LocalAddr().String())
+	log.Println("stream remote", stream.RemoteAddr().String())
+	session.ClientAddr = stream.RemoteAddr().String()
 	return
 }
 

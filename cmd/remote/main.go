@@ -135,10 +135,17 @@ func handleConn(kcpconn *kcp.UDPSession) {
 	}
 	defer ln.Close()
 
+	log.Print("ln addr", ln.Addr().String())
+	log.Print("kcp local", kcpconn.LocalAddr().String())
+	log.Print("kcp remote", kcpconn.RemoteAddr().String())
+
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	host, _, _ := net.SplitHostPort(kcpconn.LocalAddr().String())
+
 	endpoint := &Endpoint{
 		BackendID: sess.BackendID,
 		SessionID: sess.ID,
-		Socket:    sess.ClientAddr,
+		Socket:    host + ":" + port,
 	}
 
 	if err = endpoint.Register(); err != nil {
