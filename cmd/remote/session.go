@@ -120,7 +120,11 @@ func (session *Session) setStream(stream *smux.Stream) (err error) {
 	if err != nil {
 		return
 	}
-	session.ClientAddr = localhost + ":" + port
+	host, _, err := net.SplitHostPort(stream.LocalAddr().String())
+	if err != nil {
+		return
+	}
+	session.ClientAddr = host + ":" + port
 	return
 }
 
