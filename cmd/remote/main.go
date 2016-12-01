@@ -70,6 +70,7 @@ func init() {
 
 func main() {
 	go handleDeath()
+	log.Println(os.Getenv("LOCALHOST"))
 	ln, err := kcp.ListenWithOptions(":"+port, nil, 10, 3)
 	kcpln = ln
 	if err != nil {
