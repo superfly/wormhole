@@ -115,8 +115,6 @@ func (session *Session) setStream(stream *smux.Stream) (err error) {
 		}
 	}()
 	session.stream = stream
-	log.Println("stream local", stream.LocalAddr().String())
-	log.Println("stream remote", stream.RemoteAddr().String())
 	session.ClientAddr = stream.RemoteAddr().String()
 	return
 }

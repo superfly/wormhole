@@ -30,6 +30,7 @@ var (
 	nodeID     = os.Getenv("NODE_ID")
 	redisURL   = os.Getenv("REDIS_URL")
 	logLevel   = os.Getenv("LOG_LEVEL")
+	localhost  = os.Getenv("LOCALHOST")
 	sessions   map[string]*Session
 	redisPool  *redis.Pool
 	smuxConfig *smux.Config
@@ -70,7 +71,6 @@ func init() {
 
 func main() {
 	go handleDeath()
-	log.Println(os.Getenv("LOCALHOST"))
 	ln, err := kcp.ListenWithOptions(":"+port, nil, 10, 3)
 	kcpln = ln
 	if err != nil {
@@ -136,17 +136,12 @@ func handleConn(kcpconn *kcp.UDPSession) {
 	}
 	defer ln.Close()
 
-	log.Print("ln addr", ln.Addr().String())
-	log.Print("kcp local", kcpconn.LocalAddr().String())
-	log.Print("kcp remote", kcpconn.RemoteAddr().String())
-
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
-	host, _, _ := net.SplitHostPort(kcpconn.LocalAddr().String())
 
 	endpoint := &Endpoint{
 		BackendID: sess.BackendID,
 		SessionID: sess.ID,
-		Socket:    host + ":" + port,
+		Socket:    localhost + ":" + port,
 	}
 
 	if err = endpoint.Register(); err != nil {
