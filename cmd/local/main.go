@@ -56,63 +56,71 @@ func main() {
 		Max: 2 * time.Minute,
 	}
 	for {
-		kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, nil, 10, 3)
-		if kcpconnErr != nil {
-			log.Errorln("Could not connect tunnel:", kcpconnErr)
+		mux, err := initializeConnection()
+		if err != nil {
+			log.Errorln("Could not make connection:", err)
 			d := b.Duration()
 			time.Sleep(d)
 			continue
 		}
+		defer controlStream.Close()
 		b.Reset()
-
-		log.Println("Connected as:", kcpconn.LocalAddr().String())
-
-		handleKCPConnection(kcpconn)
+		handleMux(mux)
 	}
 }
 
-func handleKCPConnection(kcpconn *kcp.UDPSession) {
-	defer kcpconn.Close()
+func initializeConnection() (*smux.Session, error) {
+	kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, nil, 10, 3)
+	if kcpconnErr != nil {
+		return nil, kcpconnErr
+	}
+	log.Println("Connected as:", kcpconn.LocalAddr().String())
 
 	setConnOptions(kcpconn)
 
 	mux, err := smux.Client(kcpconn, smuxConfig)
 	if err != nil {
-		log.Fatalln(err)
+		log.Errorln("Error creating multiplexed session:", err)
+		return nil, err
 	}
-	defer mux.Close()
 	handleProgramTermination(mux)
 
+	controlStream, err = handshakeConnection(mux)
+	if err != nil {
+		return nil, err
+	}
+	return mux, nil
+}
+
+func handshakeConnection(mux *smux.Session) (*smux.Stream, error) {
 	stream, err := connect(mux)
 	if err != nil {
 		log.Errorln("Could not connect:", err)
-		return
+		return nil, err
 	}
-	controlStream = stream
 
 	err = authenticate(stream)
 	if err != nil {
 		log.Errorln("Could not authenticate:", err)
-		return
+		defer stream.Close()
+		return nil, err
 	}
 
 	log.Println("Authenticated.")
+	return stream, nil
 
+}
+
+func handleMux(mux *smux.Session) error {
+	defer mux.Close()
 	go wormhole.InitPong(controlStream)
 
-	b := &backoff.Backoff{
-		Max: 15 * time.Second,
-	}
 	for {
 		stream, err := mux.AcceptStream()
 		if err != nil { // Probably broken pipe...
 			log.Errorln("Error accepting stream:", err)
-			d := b.Duration()
-			log.Println("Retrying to accept a stream in ", d)
-			time.Sleep(d)
-			continue
+			return err
 		}
-		b.Reset()
 
 		go handleStream(stream)
 	}
