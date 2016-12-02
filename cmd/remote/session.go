@@ -104,6 +104,9 @@ func NewSession(mux *smux.Session) *Session {
 // RequireStream ...
 func (session *Session) RequireStream() error {
 	stream, err := session.mux.AcceptStream()
+	if err != nil {
+		return err
+	}
 	err = session.setStream(stream)
 	return err
 }
@@ -115,7 +118,7 @@ func (session *Session) setStream(stream *smux.Stream) (err error) {
 		}
 	}()
 	session.stream = stream
-	session.ClientAddr = stream.RemoteAddr().String()
+	session.ClientAddr = stream.RemoteAddr().String() // sometime panics
 	return
 }
 

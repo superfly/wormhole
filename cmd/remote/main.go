@@ -114,7 +114,7 @@ func handleConn(kcpconn *kcp.UDPSession) {
 	sess := NewSession(mux)
 	err = sess.RequireStream()
 	if err != nil {
-		log.Errorln(err)
+		log.Errorln("error getting a stream:", err)
 		return
 	}
 
