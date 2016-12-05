@@ -11,18 +11,11 @@ import (
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/wormhole"
 	kcp "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
 
 	log "github.com/Sirupsen/logrus"
-)
-
-const (
-	noDelay      = 0
-	interval     = 30
-	resend       = 2
-	noCongestion = 1
-	maxBuffer    = 4194304
 )
 
 var (
@@ -58,9 +51,9 @@ func init() {
 	}
 	// smux conf
 	smuxConfig = smux.DefaultConfig()
-	smuxConfig.MaxReceiveBuffer = maxBuffer
-	smuxConfig.KeepAliveInterval = 5 * time.Second
-	smuxConfig.KeepAliveTimeout = 5 * time.Second
+	smuxConfig.MaxReceiveBuffer = wormhole.MaxBuffer
+	smuxConfig.KeepAliveInterval = wormhole.KeepAlive * time.Second
+	// smuxConfig.KeepAliveTimeout = 5 * time.Second
 
 	// logging
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
@@ -72,12 +65,24 @@ func init() {
 func main() {
 	go handleDeath()
 	ln, err := kcp.ListenWithOptions(":"+port, nil, 10, 3)
+
+	if err = ln.SetDSCP(wormhole.DSCP); err != nil {
+		log.Warnln("SetDSCP:", err)
+	}
+	if err = ln.SetReadBuffer(wormhole.MaxBuffer); err != nil {
+		log.Fatalln("SetReadBuffer:", err)
+	}
+	if err = ln.SetWriteBuffer(wormhole.MaxBuffer); err != nil {
+		log.Fatalln("SetWriteBuffer:", err)
+	}
 	kcpln = ln
 	if err != nil {
 		panic(err)
 	}
 	defer kcpln.Close()
 	log.Println("Listening on", kcpln.Addr().String())
+
+	go wormhole.DebugSNMP()
 
 	for {
 		kcpconn, err := kcpln.AcceptKCP()
@@ -93,11 +98,11 @@ func main() {
 
 func setConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(noDelay, interval, resend, noCongestion)
+	kcpconn.SetNoDelay(wormhole.NoDelay, wormhole.Interval, wormhole.Resend, wormhole.NoCongestion)
 	kcpconn.SetMtu(1350)
 	kcpconn.SetWindowSize(1024, 1024)
 	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(5)
+	kcpconn.SetKeepAlive(wormhole.KeepAlive)
 }
 
 func handleConn(kcpconn *kcp.UDPSession) {
@@ -196,13 +201,6 @@ func listenTCP() (*net.TCPListener, error) {
 }
 
 func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
-	if err := tcpConn.SetReadBuffer(maxBuffer); err != nil {
-		return err
-	}
-	if err := tcpConn.SetWriteBuffer(maxBuffer); err != nil {
-		return err
-	}
-
 	stream, err := mux.OpenStream()
 	if err != nil {
 		return err

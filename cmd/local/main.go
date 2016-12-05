@@ -20,14 +20,6 @@ import (
 	"github.com/superfly/wormhole"
 )
 
-const (
-	noDelay      = 0
-	interval     = 30
-	resend       = 2
-	noCongestion = 1
-	maxBuffer    = 4194304
-)
-
 var (
 	localEndpoint  = os.Getenv("LOCAL_ENDPOINT")
 	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
@@ -41,9 +33,9 @@ const (
 
 func init() {
 	smuxConfig = smux.DefaultConfig()
-	smuxConfig.MaxReceiveBuffer = maxBuffer
-	smuxConfig.KeepAliveInterval = 5 * time.Second
-	smuxConfig.KeepAliveTimeout = 5 * time.Second
+	smuxConfig.MaxReceiveBuffer = wormhole.MaxBuffer
+	smuxConfig.KeepAliveInterval = wormhole.KeepAlive * time.Second
+	// smuxConfig.KeepAliveTimeout = wormhole.Interval * time.Second
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
@@ -55,6 +47,7 @@ func main() {
 	b := &backoff.Backoff{
 		Max: 2 * time.Minute,
 	}
+	go wormhole.DebugSNMP()
 	for {
 		mux, err := initializeConnection()
 		if err != nil {
@@ -209,10 +202,10 @@ func handleStream(stream *smux.Stream) {
 
 	log.Debugln("dialed local connection")
 
-	if err := localConn.(*net.TCPConn).SetReadBuffer(maxBuffer); err != nil {
+	if err := localConn.(*net.TCPConn).SetReadBuffer(wormhole.MaxBuffer); err != nil {
 		log.Errorln("TCP SetReadBuffer:", err)
 	}
-	if err := localConn.(*net.TCPConn).SetWriteBuffer(maxBuffer); err != nil {
+	if err := localConn.(*net.TCPConn).SetWriteBuffer(wormhole.MaxBuffer); err != nil {
 		log.Errorln("TCP SetWriteBuffer:", err)
 	}
 
@@ -223,13 +216,13 @@ func handleStream(stream *smux.Stream) {
 
 func setConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(noDelay, interval, resend, noCongestion)
+	kcpconn.SetNoDelay(wormhole.NoDelay, wormhole.Interval, wormhole.Resend, wormhole.NoCongestion)
 	kcpconn.SetMtu(1350)
 	kcpconn.SetWindowSize(1024, 1024)
 	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(5)
+	kcpconn.SetKeepAlive(wormhole.KeepAlive)
 
-	if err := kcpconn.SetDSCP(0); err != nil {
+	if err := kcpconn.SetDSCP(wormhole.DSCP); err != nil {
 		log.Errorln("SetDSCP:", err)
 	}
 	if err := kcpconn.SetReadBuffer(smuxConfig.MaxReceiveBuffer); err != nil {
