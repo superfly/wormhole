@@ -100,7 +100,7 @@ func setConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetStreamMode(true)
 	kcpconn.SetNoDelay(wormhole.NoDelay, wormhole.Interval, wormhole.Resend, wormhole.NoCongestion)
 	kcpconn.SetMtu(1350)
-	kcpconn.SetWindowSize(1024, 1024)
+	kcpconn.SetWindowSize(128, 1024)
 	kcpconn.SetACKNoDelay(true)
 	kcpconn.SetKeepAlive(wormhole.KeepAlive)
 }
