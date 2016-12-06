@@ -25,10 +25,9 @@ var (
 	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
 	smuxConfig     *smux.Config
 	controlStream  *smux.Stream
-)
 
-const (
-	clientID = "wormhole v0.0.1"
+	// VERSION Handled by build flag
+	VERSION = "latest"
 )
 
 func init() {
@@ -156,7 +155,7 @@ func authenticate(stream *smux.Stream) error {
 	am := wormhole.AuthMessage{
 		Token:  os.Getenv("FLY_TOKEN"),
 		Name:   hostname,
-		Client: clientID,
+		Client: "wormhole " + VERSION,
 	}
 	buf, err := msgpack.Marshal(am)
 	if err != nil {

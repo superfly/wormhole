@@ -9,3 +9,5 @@ steps:
     agents:
       queue: deploy
       kubernetes: true
+  - name: ":github: create release"
+    command: .buildkite/release.sh
