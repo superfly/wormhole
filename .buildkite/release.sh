@@ -12,7 +12,7 @@ docker run --rm \
   -e VERSION=${BUILDKITE_TAG} \
   golang
 
-GHR='github-release'
+GHR='./github-release'
 
 if [ ! -f $GHR ]; then
   curl -Lk https://github.com/buildkite/github-release/releases/download/v1.0/github-release-linux-amd64 > $GHR
