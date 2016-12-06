@@ -5,7 +5,11 @@ if [ -z "$BUILDKITE_TAG" ]; then
   exit 0
 fi
 
-source .buildkite/compile.sh
+docker run --rm \
+  -v $(pwd):/go/src/github.com/superfly/wormhole:rw \
+  --entrypoint /go/src/github.com/superfly/wormhole/.buildkite/compile.sh \
+  --workdir /go/src/github.com/superfly/wormhole \
+  golang
 
 GHR='/usr/local/bin/github-release'
 
