@@ -204,8 +204,8 @@ func handleStream(stream *smux.Stream) {
 
 	localConn, err := net.DialTimeout("tcp", localEndpoint, 5*time.Second)
 	if err != nil {
-		localConn.Close()
-		log.Error(err)
+		log.Errorln(err)
+		return
 	}
 
 	log.Debugln("dialed local connection")
