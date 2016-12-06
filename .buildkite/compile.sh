@@ -6,6 +6,9 @@ if [[ "$unamestr" == 'Darwin' ]]; then
 fi
 
 VERSION=${VERSION:-"latest"}
+
+echo "Compiling version: ${VERSION}"
+
 LDFLAGS="-X main.VERSION=$VERSION -s -w"
 GCFLAGS=""
 
