@@ -181,7 +181,7 @@ func (session *Session) sendResponse(resp *wormhole.Response) error {
 func (session *Session) LivenessLoop() {
 	err := wormhole.InitPing(session.stream)
 	if err != nil {
-		log.Errorln("liveness broken on", session.stream.RemoteAddr().String(), "because:", err)
+		log.Errorln("PING error", session.stream.RemoteAddr().String(), "because:", err)
 		session.mux.Close()
 	}
 }

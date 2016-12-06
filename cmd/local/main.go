@@ -104,9 +104,17 @@ func handshakeConnection(mux *smux.Session) (*smux.Stream, error) {
 
 }
 
+func stayAlive() {
+	err := wormhole.InitPong(controlStream)
+	if err != nil {
+		log.Errorln("PONG error:", err)
+	}
+	log.Println("Pong ended.")
+}
+
 func handleMux(mux *smux.Session) error {
 	defer mux.Close()
-	go wormhole.InitPong(controlStream)
+	go stayAlive()
 
 	for {
 		stream, err := mux.AcceptStream()
