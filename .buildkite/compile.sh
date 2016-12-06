@@ -5,7 +5,7 @@ if [[ "$unamestr" == 'Darwin' ]]; then
 	MD5='md5'
 fi
 
-VERSION=${VERSION:-$BUILDKITE_TAG}
+VERSION=${VERSION:-"latest"}
 LDFLAGS="-X main.VERSION=$VERSION -s -w"
 GCFLAGS=""
 
