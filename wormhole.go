@@ -29,7 +29,7 @@ func OutputSNMP() {
 
 // DebugSNMP ...
 func DebugSNMP() {
-	for _ = range time.Tick(30 * time.Second) {
+	for _ = range time.Tick(120 * time.Second) {
 		OutputSNMP()
 	}
 }
