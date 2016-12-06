@@ -220,7 +220,7 @@ func handleClient(c1, c2 io.ReadWriteCloser) {
 	go func() {
 		_, err := io.Copy(c1, c2)
 		if err != nil {
-			log.Error(err)
+			log.Debug(err)
 		}
 		close(c1die)
 	}()
@@ -229,7 +229,7 @@ func handleClient(c1, c2 io.ReadWriteCloser) {
 	go func() {
 		_, err := io.Copy(c2, c1)
 		if err != nil {
-			log.Error(err)
+			log.Debug(err)
 		}
 		close(c2die)
 	}()
@@ -294,7 +294,9 @@ func handleDeath() {
 			for id, session := range sessions {
 				redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), id)
 				redisConn.Send("SREM", "node:"+nodeID+":sessions", id)
+				log.Println("SREM", "node:"+nodeID+":sessions", id)
 				redisConn.Send("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
+				log.Println("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
 			}
 			_, err := redisConn.Do("EXEC")
 			if err != nil {
