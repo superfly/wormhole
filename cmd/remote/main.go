@@ -155,8 +155,9 @@ func handleConn(kcpconn *kcp.UDPSession) {
 	}
 	defer endpoint.Remove()
 
-	go sess.UpdateAttribute("endpoint_addr", ln.Addr().String())
-	log.Println("Listening on:", ln.Addr().String())
+	sess.EndpointAddr = endpoint.Socket
+	go sess.UpdateAttribute("endpoint_addr", endpoint.Socket)
+	log.Println("Listening on:", endpoint.Socket)
 
 	for {
 		ln.SetDeadline(time.Now().Add(time.Second))
