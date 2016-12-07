@@ -187,13 +187,14 @@ func connect(mux *smux.Session) (*smux.Stream, error) {
 	return stream, err
 }
 
-func signalProcess(sig os.Signal) (exited bool, exitStatus syscall.WaitStatus, err error) {
+func signalProcess(sig os.Signal) (exited bool, exitStatus int, err error) {
 	exited = false
 	err = cmd.Process.Signal(sig)
 	if err != nil {
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			exited = true
-			exitStatus, _ = exiterr.Sys().(syscall.WaitStatus)
+			status, _ := exiterr.Sys().(syscall.WaitStatus)
+			exitStatus = status.ExitStatus()
 		}
 	}
 	return
@@ -204,7 +205,7 @@ func handleOsSignal(mux *smux.Session) {
 	signal.Notify(signalChan)
 	go func(signalChan <-chan os.Signal) {
 		for sig := range signalChan {
-			var exitStatus syscall.WaitStatus
+			var exitStatus int
 			var exited bool
 			if cmd != nil {
 				exited, exitStatus, _ = signalProcess(sig)
