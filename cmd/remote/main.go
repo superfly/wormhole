@@ -2,7 +2,6 @@ package main // import "github.com/superfly/wormhole/cmd/remote"
 
 import (
 	"errors"
-	"io"
 	"net"
 	"net/url"
 	"os"
@@ -208,38 +207,8 @@ func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
 	}
 	log.Debug("Opened a stream...")
 
-	go handleClient(tcpConn, stream)
+	go wormhole.CopyCloseIO(tcpConn, stream)
 	return nil
-}
-
-func handleClient(c1, c2 io.ReadWriteCloser) {
-	defer c1.Close()
-	defer c2.Close()
-
-	// start tunnel
-	c1die := make(chan struct{})
-	go func() {
-		_, err := io.Copy(c1, c2)
-		if err != nil {
-			log.Debug(err)
-		}
-		close(c1die)
-	}()
-
-	c2die := make(chan struct{})
-	go func() {
-		_, err := io.Copy(c2, c1)
-		if err != nil {
-			log.Debug(err)
-		}
-		close(c2die)
-	}()
-
-	// wait for tunnel termination
-	select {
-	case <-c1die:
-	case <-c2die:
-	}
 }
 
 func newRedisPool(redisURL string) *redis.Pool {

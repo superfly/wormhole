@@ -2,10 +2,12 @@ package main // import "github.com/superfly/wormhole/cmd/local"
 
 import (
 	"errors"
-	"io"
+	"fmt"
 	"net"
 	"os"
+	"os/exec"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,7 +27,7 @@ var (
 	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
 	smuxConfig     *smux.Config
 	controlStream  *smux.Stream
-
+	cmd            *exec.Cmd
 	// VERSION Handled by build flag
 	VERSION = "latest"
 )
@@ -42,7 +44,58 @@ func init() {
 	}
 }
 
+func runProgram(program string) (port string, err error) {
+	cs := []string{"/bin/sh", "-c", program}
+	cmd = exec.Command(cs[0], cs[1:]...)
+	cmd.Stdin = nil
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	port = os.Getenv("PORT")
+	if port == "" {
+		port = "5000"
+		cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", 5000))
+	} else {
+		cmd.Env = os.Environ()
+	}
+	log.Println("Starting program:", program)
+	err = cmd.Start()
+	if err != nil {
+		log.Println("Failed to start program:", err)
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+				log.Printf("Exit Status: %d", status.ExitStatus())
+				os.Exit(status.ExitStatus())
+			}
+		}
+		return
+	}
+	go func(cmd *exec.Cmd) {
+		err = cmd.Wait()
+		if err != nil {
+			log.Errorln("Program error:", err)
+			if exiterr, ok := err.(*exec.ExitError); ok {
+				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
+					log.Printf("Exit Status: %d", status.ExitStatus())
+					os.Exit(status.ExitStatus())
+				}
+			}
+		}
+		log.Println("Terminating program", program)
+	}(cmd)
+	return
+}
+
 func main() {
+	args := os.Args[1:]
+	if len(args) > 0 {
+		port, err := runProgram(strings.Join(args, " "))
+		if err != nil {
+			log.Errorln("Error running program:", err)
+			return
+		}
+		localEndpoint = "127.0.0.1:" + port
+	}
+
 	b := &backoff.Backoff{
 		Max: 2 * time.Minute,
 	}
@@ -75,7 +128,7 @@ func initializeConnection() (*smux.Session, error) {
 		log.Errorln("Error creating multiplexed session:", err)
 		return nil, err
 	}
-	handleProgramTermination(mux)
+	handleOsSignal(mux)
 
 	controlStream, err = handshakeConnection(mux)
 	if err != nil {
@@ -134,16 +187,42 @@ func connect(mux *smux.Session) (*smux.Stream, error) {
 	return stream, err
 }
 
-func handleProgramTermination(mux *smux.Session) {
-	c := make(chan os.Signal, 2)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func(c <-chan os.Signal) {
-		for _ = range c {
-			log.Println("Cleaning up local agent.")
-			mux.Close()
-			os.Exit(1)
+func signalProcess(sig os.Signal) (exited bool, exitStatus syscall.WaitStatus, err error) {
+	exited = false
+	err = cmd.Process.Signal(sig)
+	if err != nil {
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			exited = true
+			exitStatus, _ = exiterr.Sys().(syscall.WaitStatus)
 		}
-	}(c)
+	}
+	return
+}
+
+func handleOsSignal(mux *smux.Session) {
+	signalChan := make(chan os.Signal, 2)
+	signal.Notify(signalChan)
+	go func(signalChan <-chan os.Signal) {
+		for sig := range signalChan {
+			var exitStatus syscall.WaitStatus
+			var exited bool
+			if cmd != nil {
+				exited, exitStatus, _ = signalProcess(sig)
+			} else {
+				exitStatus = 0
+			}
+			switch sig {
+			case syscall.SIGINT, syscall.SIGTERM:
+				log.Println("Cleaning up local agent.")
+				mux.Close()
+				os.Exit(int(exitStatus))
+			default:
+				if cmd != nil && exited {
+					os.Exit(int(exitStatus))
+				}
+			}
+		}
+	}(signalChan)
 }
 
 func authenticate(stream *smux.Stream) error {
@@ -168,7 +247,7 @@ func authenticate(stream *smux.Stream) error {
 	}
 
 	log.Debugln("Waiting for authentication answer...")
-	resp, err := waitForResponse(stream)
+	resp, err := wormhole.AwaitResponse(stream)
 	if err != nil {
 		return errors.New("error waiting for authentication response: " + err.Error())
 	}
@@ -182,23 +261,7 @@ func authenticate(stream *smux.Stream) error {
 	return nil
 }
 
-func waitForResponse(stream *smux.Stream) (*wormhole.Response, error) {
-	var resp wormhole.Response
-
-	buf := make([]byte, 1024)
-	nr, err := stream.Read(buf)
-	if err != nil {
-		return nil, errors.New("error reading from stream: " + err.Error())
-	}
-	err = msgpack.Unmarshal(buf[:nr], &resp)
-	if err != nil {
-		return nil, errors.New("unparsable auth message")
-	}
-
-	return &resp, nil
-}
-
-func handleStream(stream *smux.Stream) {
+func handleStream(stream *smux.Stream) (err error) {
 	log.Debugln("Accepted stream")
 
 	localConn, err := net.DialTimeout("tcp", localEndpoint, 5*time.Second)
@@ -209,16 +272,17 @@ func handleStream(stream *smux.Stream) {
 
 	log.Debugln("dialed local connection")
 
-	if err := localConn.(*net.TCPConn).SetReadBuffer(wormhole.MaxBuffer); err != nil {
-		log.Errorln("TCP SetReadBuffer:", err)
+	if err = localConn.(*net.TCPConn).SetReadBuffer(wormhole.MaxBuffer); err != nil {
+		log.Errorln("TCP SetReadBuffer error:", err)
 	}
-	if err := localConn.(*net.TCPConn).SetWriteBuffer(wormhole.MaxBuffer); err != nil {
-		log.Errorln("TCP SetWriteBuffer:", err)
+	if err = localConn.(*net.TCPConn).SetWriteBuffer(wormhole.MaxBuffer); err != nil {
+		log.Errorln("TCP SetWriteBuffer error:", err)
 	}
 
 	log.Debugln("local connection settings has been set...")
 
-	handleClient(localConn, stream)
+	err = wormhole.CopyCloseIO(localConn, stream)
+	return err
 }
 
 func setConnOptions(kcpconn *kcp.UDPSession) {
@@ -237,25 +301,5 @@ func setConnOptions(kcpconn *kcp.UDPSession) {
 	}
 	if err := kcpconn.SetWriteBuffer(smuxConfig.MaxReceiveBuffer); err != nil {
 		log.Errorln("SetWriteBuffer:", err)
-	}
-}
-
-func handleClient(c1, c2 io.ReadWriteCloser) {
-	log.Debugln("c2 opened")
-	defer log.Debugln("c2 closed")
-	defer c1.Close()
-	defer c2.Close()
-
-	// start tunnel
-	c1die := make(chan struct{})
-	go func() { io.Copy(c1, c2); close(c1die) }()
-
-	c2die := make(chan struct{})
-	go func() { io.Copy(c2, c1); close(c2die) }()
-
-	// wait for tunnel termination
-	select {
-	case <-c1die:
-	case <-c2die:
 	}
 }
