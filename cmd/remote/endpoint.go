@@ -35,7 +35,6 @@ func (endpoint *Endpoint) Remove() error {
 	redisConn := redisPool.Get()
 	defer redisConn.Close()
 
-	// Pipelining it up!
 	_, err := redisConn.Do("SREM", endpointsRedisKey(endpoint.BackendID), endpoint.Socket)
 	if err != nil {
 		return err

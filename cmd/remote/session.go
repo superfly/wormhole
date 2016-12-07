@@ -47,6 +47,7 @@ func (session *Session) RegisterConnection(t time.Time) error {
 	redisConn.Send("HMSET", redis.Args{}.Add(session.redisKey()).AddFlat(session)...)
 	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), session.ID)
 	redisConn.Send("SADD", "node:"+nodeID+":sessions", session.ID)
+	redisConn.Send("SADD", "backend:"+session.BackendID+":sessions", session.ID)
 	_, err := redisConn.Do("EXEC")
 
 	return err
@@ -61,6 +62,7 @@ func (session *Session) RegisterDisconnection() error {
 	redisConn.Send("MULTI")
 	redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), session.ID)
 	redisConn.Send("SREM", "node:"+nodeID+":sessions", session.ID)
+	redisConn.Send("SREM", "backend:"+session.BackendID+":sessions", session.ID)
 	_, err := redisConn.Do("EXEC")
 	return err
 }

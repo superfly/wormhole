@@ -295,9 +295,8 @@ func handleDeath() {
 			for id, session := range sessions {
 				redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), id)
 				redisConn.Send("SREM", "node:"+nodeID+":sessions", id)
-				log.Println("SREM", "node:"+nodeID+":sessions", id)
 				redisConn.Send("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
-				log.Println("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
+				redisConn.Send("SREM", "backend:"+session.BackendID+":sessions", session.ID)
 			}
 			_, err := redisConn.Do("EXEC")
 			if err != nil {
