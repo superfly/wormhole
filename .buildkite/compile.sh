@@ -1,4 +1,7 @@
 #!/bin/bash
+
+set -e
+
 MD5='md5sum'
 unamestr=`uname`
 if [[ "$unamestr" == 'Darwin' ]]; then

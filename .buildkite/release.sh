@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -e
+
 if [ -z "$BUILDKITE_TAG" ]; then
   echo "Not building a tag, nothing to do."
   exit 0
