@@ -159,6 +159,7 @@ func handleConn(kcpconn *kcp.UDPSession) {
 		BackendID: sess.BackendID,
 		SessionID: sess.ID,
 		Socket:    localhost + ":" + port,
+		Release:   sess.Release,
 	}
 
 	if err = endpoint.Register(); err != nil {

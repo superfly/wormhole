@@ -30,6 +30,8 @@ type Session struct {
 	ClientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
+	Release string `redis:"release,omitempty"`
+
 	stream *smux.Stream
 	mux    *smux.Session
 
@@ -142,6 +144,7 @@ func (session *Session) RequireAuthentication() error {
 
 	session.Client = am.Client
 	session.NodeID = nodeID
+	session.Release = am.Release
 
 	backendID, err := BackendIDFromToken(am.Token)
 	if err != nil {

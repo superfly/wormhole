@@ -1,12 +1,15 @@
 package main // import "github.com/superfly/wormhole/cmd/local"
 
 import (
+	"bufio"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"os/signal"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -28,15 +31,18 @@ var (
 	smuxConfig     *smux.Config
 	controlStream  *smux.Stream
 	cmd            *exec.Cmd
+	flyToken       = os.Getenv("FLY_TOKEN")
 
-	// passphrase Replaced during build with a flag
 	passphrase string
+	version    string
 
-	// version Handled by build flag
-	version string
+	release string
 )
 
 func init() {
+	if flyToken == "" {
+		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
+	}
 	smuxConfig = smux.DefaultConfig()
 	smuxConfig.MaxReceiveBuffer = wormhole.MaxBuffer
 	smuxConfig.KeepAliveInterval = wormhole.KeepAlive * time.Second
@@ -53,6 +59,31 @@ func init() {
 		passphrase = os.Getenv("PASSPHRASE")
 		if passphrase == "" {
 			log.Fatalln("PASSPHRASE needs to be set")
+		}
+	}
+	computeRelease()
+}
+
+func computeRelease() {
+	if release = os.Getenv("FLY_RELEASE"); release != "" {
+		return
+	}
+	if file, err := os.Open(".git/HEAD"); err == nil {
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		r, _ := regexp.Compile("^ref: (.+)")
+		for scanner.Scan() {
+			txt := scanner.Text()
+			if r.MatchString(txt) {
+				matches := r.FindAllStringSubmatch(txt, -1)
+				read, err := ioutil.ReadFile(".git/" + matches[0][1])
+				if err != nil {
+					log.Warnln("Error reading git ref:", err)
+				} else {
+					release = string(read)
+				}
+				break
+			}
 		}
 	}
 }
@@ -247,9 +278,10 @@ func authenticate(stream *smux.Stream) error {
 		hostname = "unknown"
 	}
 	am := wormhole.AuthMessage{
-		Token:  os.Getenv("FLY_TOKEN"),
-		Name:   hostname,
-		Client: "wormhole " + version,
+		Token:   flyToken,
+		Name:    hostname,
+		Client:  "wormhole " + version,
+		Release: release,
 	}
 	buf, err := msgpack.Marshal(am)
 	if err != nil {

@@ -13,6 +13,7 @@ type Response struct {
 	Errors []string
 }
 
+// AwaitResponse ...
 func AwaitResponse(stream io.ReadWriteCloser) (resp *Response, err error) {
 	buf := make([]byte, 1024)
 	nr, err := stream.Read(buf)
