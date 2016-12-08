@@ -28,8 +28,12 @@ var (
 	smuxConfig     *smux.Config
 	controlStream  *smux.Stream
 	cmd            *exec.Cmd
-	// VERSION Handled by build flag
-	VERSION = "latest"
+
+	// passphrase Replaced during build with a flag
+	passphrase string
+
+	// version Handled by build flag
+	version string
 )
 
 func init() {
@@ -41,6 +45,15 @@ func init() {
 	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
 		remoteEndpoint = ":10000"
+	}
+	if version == "" {
+		version = "latest"
+	}
+	if passphrase == "" {
+		passphrase = os.Getenv("PASSPHRASE")
+		if passphrase == "" {
+			log.Fatalln("PASSPHRASE needs to be set")
+		}
 	}
 }
 
@@ -115,7 +128,8 @@ func main() {
 }
 
 func initializeConnection() (*smux.Session, error) {
-	kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, nil, 10, 3)
+	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:32])
+	kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, block, 10, 3)
 	if kcpconnErr != nil {
 		return nil, kcpconnErr
 	}
@@ -235,7 +249,7 @@ func authenticate(stream *smux.Stream) error {
 	am := wormhole.AuthMessage{
 		Token:  os.Getenv("FLY_TOKEN"),
 		Name:   hostname,
-		Client: "wormhole " + VERSION,
+		Client: "wormhole " + version,
 	}
 	buf, err := msgpack.Marshal(am)
 	if err != nil {

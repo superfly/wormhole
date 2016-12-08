@@ -27,6 +27,8 @@ var (
 	redisPool  *redis.Pool
 	smuxConfig *smux.Config
 	kcpln      *kcp.Listener
+	passphrase string
+	version    string
 )
 
 func init() {
@@ -59,11 +61,22 @@ func init() {
 	log.SetFormatter(textFormatter)
 
 	sessions = make(map[string]*Session)
+
+	if version == "" {
+		version = "latest"
+	}
+	if passphrase == "" {
+		passphrase = os.Getenv("PASSPHRASE")
+		if passphrase == "" {
+			log.Fatalln("PASSPHRASE needs to be set")
+		}
+	}
 }
 
 func main() {
 	go handleDeath()
-	ln, err := kcp.ListenWithOptions(":"+port, nil, 10, 3)
+	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:32])
+	ln, err := kcp.ListenWithOptions(":"+port, block, 10, 3)
 
 	if err = ln.SetDSCP(wormhole.DSCP); err != nil {
 		log.Warnln("SetDSCP:", err)

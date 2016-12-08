@@ -48,6 +48,9 @@ docker run --rm \
 
 docker build -t $base_image_name .
 
+# clean up
+rm -f ./app
+
 declare -a tag_versions=("${major}" "${major}.${minor}" "${major}.${minor}.${patch}")
 for i in "${tag_versions[@]}"; do
   echo "Tagging and pushing ${base_image_name}:${i}"
