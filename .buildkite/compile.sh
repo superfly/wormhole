@@ -9,10 +9,7 @@ if [[ "$unamestr" == 'Darwin' ]]; then
 fi
 
 VERSION=${VERSION:-"latest"}
-if [ "$PASSPHRASE" = "" ]; then
-   echo "Need to set PASSPHRASE"
-   exit 1
-fi
+[ -z "$PASSPHRASE" ] && echo "Need to set PASSPHRASE" && exit 1;
 
 echo "Compiling version: ${VERSION}"
 
