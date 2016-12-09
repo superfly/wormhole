@@ -50,7 +50,7 @@ func (session *Session) RegisterConnection(t time.Time) error {
 	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), session.ID)
 	redisConn.Send("SADD", "node:"+nodeID+":sessions", session.ID)
 	redisConn.Send("SADD", "backend:"+session.BackendID+":sessions", session.ID)
-	redisConn.Send("ZADD", "backend:"+session.BackendID+":sessions", "NX", timeToScore(t), session.Release)
+	redisConn.Send("ZADD", "backend:"+session.BackendID+":releases", "NX", timeToScore(t), session.Release)
 	_, err := redisConn.Do("EXEC")
 
 	return err
