@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	git "gopkg.in/libgit2/git2go.v22"
+	git "gopkg.in/src-d/go-git.v4"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/jpillora/backoff"
@@ -84,7 +84,7 @@ func computeRelease() {
 
 	if _, err := os.Stat(".git"); !os.IsNotExist(err) {
 		release.VCSType = "git"
-		repo, err := git.OpenRepository(".")
+		repo, err := git.NewFilesystemRepository(".git")
 		if err != nil {
 			log.Warnln("Could not open repository:", err)
 			return
@@ -95,18 +95,18 @@ func computeRelease() {
 			return
 		}
 
-		oid := ref.Target()
+		oid := ref.Hash()
 		release.VCSRevision = oid.String()
-		tip, err := repo.LookupCommit(oid)
+		tip, err := repo.Commit(oid)
 		if err != nil {
 			log.Warnln("Could not get current commit:", err)
 			return
 		}
-		author := tip.Author()
+		author := tip.Author
 		release.VCSRevisionAuthorEmail = author.Email
 		release.VCSRevisionAuthorName = author.Name
 		release.VCSRevisionTime = author.When
-		release.VCSRevisionMessage = tip.Message()
+		release.VCSRevisionMessage = tip.Message
 	}
 	if release.ID == "" && release.VCSRevision != "" {
 		release.ID = release.VCSRevision
