@@ -26,7 +26,6 @@ const (
 )
 
 var (
-	// Set a build time
 	passphrase string
 	version    string
 

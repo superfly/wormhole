@@ -35,19 +35,14 @@ echo "+++ Building and pushing to Docker Hub"
 
 base_image_name="flyio/wormhole"
 
+yes | cp -f pkg/wormhole_linux_amd64 app
+docker build -t $base_image_name .
+
 semver=${BUILDKITE_TAG:1}
 IFS='.'; version_parts=($semver); unset IFS
 major=${version_parts[0]}
 minor=${version_parts[1]}
 patch=${version_parts[2]}
-
-docker run --rm \
-  -v $(pwd):/go/src/github.com/superfly/wormhole \
-  -e CGO_ENABLED=0 -e GOOS=linux \
-  golang \
-  go build -a -o /go/src/github.com/superfly/wormhole/app github.com/superfly/wormhole/cmd/wormhole
-
-docker build -t $base_image_name .
 
 # clean up
 rm -f ./app
