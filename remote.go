@@ -26,8 +26,10 @@ var (
 )
 
 // StartRemote ...
-func StartRemote() {
-	ensureEnvironment()
+func StartRemote(pass, ver string) {
+	passphrase = pass
+	version = ver
+	ensureRemoteEnvironment()
 	go handleDeath()
 	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:32])
 	ln, err := kcp.ListenWithOptions(":"+listenPort, block, 10, 3)
@@ -62,7 +64,8 @@ func StartRemote() {
 	log.Println("Stopping server KCP...")
 }
 
-func ensureEnvironment() {
+func ensureRemoteEnvironment() {
+	ensureEnvironment()
 	if listenPort == "" {
 		listenPort = "10000"
 	}
@@ -77,17 +80,6 @@ func ensureEnvironment() {
 	}
 
 	sessions = make(map[string]*Session)
-
-	if version == "" {
-		version = "latest"
-	}
-	if passphrase == "" {
-		passphrase = os.Getenv("PASSPHRASE")
-		if passphrase == "" {
-			log.Fatalln("PASSPHRASE needs to be set")
-		}
-	}
-
 }
 
 func setRemoteConnOptions(kcpconn *kcp.UDPSession) {

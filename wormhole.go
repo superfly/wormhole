@@ -35,12 +35,6 @@ var (
 )
 
 func init() {
-	if passphrase == "" {
-		passphrase = os.Getenv("PASSPHRASE")
-		if passphrase == "" {
-			log.Fatalln("PASSPHRASE needs to be set")
-		}
-	}
 	if logLevel == "" {
 		log.SetLevel(log.InfoLevel)
 	} else if logLevel == "debug" {
@@ -53,6 +47,18 @@ func init() {
 	smuxConfig = smux.DefaultConfig()
 	smuxConfig.MaxReceiveBuffer = MaxBuffer
 	smuxConfig.KeepAliveInterval = KeepAlive * time.Second
+}
+
+func ensureEnvironment() {
+	if passphrase == "" {
+		passphrase = os.Getenv("PASSPHRASE")
+		if passphrase == "" {
+			log.Fatalln("PASSPHRASE needs to be set")
+		}
+	}
+	if version == "" {
+		version = "latest"
+	}
 }
 
 // OutputSNMP ...

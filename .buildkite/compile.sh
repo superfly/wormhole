@@ -13,10 +13,11 @@ VERSION=${VERSION:-"latest"}
 
 echo "Compiling version: ${VERSION}"
 
-LDFLAGS="-X 'wormhole.version=$VERSION' -X 'wormhole.passphrase=$PASSPHRASE' -s -w"
+LDFLAGS="-X 'main.version=$VERSION' -X 'main.passphrase=$PASSPHRASE' -s -w"
 GCFLAGS=""
 
-mkdir -p pkg
+# Cleanup
+rm -rf pkg && mkdir -p pkg
 
 OSES=(linux darwin windows freebsd)
 ARCHS=(amd64 386)

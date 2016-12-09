@@ -34,6 +34,7 @@ var (
 )
 
 func ensureLocalEnvironment() {
+	ensureEnvironment()
 	if flyToken == "" {
 		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
 	}
@@ -54,9 +55,6 @@ func ensureLocalEnvironment() {
 	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
 		remoteEndpoint = ":10000"
-	}
-	if version == "" {
-		version = "latest"
 	}
 	computeRelease()
 }
@@ -147,7 +145,9 @@ func runProgram(program string) (localPort string, err error) {
 }
 
 // StartLocal ...
-func StartLocal() {
+func StartLocal(pass, ver string) {
+	passphrase = pass
+	version = ver
 	ensureLocalEnvironment()
 	args := os.Args[1:]
 	if len(args) > 0 {

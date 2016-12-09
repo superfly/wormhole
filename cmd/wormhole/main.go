@@ -1,4 +1,5 @@
-package main // import "github.com/superfly/wormhole/cmd/wormhole"
+package main
+
 import (
 	"flag"
 
@@ -6,14 +7,16 @@ import (
 )
 
 var (
+	passphrase string
+	version    string
 	serverMode = flag.Bool("server", false, "Run the wormhole in server mode.")
 )
 
 func main() {
 	flag.Parse()
 	if *serverMode {
-		wormhole.StartRemote()
+		wormhole.StartRemote(passphrase, version)
 	} else {
-		wormhole.StartLocal()
+		wormhole.StartLocal(passphrase, version)
 	}
 }
