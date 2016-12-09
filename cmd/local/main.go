@@ -71,12 +71,16 @@ func computeRelease() {
 	if file, err := os.Open(".git/HEAD"); err == nil {
 		defer file.Close()
 		scanner := bufio.NewScanner(file)
-		r, _ := regexp.Compile("^ref: (.+)")
+		refRegexp, _ := regexp.Compile("^ref: (.+)")
+		shaRegexp, _ := regexp.Compile("^([a-zA-Z0-9]*)$")
 		for scanner.Scan() {
 			txt := scanner.Text()
-			if r.MatchString(txt) {
-				matches := r.FindAllStringSubmatch(txt, -1)
-				read, err := ioutil.ReadFile(".git/" + matches[0][1])
+			if shaRegexp.MatchString(txt) {
+				release = shaRegexp.FindAllStringSubmatch(txt, -1)[0][1]
+				break
+			}
+			if refRegexp.MatchString(txt) {
+				read, err := ioutil.ReadFile(".git/" + refRegexp.FindAllStringSubmatch(txt, -1)[0][1])
 				if err != nil {
 					log.Warnln("Error reading git ref:", err)
 				} else {
