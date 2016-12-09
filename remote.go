@@ -1,4 +1,4 @@
-package main // import "github.com/superfly/wormhole/cmd/remote"
+package wormhole
 
 import (
 	"errors"
@@ -9,82 +9,36 @@ import (
 	"syscall"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"github.com/superfly/wormhole"
 	kcp "github.com/xtaci/kcp-go"
 	"github.com/xtaci/smux"
-
-	log "github.com/Sirupsen/logrus"
 )
 
 var (
-	port       = os.Getenv("PORT")
+	listenPort = os.Getenv("PORT")
 	nodeID     = os.Getenv("NODE_ID")
 	redisURL   = os.Getenv("REDIS_URL")
-	logLevel   = os.Getenv("LOG_LEVEL")
 	localhost  = os.Getenv("LOCALHOST")
 	sessions   map[string]*Session
 	redisPool  *redis.Pool
-	smuxConfig *smux.Config
 	kcpln      *kcp.Listener
-	passphrase string
-	version    string
 )
 
-func init() {
-	if port == "" {
-		port = "10000"
-	}
-	if redisURL == "" {
-		panic("REDIS_URL is required.")
-	}
-
-	redisPool = newRedisPool(redisURL)
-
-	if logLevel == "" {
-		log.SetLevel(log.InfoLevel)
-	} else if logLevel == "debug" {
-		log.SetLevel(log.DebugLevel)
-	}
-
-	if nodeID == "" {
-		nodeID, _ = os.Hostname()
-	}
-	// smux conf
-	smuxConfig = smux.DefaultConfig()
-	smuxConfig.MaxReceiveBuffer = wormhole.MaxBuffer
-	smuxConfig.KeepAliveInterval = wormhole.KeepAlive * time.Second
-	// smuxConfig.KeepAliveTimeout = 5 * time.Second
-
-	// logging
-	textFormatter := &log.TextFormatter{FullTimestamp: true}
-	log.SetFormatter(textFormatter)
-
-	sessions = make(map[string]*Session)
-
-	if version == "" {
-		version = "latest"
-	}
-	if passphrase == "" {
-		passphrase = os.Getenv("PASSPHRASE")
-		if passphrase == "" {
-			log.Fatalln("PASSPHRASE needs to be set")
-		}
-	}
-}
-
-func main() {
+// StartRemote ...
+func StartRemote() {
+	ensureEnvironment()
 	go handleDeath()
 	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:32])
-	ln, err := kcp.ListenWithOptions(":"+port, block, 10, 3)
+	ln, err := kcp.ListenWithOptions(":"+listenPort, block, 10, 3)
 
-	if err = ln.SetDSCP(wormhole.DSCP); err != nil {
+	if err = ln.SetDSCP(DSCP); err != nil {
 		log.Warnln("SetDSCP:", err)
 	}
-	if err = ln.SetReadBuffer(wormhole.MaxBuffer); err != nil {
+	if err = ln.SetReadBuffer(MaxBuffer); err != nil {
 		log.Fatalln("SetReadBuffer:", err)
 	}
-	if err = ln.SetWriteBuffer(wormhole.MaxBuffer); err != nil {
+	if err = ln.SetWriteBuffer(MaxBuffer); err != nil {
 		log.Fatalln("SetWriteBuffer:", err)
 	}
 	kcpln = ln
@@ -94,7 +48,7 @@ func main() {
 	defer kcpln.Close()
 	log.Println("Listening on", kcpln.Addr().String())
 
-	go wormhole.DebugSNMP()
+	go DebugSNMP()
 
 	for {
 		kcpconn, err := kcpln.AcceptKCP()
@@ -108,18 +62,46 @@ func main() {
 	log.Println("Stopping server KCP...")
 }
 
-func setConnOptions(kcpconn *kcp.UDPSession) {
+func ensureEnvironment() {
+	if listenPort == "" {
+		listenPort = "10000"
+	}
+	if redisURL == "" {
+		log.Fatalln("REDIS_URL is required.")
+	}
+
+	redisPool = newRedisPool(redisURL)
+
+	if nodeID == "" {
+		nodeID, _ = os.Hostname()
+	}
+
+	sessions = make(map[string]*Session)
+
+	if version == "" {
+		version = "latest"
+	}
+	if passphrase == "" {
+		passphrase = os.Getenv("PASSPHRASE")
+		if passphrase == "" {
+			log.Fatalln("PASSPHRASE needs to be set")
+		}
+	}
+
+}
+
+func setRemoteConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(wormhole.NoDelay, wormhole.Interval, wormhole.Resend, wormhole.NoCongestion)
+	kcpconn.SetNoDelay(NoDelay, Interval, Resend, NoCongestion)
 	kcpconn.SetMtu(1350)
 	kcpconn.SetWindowSize(128, 1024)
 	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(wormhole.KeepAlive)
+	kcpconn.SetKeepAlive(KeepAlive)
 }
 
 func handleConn(kcpconn *kcp.UDPSession) {
 	defer kcpconn.Close()
-	setConnOptions(kcpconn)
+	setRemoteConnOptions(kcpconn)
 
 	mux, err := smux.Server(kcpconn, smuxConfig)
 	if err != nil {
@@ -221,7 +203,7 @@ func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
 	}
 	log.Debug("Opened a stream...")
 
-	go wormhole.CopyCloseIO(tcpConn, stream)
+	go CopyCloseIO(tcpConn, stream)
 	return nil
 }
 

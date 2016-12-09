@@ -2,10 +2,12 @@ package wormhole
 
 import (
 	"io"
-	"log"
+	"os"
 	"time"
 
+	log "github.com/Sirupsen/logrus"
 	kcp "github.com/xtaci/kcp-go"
+	"github.com/xtaci/smux"
 )
 
 // Constants, useful to both server and client
@@ -22,6 +24,30 @@ const (
 	KCPParity = 3
 	DSCP      = 0
 )
+
+var (
+	// Set a build time
+	passphrase string
+	version    string
+
+	logLevel   = os.Getenv("LOG_LEVEL")
+	smuxConfig *smux.Config
+)
+
+func init() {
+	if logLevel == "" {
+		log.SetLevel(log.InfoLevel)
+	} else if logLevel == "debug" {
+		log.SetLevel(log.DebugLevel)
+	}
+	// logging
+	textFormatter := &log.TextFormatter{FullTimestamp: true}
+	log.SetFormatter(textFormatter)
+
+	smuxConfig = smux.DefaultConfig()
+	smuxConfig.MaxReceiveBuffer = MaxBuffer
+	smuxConfig.KeepAliveInterval = KeepAlive * time.Second
+}
 
 // OutputSNMP ...
 func OutputSNMP() {

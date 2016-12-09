@@ -1,4 +1,4 @@
-package main
+package wormhole
 
 import "github.com/garyburd/redigo/redis"
 

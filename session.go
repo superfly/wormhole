@@ -1,4 +1,4 @@
-package main
+package wormhole
 
 import (
 	"errors"
@@ -10,7 +10,6 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/rs/xid"
-	"github.com/superfly/wormhole"
 	"github.com/xtaci/smux"
 )
 
@@ -30,7 +29,7 @@ type Session struct {
 	ClientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
-	Release *wormhole.Release
+	Release *Release
 
 	stream *smux.Stream
 	mux    *smux.Session
@@ -130,7 +129,7 @@ func (session *Session) setStream(stream *smux.Stream) (err error) {
 
 // RequireAuthentication ...
 func (session *Session) RequireAuthentication() error {
-	var am wormhole.AuthMessage
+	var am AuthMessage
 	log.Println("Waiting for auth message...")
 	buf := make([]byte, 1024)
 	nr, err := session.stream.Read(buf)
@@ -142,7 +141,7 @@ func (session *Session) RequireAuthentication() error {
 		return errors.New("unparsable auth message")
 	}
 
-	var resp wormhole.Response
+	var resp Response
 
 	session.Client = am.Client
 	session.NodeID = nodeID
@@ -172,7 +171,7 @@ func (session *Session) RequireAuthentication() error {
 	return nil
 }
 
-func (session *Session) sendResponse(resp *wormhole.Response) error {
+func (session *Session) sendResponse(resp *Response) error {
 	buf, err := msgpack.Marshal(resp)
 	if err != nil {
 		return errors.New("error marshalling response: " + err.Error())
@@ -186,7 +185,7 @@ func (session *Session) sendResponse(resp *wormhole.Response) error {
 
 // LivenessLoop ...
 func (session *Session) LivenessLoop() {
-	err := wormhole.InitPing(session.stream)
+	err := InitPing(session.stream)
 	if err != nil {
 		log.Errorln("PING error", session.stream.RemoteAddr().String(), "because:", err)
 		session.mux.Close()

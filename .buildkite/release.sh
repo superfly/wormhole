@@ -33,7 +33,7 @@ $GHR $BUILDKITE_TAG pkg/* --commit $BUILDKITE_COMMIT \
 
 echo "+++ Building and pushing to Docker Hub"
 
-base_image_name="flyio/wormhole-local"
+base_image_name="flyio/wormhole"
 
 semver=${BUILDKITE_TAG:1}
 IFS='.'; version_parts=($semver); unset IFS
@@ -45,7 +45,7 @@ docker run --rm \
   -v $(pwd):/go/src/github.com/superfly/wormhole \
   -e CGO_ENABLED=0 -e GOOS=linux \
   golang \
-  go build -a -o /go/src/github.com/superfly/wormhole/app github.com/superfly/wormhole/cmd/local
+  go build -a -o /go/src/github.com/superfly/wormhole/app github.com/superfly/wormhole/cmd/wormhole
 
 docker build -t $base_image_name .
 

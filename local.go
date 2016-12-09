@@ -1,4 +1,4 @@
-package main // import "github.com/superfly/wormhole/cmd/local"
+package wormhole
 
 import (
 	"errors"
@@ -19,27 +19,21 @@ import (
 	"github.com/xtaci/smux"
 
 	log "github.com/Sirupsen/logrus"
-
-	"github.com/superfly/wormhole"
 )
 
 var (
 	localEndpoint  = os.Getenv("LOCAL_ENDPOINT")
 	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
-	smuxConfig     *smux.Config
 	controlStream  *smux.Stream
 	cmd            *exec.Cmd
 	flyToken       = os.Getenv("FLY_TOKEN")
 
-	passphrase string
-	version    string
-
 	releaseIDVar   = os.Getenv("FLY_RELEASE_ID_VAR")
 	releaseDescVar = os.Getenv("FLY_RELEASE_DESC_VAR")
-	release        = &wormhole.Release{}
+	release        = &Release{}
 )
 
-func init() {
+func ensureLocalEnvironment() {
 	if flyToken == "" {
 		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
 	}
@@ -53,9 +47,9 @@ func init() {
 	}
 
 	smuxConfig = smux.DefaultConfig()
-	smuxConfig.MaxReceiveBuffer = wormhole.MaxBuffer
-	smuxConfig.KeepAliveInterval = wormhole.KeepAlive * time.Second
-	// smuxConfig.KeepAliveTimeout = wormhole.Interval * time.Second
+	smuxConfig.MaxReceiveBuffer = MaxBuffer
+	smuxConfig.KeepAliveInterval = KeepAlive * time.Second
+	// smuxConfig.KeepAliveTimeout = Interval * time.Second
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
@@ -117,15 +111,15 @@ func computeRelease() {
 	log.Println("current release:", release)
 }
 
-func runProgram(program string) (port string, err error) {
+func runProgram(program string) (localPort string, err error) {
 	cs := []string{"/bin/sh", "-c", program}
 	cmd = exec.Command(cs[0], cs[1:]...)
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	port = os.Getenv("PORT")
-	if port == "" {
-		port = "5000"
+	localPort = os.Getenv("PORT")
+	if localPort == "" {
+		localPort = "5000"
 		cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", 5000))
 	} else {
 		cmd.Env = os.Environ()
@@ -158,21 +152,23 @@ func runProgram(program string) (port string, err error) {
 	return
 }
 
-func main() {
+// StartLocal ...
+func StartLocal() {
+	ensureLocalEnvironment()
 	args := os.Args[1:]
 	if len(args) > 0 {
-		port, err := runProgram(strings.Join(args, " "))
+		localPort, err := runProgram(strings.Join(args, " "))
 		if err != nil {
 			log.Errorln("Error running program:", err)
 			return
 		}
-		localEndpoint = "127.0.0.1:" + port
+		localEndpoint = "127.0.0.1:" + localPort
 	}
 
 	b := &backoff.Backoff{
 		Max: 2 * time.Minute,
 	}
-	go wormhole.DebugSNMP()
+	go DebugSNMP()
 	for {
 		mux, err := initializeConnection()
 		if err != nil {
@@ -231,7 +227,7 @@ func handshakeConnection(mux *smux.Session) (*smux.Stream, error) {
 }
 
 func stayAlive() {
-	err := wormhole.InitPong(controlStream)
+	err := InitPong(controlStream)
 	if err != nil {
 		log.Errorln("PONG error:", err)
 	}
@@ -306,7 +302,7 @@ func authenticate(stream *smux.Stream) error {
 		log.Debugln("Could not get hostname:", err)
 		hostname = "unknown"
 	}
-	am := wormhole.AuthMessage{
+	am := AuthMessage{
 		Token:   flyToken,
 		Name:    hostname,
 		Client:  "wormhole " + version,
@@ -323,7 +319,7 @@ func authenticate(stream *smux.Stream) error {
 	}
 
 	log.Debugln("Waiting for authentication answer...")
-	resp, err := wormhole.AwaitResponse(stream)
+	resp, err := AwaitResponse(stream)
 	if err != nil {
 		return errors.New("error waiting for authentication response: " + err.Error())
 	}
@@ -348,28 +344,28 @@ func handleStream(stream *smux.Stream) (err error) {
 
 	log.Debugln("dialed local connection")
 
-	if err = localConn.(*net.TCPConn).SetReadBuffer(wormhole.MaxBuffer); err != nil {
+	if err = localConn.(*net.TCPConn).SetReadBuffer(MaxBuffer); err != nil {
 		log.Errorln("TCP SetReadBuffer error:", err)
 	}
-	if err = localConn.(*net.TCPConn).SetWriteBuffer(wormhole.MaxBuffer); err != nil {
+	if err = localConn.(*net.TCPConn).SetWriteBuffer(MaxBuffer); err != nil {
 		log.Errorln("TCP SetWriteBuffer error:", err)
 	}
 
 	log.Debugln("local connection settings has been set...")
 
-	err = wormhole.CopyCloseIO(localConn, stream)
+	err = CopyCloseIO(localConn, stream)
 	return err
 }
 
 func setConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(wormhole.NoDelay, wormhole.Interval, wormhole.Resend, wormhole.NoCongestion)
+	kcpconn.SetNoDelay(NoDelay, Interval, Resend, NoCongestion)
 	kcpconn.SetMtu(1350)
 	kcpconn.SetWindowSize(128, 1024)
 	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(wormhole.KeepAlive)
+	kcpconn.SetKeepAlive(KeepAlive)
 
-	if err := kcpconn.SetDSCP(wormhole.DSCP); err != nil {
+	if err := kcpconn.SetDSCP(DSCP); err != nil {
 		log.Errorln("SetDSCP:", err)
 	}
 	if err := kcpconn.SetReadBuffer(smuxConfig.MaxReceiveBuffer); err != nil {
