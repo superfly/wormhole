@@ -1,5 +1,5 @@
-hash: 7f7e13e711fb310ac138ea6cee94fe51df691c9508c2629559ccd4241c389df2
-updated: 2016-12-08T17:41:56.428437863-06:00
+hash: 847381c85ba02eb858137051eb1c552a55e92b8c5ef823e1a03c13641a7ac825
+updated: 2016-12-09T09:47:33.428223495-06:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -64,6 +64,8 @@ imports:
   - internal/log
   - internal/modules
   - internal/remote_api
+- name: gopkg.in/libgit2/git2go.v22
+  version: 41ad00f868e7dfcdb04c7538f27350d400f710a3
 - name: gopkg.in/vmihailenco/msgpack.v2
   version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
   subpackages:

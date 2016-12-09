@@ -1,19 +1,17 @@
 package main // import "github.com/superfly/wormhole/cmd/local"
 
 import (
-	"bufio"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
 	"os/signal"
-	"regexp"
 	"strings"
 	"syscall"
 	"time"
 
+	git "gopkg.in/libgit2/git2go.v22"
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/jpillora/backoff"
@@ -36,13 +34,24 @@ var (
 	passphrase string
 	version    string
 
-	release string
+	releaseIDVar   = os.Getenv("FLY_RELEASE_ID_VAR")
+	releaseDescVar = os.Getenv("FLY_RELEASE_DESC_VAR")
+	release        = &wormhole.Release{}
 )
 
 func init() {
 	if flyToken == "" {
 		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
 	}
+
+	if releaseIDVar == "" {
+		releaseIDVar = "FLY_RELEASE_ID"
+	}
+
+	if releaseDescVar == "" {
+		releaseDescVar = "FLY_RELEASE_DESC"
+	}
+
 	smuxConfig = smux.DefaultConfig()
 	smuxConfig.MaxReceiveBuffer = wormhole.MaxBuffer
 	smuxConfig.KeepAliveInterval = wormhole.KeepAlive * time.Second
@@ -65,31 +74,47 @@ func init() {
 }
 
 func computeRelease() {
-	if release = os.Getenv("FLY_RELEASE"); release != "" {
-		return
+	if releaseID := os.Getenv(releaseIDVar); releaseID != "" {
+		release.ID = releaseID
 	}
-	if file, err := os.Open(".git/HEAD"); err == nil {
-		defer file.Close()
-		scanner := bufio.NewScanner(file)
-		refRegexp, _ := regexp.Compile("^ref: (.+)")
-		shaRegexp, _ := regexp.Compile("^([a-zA-Z0-9]*)$")
-		for scanner.Scan() {
-			txt := scanner.Text()
-			if shaRegexp.MatchString(txt) {
-				release = shaRegexp.FindAllStringSubmatch(txt, -1)[0][1]
-				break
-			}
-			if refRegexp.MatchString(txt) {
-				read, err := ioutil.ReadFile(".git/" + refRegexp.FindAllStringSubmatch(txt, -1)[0][1])
-				if err != nil {
-					log.Warnln("Error reading git ref:", err)
-				} else {
-					release = string(read)
-				}
-				break
-			}
+
+	if releaseDesc := os.Getenv(releaseDescVar); releaseDesc != "" {
+		release.Description = releaseDesc
+	}
+
+	if _, err := os.Stat(".git"); !os.IsNotExist(err) {
+		release.VCSType = "git"
+		repo, err := git.OpenRepository(".")
+		if err != nil {
+			log.Warnln("Could not open repository:", err)
+			return
 		}
+		ref, err := repo.Head()
+		if err != nil {
+			log.Warnln("Could not get repo head:", err)
+			return
+		}
+
+		oid := ref.Target()
+		release.VCSRevision = oid.String()
+		tip, err := repo.LookupCommit(oid)
+		if err != nil {
+			log.Warnln("Could not get current commit:", err)
+			return
+		}
+		author := tip.Author()
+		release.VCSRevisionAuthorEmail = author.Email
+		release.VCSRevisionAuthorName = author.Name
+		release.VCSRevisionTime = author.When
+		release.VCSRevisionMessage = tip.Message()
 	}
+	if release.ID == "" && release.VCSRevision != "" {
+		release.ID = release.VCSRevision
+	}
+	if release.Description == "" && release.VCSRevisionMessage != "" {
+		release.Description = release.VCSRevisionMessage
+	}
+	log.Println("current release:", release)
 }
 
 func runProgram(program string) (port string, err error) {

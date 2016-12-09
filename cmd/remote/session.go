@@ -30,7 +30,7 @@ type Session struct {
 	ClientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
-	Release string `redis:"release,omitempty"`
+	Release *wormhole.Release
 
 	stream *smux.Stream
 	mux    *smux.Session
@@ -50,7 +50,8 @@ func (session *Session) RegisterConnection(t time.Time) error {
 	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), session.ID)
 	redisConn.Send("SADD", "node:"+nodeID+":sessions", session.ID)
 	redisConn.Send("SADD", "backend:"+session.BackendID+":sessions", session.ID)
-	redisConn.Send("ZADD", "backend:"+session.BackendID+":releases", "NX", timeToScore(t), session.Release)
+	redisConn.Send("ZADD", "backend:"+session.BackendID+":releases", "NX", timeToScore(t), session.Release.ID)
+	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+session.BackendID+":release:"+session.Release.ID).AddFlat(session.Release)...)
 	_, err := redisConn.Do("EXEC")
 
 	return err

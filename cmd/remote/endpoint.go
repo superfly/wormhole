@@ -12,7 +12,7 @@ type Endpoint struct {
 	SessionID string `redis:"session_id"`
 	BackendID string `redis:"backend_id"`
 	Socket    string `redis:"socket"`
-	Release   string `redis:"release"`
+	ReleaseID string `redis:"release_id"`
 }
 
 // Register ...

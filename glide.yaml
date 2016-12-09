@@ -14,3 +14,4 @@ import:
 - package: github.com/rs/xid
 - package: github.com/klauspost/cpuid
   version: ~1.0.0
+- package: gopkg.in/libgit2/git2go.v22
