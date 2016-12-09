@@ -13,7 +13,7 @@ VERSION=${VERSION:-"latest"}
 
 echo "Compiling version: ${VERSION}"
 
-LDFLAGS="-X 'main.version=$VERSION' -X 'main.passphrase=$PASSPHRASE' -s -w"
+LDFLAGS="-X 'wormhole.version=$VERSION' -X 'wormhole.passphrase=$PASSPHRASE' -s -w"
 GCFLAGS=""
 
 mkdir -p pkg

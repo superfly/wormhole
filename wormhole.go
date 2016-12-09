@@ -35,6 +35,12 @@ var (
 )
 
 func init() {
+	if passphrase == "" {
+		passphrase = os.Getenv("PASSPHRASE")
+		if passphrase == "" {
+			log.Fatalln("PASSPHRASE needs to be set")
+		}
+	}
 	if logLevel == "" {
 		log.SetLevel(log.InfoLevel)
 	} else if logLevel == "debug" {

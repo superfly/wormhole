@@ -58,12 +58,6 @@ func ensureLocalEnvironment() {
 	if version == "" {
 		version = "latest"
 	}
-	if passphrase == "" {
-		passphrase = os.Getenv("PASSPHRASE")
-		if passphrase == "" {
-			log.Fatalln("PASSPHRASE needs to be set")
-		}
-	}
 	computeRelease()
 }
 
