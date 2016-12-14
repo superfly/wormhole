@@ -54,7 +54,7 @@ func ensureLocalEnvironment() {
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
-		remoteEndpoint = ":10000"
+		remoteEndpoint = "wormhole.fly.io:30000"
 	}
 	computeRelease()
 }
