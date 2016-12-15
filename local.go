@@ -157,6 +157,18 @@ func StartLocal(pass, ver string) {
 			return
 		}
 		localEndpoint = "127.0.0.1:" + localPort
+
+		for {
+			conn, err := net.Dial("tcp", localEndpoint)
+			if conn != nil {
+				conn.Close()
+			}
+			if err == nil {
+				log.Println("Local server is ready on:", localEndpoint)
+				break
+			}
+			time.Sleep(200 * time.Millisecond)
+		}
 	}
 
 	b := &backoff.Backoff{
