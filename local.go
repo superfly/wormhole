@@ -190,8 +190,8 @@ func StartLocal(pass, ver string) {
 }
 
 func initializeConnection() (*smux.Session, error) {
-	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:32])
-	kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, block, 10, 3)
+	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:SecretLength])
+	kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, block, KCPShards, KCPParity)
 	if kcpconnErr != nil {
 		return nil, kcpconnErr
 	}

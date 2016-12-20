@@ -23,6 +23,8 @@ const (
 	KCPShards = 10
 	KCPParity = 3
 	DSCP      = 0
+
+	SecretLength = 32
 )
 
 var (
@@ -53,6 +55,8 @@ func ensureEnvironment() {
 		passphrase = os.Getenv("PASSPHRASE")
 		if passphrase == "" {
 			log.Fatalln("PASSPHRASE needs to be set")
+		} else if len([]byte(passphrase)) < SecretLength {
+			log.Fatalf("PASSPHRASE needs to be at least %d bytes long\n", SecretLength)
 		}
 	}
 	if version == "" {

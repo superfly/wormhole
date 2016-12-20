@@ -31,8 +31,11 @@ func StartRemote(pass, ver string) {
 	version = ver
 	ensureRemoteEnvironment()
 	go handleDeath()
-	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:32])
-	ln, err := kcp.ListenWithOptions(":"+listenPort, block, 10, 3)
+	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:SecretLength])
+	ln, err := kcp.ListenWithOptions(":"+listenPort, block, KCPShards, KCPParity)
+	if err != nil {
+		log.Fatalln("KCP Server:", err)
+	}
 
 	if err = ln.SetDSCP(DSCP); err != nil {
 		log.Warnln("SetDSCP:", err)
