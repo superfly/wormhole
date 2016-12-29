@@ -1,5 +1,5 @@
-hash: a92274e7185f310de6065bc9bc358d50ec4af8b6330793f7ea6aaecaac7849ba
-updated: 2016-12-09T11:52:50.306819878-06:00
+hash: 08aedeaf92a4f77b05135fc59279ce49f776be8079135ade8023f7779eaee540
+updated: 2017-01-03T11:54:03.598515849-08:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -34,11 +34,11 @@ imports:
   - scanner
   - token
   - types
+- name: github.com/superfly/smux
+  version: c34bbd53d50f4b7450eb0a4c8bcfe6e576dd2014
+  vcs: git
 - name: github.com/xtaci/kcp-go
   version: 2a9a3f742303ffb01acd1704d198a805238135fd
-  vcs: git
-- name: github.com/xtaci/smux
-  version: b4a6fb87c6ff61e88833b551ce9247e09c9d71d2
   vcs: git
 - name: golang.org/x/crypto
   version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
@@ -48,7 +48,10 @@ imports:
   - curve25519
   - ed25519
   - ed25519/internal/edwards25519
+  - nacl/box
+  - nacl/secretbox
   - pbkdf2
+  - poly1305
   - salsa20
   - salsa20/salsa
   - ssh
@@ -80,35 +83,42 @@ imports:
   - internal/modules
   - internal/remote_api
 - name: gopkg.in/src-d/go-git.v4
-  version: 18f9bb53a0b3ded9cecf02bec1c08ed4833fb97c
+  version: ff449c6a58ef0d7416083f0dca67f49b591f9628
   subpackages:
   - config
-  - diff
   - plumbing
-  - plumbing/client
-  - plumbing/client/common
-  - plumbing/client/http
-  - plumbing/client/ssh
   - plumbing/format/config
   - plumbing/format/idxfile
   - plumbing/format/index
   - plumbing/format/objfile
   - plumbing/format/packfile
-  - plumbing/format/packp
-  - plumbing/format/packp/advrefs
-  - plumbing/format/packp/pktline
-  - plumbing/format/packp/ulreq
+  - plumbing/format/pktline
+  - plumbing/object
+  - plumbing/protocol/packp
+  - plumbing/protocol/packp/capability
+  - plumbing/protocol/packp/sideband
   - plumbing/storer
+  - plumbing/transport
+  - plumbing/transport/client
+  - plumbing/transport/file
+  - plumbing/transport/git
+  - plumbing/transport/http
+  - plumbing/transport/internal/common
+  - plumbing/transport/ssh
   - storage/filesystem
   - storage/filesystem/internal/dotgit
   - storage/memory
   - utils/binary
-  - utils/fs
-  - utils/fs/os
+  - utils/diff
+  - utils/ioutil
 - name: gopkg.in/vmihailenco/msgpack.v2
   version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
   subpackages:
   - codes
 - name: gopkg.in/warnings.v0
   version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
+- name: srcd.works/go-billy.v1
+  version: 6ca1fd6ba86f5929a23633719f5fd413a0046998
+  subpackages:
+  - os
 testImports: []

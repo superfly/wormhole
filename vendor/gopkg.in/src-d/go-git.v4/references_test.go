@@ -6,6 +6,7 @@ import (
 
 	"gopkg.in/src-d/go-git.v4/fixtures"
 	"gopkg.in/src-d/go-git.v4/plumbing"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
 
 	. "gopkg.in/check.v1"
 )
@@ -286,26 +287,20 @@ var referencesTests = [...]struct {
 	*/
 }
 
-func (s *ReferencesSuite) SetUpSuite(c *C) {
-	s.BaseSuite.SetUpSuite(c)
-	s.buildRepositories(c, fixtures.All().ByTag("packfile"))
-}
-
 func (s *ReferencesSuite) TestRevList(c *C) {
 	for _, t := range referencesTests {
-		repo, ok := s.Repositories[t.repo]
-		c.Assert(ok, Equals, true)
+		r := s.NewRepositoryFromPackfile(fixtures.ByURL(t.repo).One())
 
-		commit, err := repo.Commit(plumbing.NewHash(t.commit))
+		commit, err := r.Commit(plumbing.NewHash(t.commit))
 		c.Assert(err, IsNil)
 
-		revs, err := commit.References(t.path)
+		revs, err := References(commit, t.path)
 		c.Assert(err, IsNil)
 		c.Assert(len(revs), Equals, len(t.revs))
 
 		for i := range revs {
 			if revs[i].Hash.String() != t.revs[i] {
-				commit, err := repo.Commit(plumbing.NewHash(t.revs[i]))
+				commit, err := s.Repository.Commit(plumbing.NewHash(t.revs[i]))
 				c.Assert(err, IsNil)
 				equiv, err := equivalent(t.path, revs[i], commit)
 				c.Assert(err, IsNil)
@@ -321,7 +316,7 @@ func (s *ReferencesSuite) TestRevList(c *C) {
 }
 
 // same length is assumed
-func compareSideBySide(a []string, b []*Commit) string {
+func compareSideBySide(a []string, b []*object.Commit) string {
 	var buf bytes.Buffer
 	buf.WriteString("\t              EXPECTED                                          OBTAINED        ")
 	var sep string
@@ -358,14 +353,16 @@ func (s *ReferencesSuite) TestEquivalent(c *C) {
 }
 
 // returns the commits from a slice of hashes
-func (s *ReferencesSuite) commits(cc *C, repo string, hs ...string) []*Commit {
-	r, ok := s.Repositories[repo]
-	cc.Assert(ok, Equals, true)
-	result := make([]*Commit, 0, len(hs))
+func (s *ReferencesSuite) commits(c *C, repo string, hs ...string) []*object.Commit {
+	r := s.NewRepositoryFromPackfile(fixtures.ByURL(repo).One())
+
+	result := make([]*object.Commit, 0, len(hs))
 	for _, h := range hs {
-		c, err := r.Commit(plumbing.NewHash(h))
-		cc.Assert(err, IsNil)
-		result = append(result, c)
+		commit, err := r.Commit(plumbing.NewHash(h))
+		c.Assert(err, IsNil)
+
+		result = append(result, commit)
 	}
+
 	return result
 }

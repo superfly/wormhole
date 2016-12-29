@@ -1,18 +1,20 @@
-package packfile
+package packfile_test
 
 import (
 	"io"
-	"testing"
 
 	"gopkg.in/src-d/go-git.v4/fixtures"
 	"gopkg.in/src-d/go-git.v4/plumbing"
 	"gopkg.in/src-d/go-git.v4/plumbing/format/idxfile"
+	"gopkg.in/src-d/go-git.v4/plumbing/format/packfile"
+	"gopkg.in/src-d/go-git.v4/plumbing/storer"
+	"gopkg.in/src-d/go-git.v4/storage/filesystem"
 	"gopkg.in/src-d/go-git.v4/storage/memory"
+
+	fs "srcd.works/go-billy.v1/memory"
 
 	. "gopkg.in/check.v1"
 )
-
-func Test(t *testing.T) { TestingT(t) }
 
 type ReaderSuite struct {
 	fixtures.Suite
@@ -21,8 +23,8 @@ type ReaderSuite struct {
 var _ = Suite(&ReaderSuite{})
 
 func (s *ReaderSuite) TestNewDecodeNonSeekable(c *C) {
-	scanner := NewScanner(nil)
-	d, err := NewDecoder(scanner, nil)
+	scanner := packfile.NewScanner(nil)
+	d, err := packfile.NewDecoder(scanner, nil)
 
 	c.Assert(d, IsNil)
 	c.Assert(err, NotNil)
@@ -30,10 +32,10 @@ func (s *ReaderSuite) TestNewDecodeNonSeekable(c *C) {
 
 func (s *ReaderSuite) TestDecode(c *C) {
 	fixtures.Basic().ByTag("packfile").Test(c, func(f *fixtures.Fixture) {
-		scanner := NewScanner(f.Packfile())
+		scanner := packfile.NewScanner(f.Packfile())
 		storage := memory.NewStorage()
 
-		d, err := NewDecoder(scanner, storage)
+		d, err := packfile.NewDecoder(scanner, storage)
 		c.Assert(err, IsNil)
 		defer d.Close()
 
@@ -45,10 +47,28 @@ func (s *ReaderSuite) TestDecode(c *C) {
 	})
 }
 
+func (s *ReaderSuite) TestDecodeMultipleTimes(c *C) {
+	f := fixtures.Basic().ByTag("packfile").One()
+	scanner := packfile.NewScanner(f.Packfile())
+	storage := memory.NewStorage()
+
+	d, err := packfile.NewDecoder(scanner, storage)
+	c.Assert(err, IsNil)
+	defer d.Close()
+
+	ch, err := d.Decode()
+	c.Assert(err, IsNil)
+	c.Assert(ch, Equals, f.PackfileHash)
+
+	ch, err = d.Decode()
+	c.Assert(err, Equals, packfile.ErrAlreadyDecoded)
+	c.Assert(ch, Equals, plumbing.ZeroHash)
+}
+
 func (s *ReaderSuite) TestDecodeInMemory(c *C) {
 	fixtures.Basic().ByTag("packfile").Test(c, func(f *fixtures.Fixture) {
-		scanner := NewScanner(f.Packfile())
-		d, err := NewDecoder(scanner, nil)
+		scanner := packfile.NewScanner(f.Packfile())
+		d, err := packfile.NewDecoder(scanner, nil)
 		c.Assert(err, IsNil)
 
 		ch, err := d.Decode()
@@ -65,15 +85,44 @@ func (nsr nonSeekableReader) Read(b []byte) (int, error) {
 	return nsr.r.Read(b)
 }
 
-func (s *ReaderSuite) TestDecodeNoSeekable(c *C) {
+func (s *ReaderSuite) TestDecodeNoSeekableWithTxStorer(c *C) {
 	fixtures.Basic().ByTag("packfile").Test(c, func(f *fixtures.Fixture) {
 		reader := nonSeekableReader{
 			r: f.Packfile(),
 		}
 
-		scanner := NewScanner(reader)
-		storage := memory.NewStorage()
-		d, err := NewDecoder(scanner, storage)
+		scanner := packfile.NewScanner(reader)
+
+		var storage storer.EncodedObjectStorer = memory.NewStorage()
+		_, isTxStorer := storage.(storer.Transactioner)
+		c.Assert(isTxStorer, Equals, true)
+
+		d, err := packfile.NewDecoder(scanner, storage)
+		c.Assert(err, IsNil)
+		defer d.Close()
+
+		ch, err := d.Decode()
+		c.Assert(err, IsNil)
+		c.Assert(ch, Equals, f.PackfileHash)
+
+		assertObjects(c, storage, expectedHashes)
+	})
+}
+
+func (s *ReaderSuite) TestDecodeNoSeekableWithoutTxStorer(c *C) {
+	fixtures.Basic().ByTag("packfile").Test(c, func(f *fixtures.Fixture) {
+		reader := nonSeekableReader{
+			r: f.Packfile(),
+		}
+
+		scanner := packfile.NewScanner(reader)
+
+		var storage storer.EncodedObjectStorer
+		storage, _ = filesystem.NewStorage(fs.New())
+		_, isTxStorer := storage.(storer.Transactioner)
+		c.Assert(isTxStorer, Equals, false)
+
+		d, err := packfile.NewDecoder(scanner, storage)
 		c.Assert(err, IsNil)
 		defer d.Close()
 
@@ -122,10 +171,10 @@ var expectedHashes = []string{
 func (s *ReaderSuite) TestDecodeCRCs(c *C) {
 	f := fixtures.Basic().ByTag("ofs-delta").One()
 
-	scanner := NewScanner(f.Packfile())
+	scanner := packfile.NewScanner(f.Packfile())
 	storage := memory.NewStorage()
 
-	d, err := NewDecoder(scanner, storage)
+	d, err := packfile.NewDecoder(scanner, storage)
 	c.Assert(err, IsNil)
 	_, err = d.Decode()
 	c.Assert(err, IsNil)
@@ -140,8 +189,8 @@ func (s *ReaderSuite) TestDecodeCRCs(c *C) {
 
 func (s *ReaderSuite) TestReadObjectAt(c *C) {
 	f := fixtures.Basic().One()
-	scanner := NewScanner(f.Packfile())
-	d, err := NewDecoder(scanner, nil)
+	scanner := packfile.NewScanner(f.Packfile())
+	d, err := packfile.NewDecoder(scanner, nil)
 	c.Assert(err, IsNil)
 
 	// when the packfile is ref-delta based, the offsets are required
@@ -152,15 +201,15 @@ func (s *ReaderSuite) TestReadObjectAt(c *C) {
 
 	// the objects at reference 186, is a delta, so should be recall,
 	// without being read before.
-	obj, err := d.ReadObjectAt(186)
+	obj, err := d.DecodeObjectAt(186)
 	c.Assert(err, IsNil)
 	c.Assert(obj.Hash().String(), Equals, "6ecf0ef2c2dffb796033e5a02219af86ec6584e5")
 }
 
 func (s *ReaderSuite) TestOffsets(c *C) {
 	f := fixtures.Basic().One()
-	scanner := NewScanner(f.Packfile())
-	d, err := NewDecoder(scanner, nil)
+	scanner := packfile.NewScanner(f.Packfile())
+	d, err := packfile.NewDecoder(scanner, nil)
 	c.Assert(err, IsNil)
 
 	c.Assert(d.Offsets(), HasLen, 0)
@@ -173,8 +222,8 @@ func (s *ReaderSuite) TestOffsets(c *C) {
 
 func (s *ReaderSuite) TestSetOffsets(c *C) {
 	f := fixtures.Basic().One()
-	scanner := NewScanner(f.Packfile())
-	d, err := NewDecoder(scanner, nil)
+	scanner := packfile.NewScanner(f.Packfile())
+	d, err := packfile.NewDecoder(scanner, nil)
 	c.Assert(err, IsNil)
 
 	h := plumbing.NewHash("6ecf0ef2c2dffb796033e5a02219af86ec6584e5")
@@ -185,10 +234,18 @@ func (s *ReaderSuite) TestSetOffsets(c *C) {
 	c.Assert(o[h], Equals, int64(42))
 }
 
-func assertObjects(c *C, s *memory.Storage, expects []string) {
-	c.Assert(len(expects), Equals, len(s.Objects))
+func assertObjects(c *C, s storer.EncodedObjectStorer, expects []string) {
+
+	i, err := s.IterEncodedObjects(plumbing.AnyObject)
+	c.Assert(err, IsNil)
+
+	var count int
+	err = i.ForEach(func(plumbing.EncodedObject) error { count++; return nil })
+	c.Assert(err, IsNil)
+	c.Assert(count, Equals, len(expects))
+
 	for _, exp := range expects {
-		obt, err := s.Object(plumbing.AnyObject, plumbing.NewHash(exp))
+		obt, err := s.EncodedObject(plumbing.AnyObject, plumbing.NewHash(exp))
 		c.Assert(err, IsNil)
 		c.Assert(obt.Hash().String(), Equals, exp)
 	}
