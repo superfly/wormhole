@@ -1,6 +1,7 @@
 package wormhole
 
 import (
+	"encoding/hex"
 	"errors"
 	"net"
 	"net/url"
@@ -11,8 +12,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/smux"
 	kcp "github.com/xtaci/kcp-go"
-	"github.com/xtaci/smux"
 )
 
 var (
@@ -20,6 +21,7 @@ var (
 	nodeID     = os.Getenv("NODE_ID")
 	redisURL   = os.Getenv("REDIS_URL")
 	localhost  = os.Getenv("LOCALHOST")
+	privateKey = os.Getenv("PRIVATE_KEY")
 	sessions   map[string]*Session
 	redisPool  *redis.Pool
 	kcpln      *kcp.Listener
@@ -69,6 +71,18 @@ func StartRemote(pass, ver string) {
 
 func ensureRemoteEnvironment() {
 	ensureEnvironment()
+	if privateKey == "" {
+		log.Fatalln("PRIVATE_KEY is required.")
+	}
+	privateKeyBytes, err := hex.DecodeString(privateKey)
+	if err != nil {
+		log.Fatalf("PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
+	}
+	if len(privateKeyBytes) != SecretLength {
+		log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", SecretLength)
+	}
+	copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
+
 	if listenPort == "" {
 		listenPort = "10000"
 	}
@@ -98,7 +112,7 @@ func handleConn(kcpconn *kcp.UDPSession) {
 	defer kcpconn.Close()
 	setRemoteConnOptions(kcpconn)
 
-	mux, err := smux.Server(kcpconn, smuxConfig)
+	mux, err := smux.EncryptedServer(kcpconn, smuxConfig)
 	if err != nil {
 		log.Errorln(err)
 		return

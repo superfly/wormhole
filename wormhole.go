@@ -1,13 +1,14 @@
 package wormhole
 
 import (
+	"encoding/hex"
 	"io"
 	"os"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/superfly/smux"
 	kcp "github.com/xtaci/kcp-go"
-	"github.com/xtaci/smux"
 )
 
 // Constants, useful to both server and client
@@ -29,6 +30,7 @@ const (
 
 var (
 	passphrase string
+	publicKey  string
 	version    string
 
 	logLevel   = os.Getenv("LOG_LEVEL")
@@ -59,6 +61,20 @@ func ensureEnvironment() {
 			log.Fatalf("PASSPHRASE needs to be at least %d bytes long\n", SecretLength)
 		}
 	}
+	if publicKey == "" {
+		publicKey = os.Getenv("PUBLIC_KEY")
+		if publicKey == "" {
+			log.Fatalln("PUBLIC_KEY needs to be set")
+		}
+	}
+	publicKeyBytes, err := hex.DecodeString(publicKey)
+	if err != nil {
+		log.Fatalf("PUBLIC_KEY needs to be in hex format. Details: %s", err.Error())
+	}
+	if len(publicKeyBytes) != SecretLength {
+		log.Fatalf("PUBLIC_KEY needs to be %d bytes long\n", SecretLength)
+	}
+	copy(smuxConfig.ServerPublicKey[:], publicKeyBytes)
 	if version == "" {
 		version = "latest"
 	}

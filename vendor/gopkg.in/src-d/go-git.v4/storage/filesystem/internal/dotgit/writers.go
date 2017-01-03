@@ -9,21 +9,28 @@ import (
 	"gopkg.in/src-d/go-git.v4/plumbing/format/idxfile"
 	"gopkg.in/src-d/go-git.v4/plumbing/format/objfile"
 	"gopkg.in/src-d/go-git.v4/plumbing/format/packfile"
-	"gopkg.in/src-d/go-git.v4/utils/fs"
+
+	"srcd.works/go-billy.v1"
 )
 
+// PackWriter is a io.Writer that generates the packfile index simultaneously,
+// a packfile.Decoder is used with a file reader to read the file being written
+// this operation is synchronized with the write operations.
+// The packfile is written in a temp file, when Close is called this file
+// is renamed/moved (depends on the Filesystem implementation) to the final
+// location, if the PackWriter is not used, nothing is written
 type PackWriter struct {
 	Notify func(h plumbing.Hash, i idxfile.Idxfile)
 
-	fs       fs.Filesystem
-	fr, fw   fs.File
+	fs       billy.Filesystem
+	fr, fw   billy.File
 	synced   *syncedReader
 	checksum plumbing.Hash
 	index    idxfile.Idxfile
 	result   chan error
 }
 
-func newPackWrite(fs fs.Filesystem) (*PackWriter, error) {
+func newPackWrite(fs billy.Filesystem) (*PackWriter, error) {
 	fw, err := fs.TempFile(fs.Join(objectsPath, packPath), "tmp_pack_")
 	if err != nil {
 		return nil, err
@@ -72,34 +79,58 @@ func (w *PackWriter) buildIndex() {
 	w.result <- err
 }
 
-func (w *PackWriter) Write(p []byte) (n int, err error) {
+// waitBuildIndex waits until buildIndex function finishes, this can terminate
+// with a packfile.ErrEmptyPackfile, this means that nothing was written so we
+// ignore the error
+func (w *PackWriter) waitBuildIndex() error {
+	err := <-w.result
+	if err == packfile.ErrEmptyPackfile {
+		return nil
+	}
+
+	return err
+}
+
+func (w *PackWriter) Write(p []byte) (int, error) {
 	return w.synced.Write(p)
 }
 
+// Close closes all the file descriptors and save the final packfile, if nothing
+// was written, the tempfiles are deleted without writing a packfile.
 func (w *PackWriter) Close() error {
 	defer func() {
+		if w.Notify != nil {
+			w.Notify(w.checksum, w.index)
+		}
+
 		close(w.result)
 	}()
 
-	pipe := []func() error{
-		w.synced.Close,
-		func() error { return <-w.result },
-		w.fr.Close,
-		w.fw.Close,
-		w.save,
+	if err := w.synced.Close(); err != nil {
+		return err
 	}
 
-	for _, f := range pipe {
-		if err := f(); err != nil {
-			return err
-		}
+	if err := w.waitBuildIndex(); err != nil {
+		return err
 	}
 
-	if w.Notify != nil {
-		w.Notify(w.checksum, w.index)
+	if err := w.fr.Close(); err != nil {
+		return err
 	}
 
-	return nil
+	if err := w.fw.Close(); err != nil {
+		return err
+	}
+
+	if len(w.index.Entries) == 0 {
+		return w.clean()
+	}
+
+	return w.save()
+}
+
+func (w *PackWriter) clean() error {
+	return w.fs.Remove(w.fw.Filename())
 }
 
 func (w *PackWriter) save() error {
@@ -218,11 +249,11 @@ func (s *syncedReader) Close() error {
 
 type ObjectWriter struct {
 	objfile.Writer
-	fs fs.Filesystem
-	f  fs.File
+	fs billy.Filesystem
+	f  billy.File
 }
 
-func newObjectWriter(fs fs.Filesystem) (*ObjectWriter, error) {
+func newObjectWriter(fs billy.Filesystem) (*ObjectWriter, error) {
 	f, err := fs.TempFile(fs.Join(objectsPath, packPath), "tmp_obj_")
 	if err != nil {
 		return nil, err

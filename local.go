@@ -15,8 +15,8 @@ import (
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/jpillora/backoff"
+	"github.com/superfly/smux"
 	kcp "github.com/xtaci/kcp-go"
-	"github.com/xtaci/smux"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -34,6 +34,7 @@ var (
 )
 
 func ensureLocalEnvironment() {
+	smuxConfig = smux.DefaultConfig()
 	ensureEnvironment()
 	if flyToken == "" {
 		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
@@ -47,7 +48,6 @@ func ensureLocalEnvironment() {
 		releaseDescVar = "FLY_RELEASE_DESC"
 	}
 
-	smuxConfig = smux.DefaultConfig()
 	smuxConfig.MaxReceiveBuffer = MaxBuffer
 	smuxConfig.KeepAliveInterval = KeepAlive * time.Second
 	// smuxConfig.KeepAliveTimeout = Interval * time.Second
@@ -199,7 +199,7 @@ func initializeConnection() (*smux.Session, error) {
 
 	setConnOptions(kcpconn)
 
-	mux, err := smux.Client(kcpconn, smuxConfig)
+	mux, err := smux.EncryptedClient(kcpconn, smuxConfig)
 	if err != nil {
 		log.Errorln("Error creating multiplexed session:", err)
 		return nil, err

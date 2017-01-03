@@ -6,10 +6,13 @@ import (
 
 	"gopkg.in/src-d/go-git.v4/config"
 	"gopkg.in/src-d/go-git.v4/plumbing"
+	"gopkg.in/src-d/go-git.v4/plumbing/object"
+	"gopkg.in/src-d/go-git.v4/plumbing/protocol/packp/sideband"
 	"gopkg.in/src-d/go-git.v4/plumbing/storer"
 	"gopkg.in/src-d/go-git.v4/storage/filesystem"
 	"gopkg.in/src-d/go-git.v4/storage/memory"
-	osfs "gopkg.in/src-d/go-git.v4/utils/fs/os"
+
+	osfs "srcd.works/go-billy.v1/os"
 )
 
 var (
@@ -24,6 +27,11 @@ var (
 type Repository struct {
 	r map[string]*Remote
 	s Storer
+
+	// Progress is where the human readable information sent by the server is
+	// stored, if nil nothing is stored and the capability (if supported)
+	// no-progress, is sent to the server to avoid send this information
+	Progress sideband.Progress
 }
 
 // NewMemoryRepository creates a new repository, backed by a memory.Storage
@@ -52,6 +60,11 @@ func NewRepository(s Storer) (*Repository, error) {
 	}, nil
 }
 
+// Config return the repository config
+func (r *Repository) Config() (*config.Config, error) {
+	return r.s.Config()
+}
+
 // Remote return a remote if exists
 func (r *Repository) Remote(name string) (*Remote, error) {
 	cfg, err := r.s.Config()
@@ -64,7 +77,7 @@ func (r *Repository) Remote(name string) (*Remote, error) {
 		return nil, ErrRemoteNotFound
 	}
 
-	return newRemote(r.s, c), nil
+	return newRemote(r.s, r.Progress, c), nil
 }
 
 // Remotes return all the remotes
@@ -78,7 +91,7 @@ func (r *Repository) Remotes() ([]*Remote, error) {
 
 	var i int
 	for _, c := range cfg.Remotes {
-		remotes[i] = newRemote(r.s, c)
+		remotes[i] = newRemote(r.s, r.Progress, c)
 		i++
 	}
 
@@ -91,7 +104,7 @@ func (r *Repository) CreateRemote(c *config.RemoteConfig) (*Remote, error) {
 		return nil, err
 	}
 
-	remote := newRemote(r.s, c)
+	remote := newRemote(r.s, r.Progress, c)
 
 	cfg, err := r.s.Config()
 	if err != nil {
@@ -136,6 +149,12 @@ func (r *Repository) Clone(o *CloneOptions) error {
 		return err
 	}
 
+	// marks the repository as bare in the config, until we have Worktree, all
+	// the repository are bare
+	if err := r.setIsBare(true); err != nil {
+		return err
+	}
+
 	c := &config.RemoteConfig{
 		Name: o.RemoteName,
 		URL:  o.URL,
@@ -146,45 +165,70 @@ func (r *Repository) Clone(o *CloneOptions) error {
 		return err
 	}
 
-	if err = remote.Connect(); err != nil {
-		return err
-	}
-
-	defer remote.Disconnect()
-
-	if err := r.updateRemoteConfig(remote, o, c); err != nil {
-		return err
-	}
-
-	if err = remote.Fetch(&FetchOptions{Depth: o.Depth}); err != nil {
-		return err
-	}
-
-	head, err := remote.Ref(o.ReferenceName, true)
+	remoteRefs, err := remote.fetch(&FetchOptions{
+		RefSpecs: r.cloneRefSpec(o, c),
+		Depth:    o.Depth,
+	})
 	if err != nil {
 		return err
 	}
 
-	return r.createReferences(head)
+	head, err := storer.ResolveReference(remoteRefs, o.ReferenceName)
+	if err != nil {
+		return err
+	}
+
+	if err := r.createReferences(c.Fetch, o.ReferenceName, head); err != nil {
+		return err
+	}
+
+	return r.updateRemoteConfig(remote, o, c, head)
 }
 
-const refspecSingleBranch = "+refs/heads/%s:refs/remotes/%s/%[1]s"
+func (r *Repository) cloneRefSpec(o *CloneOptions,
+	c *config.RemoteConfig) []config.RefSpec {
 
-func (r *Repository) updateRemoteConfig(
-	remote *Remote, o *CloneOptions, c *config.RemoteConfig,
-) error {
+	if !o.SingleBranch {
+		return c.Fetch
+	}
+
+	var rs string
+
+	if o.ReferenceName == plumbing.HEAD {
+		rs = fmt.Sprintf(refspecSingleBranchHEAD, c.Name)
+	} else {
+		rs = fmt.Sprintf(refspecSingleBranch,
+			o.ReferenceName.Short(), c.Name)
+	}
+
+	return []config.RefSpec{config.RefSpec(rs)}
+}
+
+func (r *Repository) setIsBare(isBare bool) error {
+	cfg, err := r.s.Config()
+	if err != nil {
+		return err
+	}
+
+	cfg.Core.IsBare = isBare
+	return r.s.SetConfig(cfg)
+}
+
+const (
+	refspecSingleBranch     = "+refs/heads/%s:refs/remotes/%s/%[1]s"
+	refspecSingleBranchHEAD = "+HEAD:refs/remotes/%s/HEAD"
+)
+
+func (r *Repository) updateRemoteConfig(remote *Remote, o *CloneOptions,
+	c *config.RemoteConfig, head *plumbing.Reference) error {
+
 	if !o.SingleBranch {
 		return nil
 	}
 
-	head, err := storer.ResolveReference(remote.Info().Refs, o.ReferenceName)
-	if err != nil {
-		return err
-	}
-
-	c.Fetch = []config.RefSpec{
-		config.RefSpec(fmt.Sprintf(refspecSingleBranch, head.Name().Short(), c.Name)),
-	}
+	c.Fetch = []config.RefSpec{config.RefSpec(fmt.Sprintf(
+		refspecSingleBranch, head.Name().Short(), c.Name,
+	))}
 
 	cfg, err := r.s.Config()
 	if err != nil {
@@ -193,27 +237,64 @@ func (r *Repository) updateRemoteConfig(
 
 	cfg.Remotes[c.Name] = c
 	return r.s.SetConfig(cfg)
-
 }
 
-func (r *Repository) createReferences(ref *plumbing.Reference) error {
-	if !ref.IsBranch() {
-		// detached HEAD mode
-		head := plumbing.NewHashReference(plumbing.HEAD, ref.Hash())
+func (r *Repository) createReferences(spec []config.RefSpec,
+	headName plumbing.ReferenceName, resolvedHead *plumbing.Reference) error {
+
+	if !resolvedHead.IsBranch() {
+		// Detached HEAD mode
+		head := plumbing.NewHashReference(plumbing.HEAD, resolvedHead.Hash())
 		return r.s.SetReference(head)
 	}
 
-	if err := r.s.SetReference(ref); err != nil {
+	// Create local reference for the resolved head
+	if err := r.s.SetReference(resolvedHead); err != nil {
 		return err
 	}
 
-	head := plumbing.NewSymbolicReference(plumbing.HEAD, ref.Name())
-	return r.s.SetReference(head)
+	// Create local symbolic HEAD
+	head := plumbing.NewSymbolicReference(plumbing.HEAD, resolvedHead.Name())
+	if err := r.s.SetReference(head); err != nil {
+		return err
+	}
+
+	return r.createRemoteHeadReference(spec, resolvedHead)
+}
+
+func (r *Repository) createRemoteHeadReference(spec []config.RefSpec,
+	resolvedHead *plumbing.Reference) error {
+
+	// Create resolved HEAD reference with remote prefix if it does not
+	// exist. This is needed when using single branch and HEAD.
+	for _, rs := range spec {
+		name := resolvedHead.Name()
+		if !rs.Match(name) {
+			continue
+		}
+
+		name = rs.Dst(name)
+		_, err := r.s.Reference(name)
+		if err == plumbing.ErrReferenceNotFound {
+			ref := plumbing.NewHashReference(name, resolvedHead.Hash())
+			if err := r.s.SetReference(ref); err != nil {
+				return err
+			}
+
+			continue
+		}
+
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 // IsEmpty returns true if the repository is empty
 func (r *Repository) IsEmpty() (bool, error) {
-	iter, err := r.Refs()
+	iter, err := r.References()
 	if err != nil {
 		return false, err
 	}
@@ -236,161 +317,131 @@ func (r *Repository) Pull(o *PullOptions) error {
 		return err
 	}
 
-	if err = remote.Connect(); err != nil {
-		return err
-	}
-
-	defer remote.Disconnect()
-
-	head, err := remote.Ref(o.ReferenceName, true)
-	if err != nil {
-		return err
-	}
-
-	if err = remote.Connect(); err != nil {
-		return err
-	}
-
-	defer remote.Disconnect()
-
-	err = remote.Fetch(&FetchOptions{
+	remoteRefs, err := remote.fetch(&FetchOptions{
 		Depth: o.Depth,
 	})
-
 	if err != nil {
 		return err
 	}
 
-	return r.createReferences(head)
-}
-
-// Commit return the commit with the given hash
-func (r *Repository) Commit(h plumbing.Hash) (*Commit, error) {
-	commit, err := r.Object(plumbing.CommitObject, h)
+	head, err := storer.ResolveReference(remoteRefs, o.ReferenceName)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
-	return commit.(*Commit), nil
+	return r.createReferences(remote.c.Fetch, o.ReferenceName, head)
+}
+
+// Fetch fetches changes from a remote repository.
+func (r *Repository) Fetch(o *FetchOptions) error {
+	if err := o.Validate(); err != nil {
+		return err
+	}
+
+	remote, err := r.Remote(o.RemoteName)
+	if err != nil {
+		return err
+	}
+
+	return remote.Fetch(o)
+}
+
+// object.Commit return the commit with the given hash
+func (r *Repository) Commit(h plumbing.Hash) (*object.Commit, error) {
+	return object.GetCommit(r.s, h)
 }
 
 // Commits decode the objects into commits
-func (r *Repository) Commits() (*CommitIter, error) {
-	iter, err := r.s.IterObjects(plumbing.CommitObject)
+func (r *Repository) Commits() (*object.CommitIter, error) {
+	iter, err := r.s.IterEncodedObjects(plumbing.CommitObject)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewCommitIter(r, iter), nil
+	return object.NewCommitIter(r.s, iter), nil
 }
 
 // Tree return the tree with the given hash
-func (r *Repository) Tree(h plumbing.Hash) (*Tree, error) {
-	tree, err := r.Object(plumbing.TreeObject, h)
-	if err != nil {
-		return nil, err
-	}
-
-	return tree.(*Tree), nil
+func (r *Repository) Tree(h plumbing.Hash) (*object.Tree, error) {
+	return object.GetTree(r.s, h)
 }
 
 // Trees decodes the objects into trees
-func (r *Repository) Trees() (*TreeIter, error) {
-	iter, err := r.s.IterObjects(plumbing.TreeObject)
+func (r *Repository) Trees() (*object.TreeIter, error) {
+	iter, err := r.s.IterEncodedObjects(plumbing.TreeObject)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewTreeIter(r, iter), nil
+	return object.NewTreeIter(r.s, iter), nil
 }
 
 // Blob returns the blob with the given hash
-func (r *Repository) Blob(h plumbing.Hash) (*Blob, error) {
-	blob, err := r.Object(plumbing.BlobObject, h)
-	if err != nil {
-		return nil, err
-	}
-
-	return blob.(*Blob), nil
+func (r *Repository) Blob(h plumbing.Hash) (*object.Blob, error) {
+	return object.GetBlob(r.s, h)
 }
 
 // Blobs decodes the objects into blobs
-func (r *Repository) Blobs() (*BlobIter, error) {
-	iter, err := r.s.IterObjects(plumbing.BlobObject)
+func (r *Repository) Blobs() (*object.BlobIter, error) {
+	iter, err := r.s.IterEncodedObjects(plumbing.BlobObject)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewBlobIter(r, iter), nil
+	return object.NewBlobIter(r.s, iter), nil
 }
 
 // Tag returns a tag with the given hash.
-func (r *Repository) Tag(h plumbing.Hash) (*Tag, error) {
-	tag, err := r.Object(plumbing.TagObject, h)
-	if err != nil {
-		return nil, err
-	}
-
-	return tag.(*Tag), nil
+func (r *Repository) Tag(h plumbing.Hash) (*object.Tag, error) {
+	return object.GetTag(r.s, h)
 }
 
-// Tags returns a TagIter that can step through all of the annotated tags
+// Tags returns a object.TagIter that can step through all of the annotated tags
 // in the repository.
-func (r *Repository) Tags() (*TagIter, error) {
-	iter, err := r.s.IterObjects(plumbing.TagObject)
+func (r *Repository) Tags() (*object.TagIter, error) {
+	iter, err := r.s.IterEncodedObjects(plumbing.TagObject)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewTagIter(r, iter), nil
+	return object.NewTagIter(r.s, iter), nil
 }
 
 // Object returns an object with the given hash.
-func (r *Repository) Object(t plumbing.ObjectType, h plumbing.Hash) (Object, error) {
-	obj, err := r.s.Object(t, h)
+func (r *Repository) Object(t plumbing.ObjectType, h plumbing.Hash) (object.Object, error) {
+	obj, err := r.s.EncodedObject(t, h)
 	if err != nil {
 		if err == plumbing.ErrObjectNotFound {
 			return nil, ErrObjectNotFound
 		}
+
 		return nil, err
 	}
 
-	switch obj.Type() {
-	case plumbing.CommitObject:
-		commit := &Commit{r: r}
-		return commit, commit.Decode(obj)
-	case plumbing.TreeObject:
-		tree := &Tree{r: r}
-		return tree, tree.Decode(obj)
-	case plumbing.BlobObject:
-		blob := &Blob{}
-		return blob, blob.Decode(obj)
-	case plumbing.TagObject:
-		tag := &Tag{r: r}
-		return tag, tag.Decode(obj)
-	default:
-		return nil, plumbing.ErrInvalidType
-	}
+	return object.DecodeObject(r.s, obj)
 }
 
-// Objects returns an ObjectIter that can step through all of the annotated tags
+// Objects returns an object.ObjectIter that can step through all of the annotated tags
 // in the repository.
-func (r *Repository) Objects() (*ObjectIter, error) {
-	iter, err := r.s.IterObjects(plumbing.AnyObject)
+func (r *Repository) Objects() (*object.ObjectIter, error) {
+	iter, err := r.s.IterEncodedObjects(plumbing.AnyObject)
 	if err != nil {
 		return nil, err
 	}
 
-	return NewObjectIter(r, iter), nil
+	return object.NewObjectIter(r.s, iter), nil
 }
 
-// Head returns the reference where HEAD is pointing
+// Head returns the reference where HEAD is pointing to.
 func (r *Repository) Head() (*plumbing.Reference, error) {
 	return storer.ResolveReference(r.s, plumbing.HEAD)
 }
 
-// Ref returns the Hash pointing the given refName
-func (r *Repository) Ref(name plumbing.ReferenceName, resolved bool) (*plumbing.Reference, error) {
+// Reference returns the reference for a given reference name. If resolved is
+// true, any symbolic reference will be resolved.
+func (r *Repository) Reference(name plumbing.ReferenceName, resolved bool) (
+	*plumbing.Reference, error) {
+
 	if resolved {
 		return storer.ResolveReference(r.s, name)
 	}
@@ -398,7 +449,7 @@ func (r *Repository) Ref(name plumbing.ReferenceName, resolved bool) (*plumbing.
 	return r.s.Reference(name)
 }
 
-// Refs returns a map with all the References
-func (r *Repository) Refs() (storer.ReferenceIter, error) {
+// References returns a ReferenceIter for all references.
+func (r *Repository) References() (storer.ReferenceIter, error) {
 	return r.s.IterReferences()
 }

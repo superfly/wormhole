@@ -10,7 +10,7 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/rs/xid"
-	"github.com/xtaci/smux"
+	"github.com/superfly/smux"
 )
 
 const (

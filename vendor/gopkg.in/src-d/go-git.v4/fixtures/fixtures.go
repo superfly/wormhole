@@ -3,29 +3,30 @@ package fixtures
 import (
 	"fmt"
 	"go/build"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/alcortesm/tgz"
-
 	"gopkg.in/check.v1"
 	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/utils/fs"
-	osfs "gopkg.in/src-d/go-git.v4/utils/fs/os"
+
+	"github.com/alcortesm/tgz"
+	"srcd.works/go-billy.v1"
+	osfs "srcd.works/go-billy.v1/os"
 )
 
 var RootFolder = ""
 
 const DataFolder = "data"
 
-var folders []string
+var folders = make(map[string]bool, 0)
 
 var fixtures = Fixtures{{
 	Tags:         []string{"packfile", "ofs-delta", ".git"},
 	URL:          "https://github.com/git-fixtures/basic.git",
 	Head:         plumbing.NewHash("6ecf0ef2c2dffb796033e5a02219af86ec6584e5"),
 	PackfileHash: plumbing.NewHash("a3fed42da1e8189a077c0e6846c040dcf73fc9dd"),
-	DotGitHash:   plumbing.NewHash("0a00a25543e6d732dbf4e8e9fec55c8e65fc4e8d"),
+	DotGitHash:   plumbing.NewHash("7a725350b88b05ca03541b59dd0649fda7f521f2"),
 	ObjectsCount: 31,
 }, {
 	Tags:         []string{"packfile", "ref-delta", ".git"},
@@ -87,6 +88,7 @@ var fixtures = Fixtures{{
 	URL:          "https://github.com/cpcs499/Final_Pres_P.git",
 	Head:         plumbing.NewHash("70bade703ce556c2c7391a8065c45c943e8b6bc3"),
 	PackfileHash: plumbing.NewHash("29f304662fd64f102d94722cf5bd8802d9a9472c"),
+	DotGitHash:   plumbing.NewHash("e1580a78f7d36791249df76df8a2a2613d629902"),
 }, {
 	Tags:         []string{"packfile", "diff-tree"},
 	URL:          "https://github.com/github/gem-builder.git",
@@ -115,6 +117,11 @@ var fixtures = Fixtures{{
 	Tags:         []string{"packfile", "diff-tree"},
 	URL:          "https://github.com/toqueteos/ts3.git",
 	PackfileHash: plumbing.NewHash("21b33a26eb7ffbd35261149fe5d886b9debab7cb"),
+}, {
+	Tags:         []string{"empty", ".git"},
+	URL:          "https://github.com/git-fixtures/empty.git",
+	DotGitHash:   plumbing.NewHash("bf3fedcc8e20fd0dec9172987ceea0038d17b516"),
+	ObjectsCount: 0,
 }}
 
 func All() Fixtures {
@@ -173,17 +180,36 @@ func (f *Fixture) Idx() *os.File {
 	return file
 }
 
-func (f *Fixture) DotGit() fs.Filesystem {
+// DotGit creates a new temporary directory and unpacks the repository .git
+// directory into it. Multiple calls to DotGit returns different directories.
+func (f *Fixture) DotGit() billy.Filesystem {
 	fn := filepath.Join(RootFolder, DataFolder, fmt.Sprintf("git-%s.tgz", f.DotGitHash))
 	path, err := tgz.Extract(fn)
 	if err != nil {
-		fmt.Println(os.Getwd())
-		fmt.Println(filepath.Clean(fn))
 		panic(err)
 	}
 
-	folders = append(folders, path)
+	folders[path] = true
 	return osfs.New(path)
+}
+
+func (f *Fixture) Worktree() billy.Filesystem {
+	fn := filepath.Join(RootFolder, DataFolder, fmt.Sprintf("git-%s.tgz", f.DotGitHash))
+	git, err := tgz.Extract(fn)
+	if err != nil {
+		panic(err)
+	}
+
+	worktree, err := ioutil.TempDir("", "worktree")
+	if err != nil {
+		panic(err)
+	}
+
+	if err := os.Rename(git, filepath.Join(worktree, ".git")); err != nil {
+		panic(err)
+	}
+
+	return osfs.New(worktree)
 }
 
 type Fixtures []*Fixture
@@ -241,8 +267,10 @@ func (s *Suite) SetUpSuite(c *check.C) {
 }
 
 func (s *Suite) TearDownSuite(c *check.C) {
-	for _, f := range folders {
+	for f := range folders {
 		err := os.RemoveAll(f)
 		c.Assert(err, check.IsNil)
+
+		delete(folders, f)
 	}
 }

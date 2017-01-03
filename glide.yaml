@@ -3,8 +3,8 @@ import:
 - package: github.com/xtaci/kcp-go
   version: 2a9a3f742303ffb01acd1704d198a805238135fd
   vcs: git
-- package: github.com/xtaci/smux
-  version: b4a6fb87c6ff61e88833b551ce9247e09c9d71d2
+- package: github.com/superfly/smux
+  version: c34bbd53d50f4b7450eb0a4c8bcfe6e576dd2014
   vcs: git
 - package: github.com/jpillora/backoff
 - package: github.com/garyburd/redigo

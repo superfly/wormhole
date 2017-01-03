@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/xtaci/smux"
+	"github.com/superfly/smux"
 )
 
 const (
