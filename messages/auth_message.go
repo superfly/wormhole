@@ -1,4 +1,4 @@
-package wormhole
+package messages
 
 import "time"
 

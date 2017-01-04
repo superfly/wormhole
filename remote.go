@@ -13,6 +13,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/smux"
+	"github.com/superfly/wormhole/utils"
 	kcp "github.com/xtaci/kcp-go"
 )
 
@@ -212,7 +213,7 @@ func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
 	}
 	log.Debug("Opened a stream...")
 
-	go CopyCloseIO(tcpConn, stream)
+	go utils.CopyCloseIO(tcpConn, stream)
 	return nil
 }
 

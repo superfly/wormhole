@@ -1,7 +1,6 @@
 package wormhole
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"os"
@@ -12,11 +11,12 @@ import (
 	"time"
 
 	git "gopkg.in/src-d/go-git.v4"
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
 	"github.com/jpillora/backoff"
 	"github.com/superfly/smux"
-	kcp "github.com/xtaci/kcp-go"
+
+	handler "github.com/superfly/wormhole/local"
+	"github.com/superfly/wormhole/messages"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -30,7 +30,7 @@ var (
 
 	releaseIDVar   = os.Getenv("FLY_RELEASE_ID_VAR")
 	releaseDescVar = os.Getenv("FLY_RELEASE_DESC_VAR")
-	release        = &Release{}
+	release        = &messages.Release{}
 )
 
 func ensureLocalEnvironment() {
@@ -174,109 +174,30 @@ func StartLocal(pass, ver string) {
 	b := &backoff.Backoff{
 		Max: 2 * time.Minute,
 	}
+	handler := &handler.SmuxHandler{Passphrase: passphrase,
+		RemoteEndpoint: remoteEndpoint,
+		LocalEndpoint:  localEndpoint,
+		Config:         smuxConfig,
+		FlyToken:       flyToken,
+		Release:        release,
+		Version:        version,
+	}
 	go DebugSNMP()
 	for {
-		mux, err := initializeConnection()
+		err := handler.InitializeConnection()
 		if err != nil {
 			log.Errorln("Could not make connection:", err)
 			d := b.Duration()
 			time.Sleep(d)
 			continue
 		}
-		defer controlStream.Close()
+		handleOsSignal(handler)
 		b.Reset()
-		handleMux(mux)
+		handler.ListenAndServe()
 	}
 }
 
-func initializeConnection() (*smux.Session, error) {
-	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:SecretLength])
-	kcpconn, kcpconnErr := kcp.DialWithOptions(remoteEndpoint, block, KCPShards, KCPParity)
-	if kcpconnErr != nil {
-		return nil, kcpconnErr
-	}
-	log.Println("Connected as:", kcpconn.LocalAddr().String())
-
-	setConnOptions(kcpconn)
-
-	mux, err := smux.EncryptedClient(kcpconn, smuxConfig)
-	if err != nil {
-		log.Errorln("Error creating multiplexed session:", err)
-		return nil, err
-	}
-	handleOsSignal(mux)
-
-	controlStream, err = handshakeConnection(mux)
-	if err != nil {
-		return nil, err
-	}
-	return mux, nil
-}
-
-func handshakeConnection(mux *smux.Session) (*smux.Stream, error) {
-	stream, err := connect(mux)
-	if err != nil {
-		log.Errorln("Could not connect:", err)
-		return nil, err
-	}
-
-	err = authenticate(stream)
-	if err != nil {
-		log.Errorln("Could not authenticate:", err)
-		defer stream.Close()
-		return nil, err
-	}
-
-	log.Println("Authenticated.")
-	return stream, nil
-
-}
-
-func stayAlive() {
-	err := InitPong(controlStream)
-	if err != nil {
-		log.Errorln("PONG error:", err)
-	}
-	log.Println("Pong ended.")
-}
-
-func handleMux(mux *smux.Session) error {
-	defer mux.Close()
-	go stayAlive()
-
-	for {
-		stream, err := mux.AcceptStream()
-		if err != nil { // Probably broken pipe...
-			log.Errorln("Error accepting stream:", err)
-			return err
-		}
-
-		go handleStream(stream)
-	}
-}
-
-func connect(mux *smux.Session) (*smux.Stream, error) {
-	stream, err := mux.OpenStream()
-	if err != nil {
-		return nil, errors.New("could not open initial stream: " + err.Error())
-	}
-	return stream, err
-}
-
-func signalProcess(sig os.Signal) (exited bool, exitStatus int, err error) {
-	exited = false
-	err = cmd.Process.Signal(sig)
-	if err != nil {
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			exited = true
-			status, _ := exiterr.Sys().(syscall.WaitStatus)
-			exitStatus = status.ExitStatus()
-		}
-	}
-	return
-}
-
-func handleOsSignal(mux *smux.Session) {
+func handleOsSignal(handler handler.ConnectionHandler) {
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan)
 	go func(signalChan <-chan os.Signal) {
@@ -291,7 +212,7 @@ func handleOsSignal(mux *smux.Session) {
 			switch sig {
 			case syscall.SIGINT, syscall.SIGTERM:
 				log.Println("Cleaning up local agent.")
-				mux.Close()
+				handler.Close()
 				os.Exit(int(exitStatus))
 			default:
 				if cmd != nil && exited {
@@ -302,82 +223,15 @@ func handleOsSignal(mux *smux.Session) {
 	}(signalChan)
 }
 
-func authenticate(stream *smux.Stream) error {
-	hostname, err := os.Hostname()
+func signalProcess(sig os.Signal) (exited bool, exitStatus int, err error) {
+	exited = false
+	err = cmd.Process.Signal(sig)
 	if err != nil {
-		log.Debugln("Could not get hostname:", err)
-		hostname = "unknown"
+		if exiterr, ok := err.(*exec.ExitError); ok {
+			exited = true
+			status, _ := exiterr.Sys().(syscall.WaitStatus)
+			exitStatus = status.ExitStatus()
+		}
 	}
-	am := AuthMessage{
-		Token:   flyToken,
-		Name:    hostname,
-		Client:  "wormhole " + version,
-		Release: release,
-	}
-	buf, err := msgpack.Marshal(am)
-	if err != nil {
-		return errors.New("could not serialize auth message: " + err.Error())
-	}
-	log.Println("Authenticating...")
-	_, err = stream.Write(buf)
-	if err != nil {
-		return errors.New("could not write auth message: " + err.Error())
-	}
-
-	log.Debugln("Waiting for authentication answer...")
-	resp, err := AwaitResponse(stream)
-	if err != nil {
-		return errors.New("error waiting for authentication response: " + err.Error())
-	}
-
-	log.Printf("%+v", resp)
-
-	if !resp.Ok {
-		return errors.New("authentication failed")
-	}
-
-	return nil
-}
-
-func handleStream(stream *smux.Stream) (err error) {
-	log.Debugln("Accepted stream")
-
-	localConn, err := net.DialTimeout("tcp", localEndpoint, 5*time.Second)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	log.Debugln("dialed local connection")
-
-	if err = localConn.(*net.TCPConn).SetReadBuffer(MaxBuffer); err != nil {
-		log.Errorln("TCP SetReadBuffer error:", err)
-	}
-	if err = localConn.(*net.TCPConn).SetWriteBuffer(MaxBuffer); err != nil {
-		log.Errorln("TCP SetWriteBuffer error:", err)
-	}
-
-	log.Debugln("local connection settings has been set...")
-
-	err = CopyCloseIO(localConn, stream)
-	return err
-}
-
-func setConnOptions(kcpconn *kcp.UDPSession) {
-	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(NoDelay, Interval, Resend, NoCongestion)
-	kcpconn.SetMtu(1350)
-	kcpconn.SetWindowSize(128, 1024)
-	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(KeepAlive)
-
-	if err := kcpconn.SetDSCP(DSCP); err != nil {
-		log.Errorln("SetDSCP:", err)
-	}
-	if err := kcpconn.SetReadBuffer(smuxConfig.MaxReceiveBuffer); err != nil {
-		log.Errorln("SetReadBuffer:", err)
-	}
-	if err := kcpconn.SetWriteBuffer(smuxConfig.MaxReceiveBuffer); err != nil {
-		log.Errorln("SetWriteBuffer:", err)
-	}
+	return
 }

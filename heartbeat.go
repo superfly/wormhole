@@ -31,20 +31,3 @@ func InitPing(stream *smux.Stream) (err error) {
 	}
 	return err
 }
-
-// InitPong ...
-func InitPong(stream *smux.Stream) (err error) {
-	for {
-		readbuf := make([]byte, 4)
-		_, err = stream.Read(readbuf)
-		if err != nil {
-			break
-		}
-		if string(readbuf) != ping {
-			err = errors.New("Unexpected ping request: " + string(readbuf))
-			break
-		}
-		stream.Write([]byte(pong))
-	}
-	return err
-}

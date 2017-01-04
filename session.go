@@ -11,6 +11,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/rs/xid"
 	"github.com/superfly/smux"
+	"github.com/superfly/wormhole/messages"
 )
 
 const (
@@ -29,7 +30,7 @@ type Session struct {
 	ClientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
-	Release *Release
+	Release *messages.Release
 
 	stream *smux.Stream
 	mux    *smux.Session
@@ -129,7 +130,7 @@ func (session *Session) setStream(stream *smux.Stream) (err error) {
 
 // RequireAuthentication ...
 func (session *Session) RequireAuthentication() error {
-	var am AuthMessage
+	var am messages.AuthMessage
 	log.Println("Waiting for auth message...")
 	buf := make([]byte, 1024)
 	nr, err := session.stream.Read(buf)
@@ -141,7 +142,7 @@ func (session *Session) RequireAuthentication() error {
 		return errors.New("unparsable auth message")
 	}
 
-	var resp Response
+	var resp messages.Response
 
 	session.Client = am.Client
 	session.NodeID = nodeID
@@ -171,7 +172,7 @@ func (session *Session) RequireAuthentication() error {
 	return nil
 }
 
-func (session *Session) sendResponse(resp *Response) error {
+func (session *Session) sendResponse(resp *messages.Response) error {
 	buf, err := msgpack.Marshal(resp)
 	if err != nil {
 		return errors.New("error marshalling response: " + err.Error())
