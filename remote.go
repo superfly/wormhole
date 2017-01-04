@@ -13,6 +13,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/smux"
+	handler "github.com/superfly/wormhole/remote"
+	config "github.com/superfly/wormhole/shared"
 	"github.com/superfly/wormhole/utils"
 	kcp "github.com/xtaci/kcp-go"
 )
@@ -34,40 +36,18 @@ func StartRemote(pass, ver string) {
 	version = ver
 	ensureRemoteEnvironment()
 	go handleDeath()
-	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:SecretLength])
-	ln, err := kcp.ListenWithOptions(":"+listenPort, block, KCPShards, KCPParity)
+
+	handler := &handler.SmuxHandler{
+		Passphrase: passphrase,
+		ListenPort: listenPort,
+	}
+	err := handler.InitializeConnection()
 	if err != nil {
-		log.Fatalln("KCP Server:", err)
+		log.Fatal(err)
 	}
+	defer handler.Close()
 
-	if err = ln.SetDSCP(DSCP); err != nil {
-		log.Warnln("SetDSCP:", err)
-	}
-	if err = ln.SetReadBuffer(MaxBuffer); err != nil {
-		log.Fatalln("SetReadBuffer:", err)
-	}
-	if err = ln.SetWriteBuffer(MaxBuffer); err != nil {
-		log.Fatalln("SetWriteBuffer:", err)
-	}
-	kcpln = ln
-	if err != nil {
-		panic(err)
-	}
-	defer kcpln.Close()
-	log.Println("Listening on", kcpln.Addr().String())
-
-	go DebugSNMP()
-
-	for {
-		kcpconn, err := kcpln.AcceptKCP()
-		if err != nil {
-			log.Errorln("error accepting KCP:", err)
-			break
-		}
-		go handleConn(kcpconn)
-		log.Println("Accepted connection from:", kcpconn.RemoteAddr())
-	}
-	log.Println("Stopping server KCP...")
+	handler.ListenAndServe(sessionHandler)
 }
 
 func ensureRemoteEnvironment() {
@@ -79,8 +59,8 @@ func ensureRemoteEnvironment() {
 	if err != nil {
 		log.Fatalf("PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
 	}
-	if len(privateKeyBytes) != SecretLength {
-		log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", SecretLength)
+	if len(privateKeyBytes) != config.SecretLength {
+		log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", config.SecretLength)
 	}
 	copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
 
@@ -100,20 +80,84 @@ func ensureRemoteEnvironment() {
 	sessions = make(map[string]*Session)
 }
 
-func setRemoteConnOptions(kcpconn *kcp.UDPSession) {
-	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(NoDelay, Interval, Resend, NoCongestion)
-	kcpconn.SetMtu(1350)
-	kcpconn.SetWindowSize(128, 1024)
-	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(KeepAlive)
+func newRedisPool(redisURL string) *redis.Pool {
+	return &redis.Pool{
+		MaxIdle:     3,
+		IdleTimeout: 240 * time.Second,
+		Dial: func() (redis.Conn, error) {
+			conn, err := redis.DialURL(redisURL)
+			if err != nil {
+				return nil, err
+			}
+
+			parsedURL, err := url.Parse(redisURL)
+			if err != nil {
+				return nil, err
+			}
+			if parsedURL.User != nil {
+				if password, hasPassword := parsedURL.User.Password(); hasPassword == true {
+					if _, authErr := conn.Do("AUTH", password); authErr != nil {
+						conn.Close()
+						return nil, authErr
+					}
+				}
+			}
+			return conn, nil
+		},
+		TestOnBorrow: func(conn redis.Conn, t time.Time) error {
+			if time.Since(t) < time.Minute {
+				return nil
+			}
+			_, err := conn.Do("PING")
+			return err
+		},
+	}
 }
 
-func handleConn(kcpconn *kcp.UDPSession) {
-	defer kcpconn.Close()
-	setRemoteConnOptions(kcpconn)
+// IT CAN BE HANDLED!
+func handleDeath() {
+	c := make(chan os.Signal, 1)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func(c <-chan os.Signal) {
+		for _ = range c {
+			log.Print("Cleaning up before exit...")
+			// _ = kcpln.Close()
+			// log.Info("Closed KCP listener.")
+			redisConn := redisPool.Get()
+			defer redisConn.Close()
 
-	mux, err := smux.EncryptedServer(kcpconn, smuxConfig)
+			t := time.Now()
+
+			// Register their disconnection, massively.
+			redisConn.Send("MULTI")
+			for id, session := range sessions {
+				redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), id)
+				redisConn.Send("SREM", "node:"+nodeID+":sessions", id)
+				redisConn.Send("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
+				redisConn.Send("SREM", "backend:"+session.BackendID+":sessions", session.ID)
+			}
+			_, err := redisConn.Do("EXEC")
+			if err != nil {
+				log.Errorln("Cleaning up redis failed:", err)
+			} else {
+				log.Print("Cleaned up Redis.")
+			}
+
+			// Actually closes the muxes
+			for id, session := range sessions {
+				if !session.IsClosed() {
+					session.Close()
+				}
+				delete(sessions, id)
+			}
+			log.Print("Cleaned up connections.")
+			os.Exit(1)
+		}
+	}(c)
+}
+
+func sessionHandler(conn *kcp.UDPSession) {
+	mux, err := smux.EncryptedServer(conn, smuxConfig)
 	if err != nil {
 		log.Errorln(err)
 		return
@@ -215,80 +259,4 @@ func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
 
 	go utils.CopyCloseIO(tcpConn, stream)
 	return nil
-}
-
-func newRedisPool(redisURL string) *redis.Pool {
-	return &redis.Pool{
-		MaxIdle:     3,
-		IdleTimeout: 240 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			conn, err := redis.DialURL(redisURL)
-			if err != nil {
-				return nil, err
-			}
-
-			parsedURL, err := url.Parse(redisURL)
-			if err != nil {
-				return nil, err
-			}
-			if parsedURL.User != nil {
-				if password, hasPassword := parsedURL.User.Password(); hasPassword == true {
-					if _, authErr := conn.Do("AUTH", password); authErr != nil {
-						conn.Close()
-						return nil, authErr
-					}
-				}
-			}
-			return conn, nil
-		},
-		TestOnBorrow: func(conn redis.Conn, t time.Time) error {
-			if time.Since(t) < time.Minute {
-				return nil
-			}
-			_, err := conn.Do("PING")
-			return err
-		},
-	}
-}
-
-// IT CAN BE HANDLED!
-func handleDeath() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
-	go func(c <-chan os.Signal) {
-		for _ = range c {
-			log.Print("Cleaning up before exit...")
-			// _ = kcpln.Close()
-			// log.Info("Closed KCP listener.")
-			redisConn := redisPool.Get()
-			defer redisConn.Close()
-
-			t := time.Now()
-
-			// Register their disconnection, massively.
-			redisConn.Send("MULTI")
-			for id, session := range sessions {
-				redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), id)
-				redisConn.Send("SREM", "node:"+nodeID+":sessions", id)
-				redisConn.Send("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
-				redisConn.Send("SREM", "backend:"+session.BackendID+":sessions", session.ID)
-			}
-			_, err := redisConn.Do("EXEC")
-			if err != nil {
-				log.Errorln("Cleaning up redis failed:", err)
-			} else {
-				log.Print("Cleaned up Redis.")
-			}
-
-			// Actually closes the muxes
-			for id, session := range sessions {
-				if !session.IsClosed() {
-					session.Close()
-				}
-				delete(sessions, id)
-			}
-			log.Print("Cleaned up connections.")
-			os.Exit(1)
-		}
-	}(c)
 }

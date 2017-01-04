@@ -7,24 +7,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/superfly/smux"
-	kcp "github.com/xtaci/kcp-go"
-)
-
-// Constants, useful to both server and client
-const (
-	NoDelay      = 0
-	Interval     = 30
-	Resend       = 2
-	NoCongestion = 1
-	MaxBuffer    = 4194304
-	KeepAlive    = 10
-
-	// KCP
-	KCPShards = 10
-	KCPParity = 3
-	DSCP      = 0
-
-	SecretLength = 32
+	config "github.com/superfly/wormhole/shared"
 )
 
 var (
@@ -47,8 +30,8 @@ func init() {
 	log.SetFormatter(textFormatter)
 
 	smuxConfig = smux.DefaultConfig()
-	smuxConfig.MaxReceiveBuffer = MaxBuffer
-	smuxConfig.KeepAliveInterval = KeepAlive * time.Second
+	smuxConfig.MaxReceiveBuffer = config.MaxBuffer
+	smuxConfig.KeepAliveInterval = config.KeepAlive * time.Second
 }
 
 func ensureEnvironment() {
@@ -56,8 +39,8 @@ func ensureEnvironment() {
 		passphrase = os.Getenv("PASSPHRASE")
 		if passphrase == "" {
 			log.Fatalln("PASSPHRASE needs to be set")
-		} else if len([]byte(passphrase)) < SecretLength {
-			log.Fatalf("PASSPHRASE needs to be at least %d bytes long\n", SecretLength)
+		} else if len([]byte(passphrase)) < config.SecretLength {
+			log.Fatalf("PASSPHRASE needs to be at least %d bytes long\n", config.SecretLength)
 		}
 	}
 	if publicKey == "" {
@@ -70,23 +53,11 @@ func ensureEnvironment() {
 	if err != nil {
 		log.Fatalf("PUBLIC_KEY needs to be in hex format. Details: %s", err.Error())
 	}
-	if len(publicKeyBytes) != SecretLength {
-		log.Fatalf("PUBLIC_KEY needs to be %d bytes long\n", SecretLength)
+	if len(publicKeyBytes) != config.SecretLength {
+		log.Fatalf("PUBLIC_KEY needs to be %d bytes long\n", config.SecretLength)
 	}
 	copy(smuxConfig.ServerPublicKey[:], publicKeyBytes)
 	if version == "" {
 		version = "latest"
-	}
-}
-
-// OutputSNMP ...
-func OutputSNMP() {
-	log.Printf("KCP SNMP:%+v", kcp.DefaultSnmp.Copy())
-}
-
-// DebugSNMP ...
-func DebugSNMP() {
-	for _ = range time.Tick(120 * time.Second) {
-		OutputSNMP()
 	}
 }

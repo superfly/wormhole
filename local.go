@@ -17,6 +17,9 @@ import (
 
 	handler "github.com/superfly/wormhole/local"
 	"github.com/superfly/wormhole/messages"
+	config "github.com/superfly/wormhole/shared"
+
+	"github.com/superfly/wormhole/utils"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -48,8 +51,8 @@ func ensureLocalEnvironment() {
 		releaseDescVar = "FLY_RELEASE_DESC"
 	}
 
-	smuxConfig.MaxReceiveBuffer = MaxBuffer
-	smuxConfig.KeepAliveInterval = KeepAlive * time.Second
+	smuxConfig.MaxReceiveBuffer = config.MaxBuffer
+	smuxConfig.KeepAliveInterval = config.KeepAlive * time.Second
 	// smuxConfig.KeepAliveTimeout = Interval * time.Second
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
@@ -182,7 +185,7 @@ func StartLocal(pass, ver string) {
 		Release:        release,
 		Version:        version,
 	}
-	go DebugSNMP()
+	go utils.DebugSNMP()
 	for {
 		err := handler.InitializeConnection()
 		if err != nil {
