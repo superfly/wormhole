@@ -14,6 +14,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/smux"
 	handler "github.com/superfly/wormhole/remote"
+	"github.com/superfly/wormhole/session"
 	config "github.com/superfly/wormhole/shared"
 	"github.com/superfly/wormhole/utils"
 	kcp "github.com/xtaci/kcp-go"
@@ -25,7 +26,7 @@ var (
 	redisURL   = os.Getenv("REDIS_URL")
 	localhost  = os.Getenv("LOCALHOST")
 	privateKey = os.Getenv("PRIVATE_KEY")
-	sessions   map[string]*Session
+	sessions   map[string]session.Session
 	redisPool  *redis.Pool
 	kcpln      *kcp.Listener
 )
@@ -77,7 +78,7 @@ func ensureRemoteEnvironment() {
 		nodeID, _ = os.Hostname()
 	}
 
-	sessions = make(map[string]*Session)
+	sessions = make(map[string]session.Session)
 }
 
 func newRedisPool(redisURL string) *redis.Pool {
@@ -164,7 +165,7 @@ func sessionHandler(conn *kcp.UDPSession) {
 	}
 	defer mux.Close()
 
-	sess := NewSession(mux)
+	sess := session.NewSmuxSession(nodeID, redisPool, sessions, mux)
 	err = sess.RequireStream()
 	if err != nil {
 		log.Errorln("error getting a stream:", err)

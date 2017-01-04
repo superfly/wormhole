@@ -13,24 +13,9 @@ import (
 
 	"github.com/superfly/wormhole/messages"
 
+	config "github.com/superfly/wormhole/shared"
 	"github.com/superfly/wormhole/utils"
 	kcp "github.com/xtaci/kcp-go"
-)
-
-const (
-	noDelay      = 0
-	interval     = 30
-	resend       = 2
-	noCongestion = 1
-	maxBuffer    = 4194304
-	keepAlive    = 10
-
-	// KCP
-	kcpShards = 10
-	kcpParity = 3
-	dscp      = 0
-
-	secretLength = 32
 )
 
 type ConnectionHandler interface {
@@ -52,8 +37,8 @@ type SmuxHandler struct {
 
 // InitializeConnection ...
 func (s *SmuxHandler) InitializeConnection() error {
-	block, _ := kcp.NewAESBlockCrypt([]byte(s.Passphrase)[:secretLength])
-	kcpconn, kcpconnErr := kcp.DialWithOptions(s.RemoteEndpoint, block, kcpShards, kcpParity)
+	block, _ := kcp.NewAESBlockCrypt([]byte(s.Passphrase)[:config.SecretLength])
+	kcpconn, kcpconnErr := kcp.DialWithOptions(s.RemoteEndpoint, block, config.KCPShards, config.KCPParity)
 	if kcpconnErr != nil {
 		return kcpconnErr
 	}
@@ -162,10 +147,10 @@ func handleStream(stream *smux.Stream, localEndpoint string) (err error) {
 
 	log.Debugln("dialed local connection")
 
-	if err = localConn.(*net.TCPConn).SetReadBuffer(maxBuffer); err != nil {
+	if err = localConn.(*net.TCPConn).SetReadBuffer(config.MaxBuffer); err != nil {
 		log.Errorln("TCP SetReadBuffer error:", err)
 	}
-	if err = localConn.(*net.TCPConn).SetWriteBuffer(maxBuffer); err != nil {
+	if err = localConn.(*net.TCPConn).SetWriteBuffer(config.MaxBuffer); err != nil {
 		log.Errorln("TCP SetWriteBuffer error:", err)
 	}
 
@@ -183,21 +168,21 @@ func connect(mux *smux.Session) (*smux.Stream, error) {
 	return stream, err
 }
 
-func setConnOptions(kcpconn *kcp.UDPSession, config *smux.Config) {
+func setConnOptions(kcpconn *kcp.UDPSession, cfg *smux.Config) {
 	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(noDelay, interval, resend, noCongestion)
+	kcpconn.SetNoDelay(config.NoDelay, config.Interval, config.Resend, config.NoCongestion)
 	kcpconn.SetMtu(1350)
 	kcpconn.SetWindowSize(128, 1024)
 	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(keepAlive)
+	kcpconn.SetKeepAlive(config.KeepAlive)
 
-	if err := kcpconn.SetDSCP(dscp); err != nil {
+	if err := kcpconn.SetDSCP(config.DSCP); err != nil {
 		log.Errorln("SetDSCP:", err)
 	}
-	if err := kcpconn.SetReadBuffer(config.MaxReceiveBuffer); err != nil {
+	if err := kcpconn.SetReadBuffer(cfg.MaxReceiveBuffer); err != nil {
 		log.Errorln("SetReadBuffer:", err)
 	}
-	if err := kcpconn.SetWriteBuffer(config.MaxReceiveBuffer); err != nil {
+	if err := kcpconn.SetWriteBuffer(cfg.MaxReceiveBuffer); err != nil {
 		log.Errorln("SetWriteBuffer:", err)
 	}
 }
