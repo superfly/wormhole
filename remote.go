@@ -122,33 +122,8 @@ func handleDeath() {
 	go func(c <-chan os.Signal) {
 		for _ = range c {
 			log.Print("Cleaning up before exit...")
-			// _ = kcpln.Close()
-			// log.Info("Closed KCP listener.")
-			redisConn := redisPool.Get()
-			defer redisConn.Close()
-
-			t := time.Now()
-
-			// Register their disconnection, massively.
-			redisConn.Send("MULTI")
 			for id, session := range sessions {
-				redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), id)
-				redisConn.Send("SREM", "node:"+nodeID+":sessions", id)
-				redisConn.Send("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
-				redisConn.Send("SREM", "backend:"+session.BackendID+":sessions", session.ID)
-			}
-			_, err := redisConn.Do("EXEC")
-			if err != nil {
-				log.Errorln("Cleaning up redis failed:", err)
-			} else {
-				log.Print("Cleaned up Redis.")
-			}
-
-			// Actually closes the muxes
-			for id, session := range sessions {
-				if !session.IsClosed() {
-					session.Close()
-				}
+				session.Close()
 				delete(sessions, id)
 			}
 			log.Print("Cleaned up connections.")
