@@ -3,12 +3,15 @@ package wormhole
 import (
 	"encoding/hex"
 	"errors"
+	"io"
 	"net"
 	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
+
+	"golang.org/x/crypto/ssh"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
@@ -21,14 +24,16 @@ import (
 )
 
 var (
-	listenPort = os.Getenv("PORT")
-	nodeID     = os.Getenv("NODE_ID")
-	redisURL   = os.Getenv("REDIS_URL")
-	localhost  = os.Getenv("LOCALHOST")
-	privateKey = os.Getenv("PRIVATE_KEY")
-	sessions   map[string]session.Session
-	redisPool  *redis.Pool
-	kcpln      *kcp.Listener
+	listenPort    = os.Getenv("PORT")
+	nodeID        = os.Getenv("NODE_ID")
+	redisURL      = os.Getenv("REDIS_URL")
+	localhost     = os.Getenv("LOCALHOST")
+	privateKey    = os.Getenv("PRIVATE_KEY")
+	sessions      map[string]session.Session
+	redisPool     *redis.Pool
+	kcpln         *kcp.Listener
+	sshPrivateKey []byte
+	sshPort       = "22222"
 )
 
 // StartRemote ...
@@ -38,6 +43,12 @@ func StartRemote(pass, ver string) {
 	ensureRemoteEnvironment()
 	go handleDeath()
 
+	/*
+		handler := &handler.SshHandler{
+			Port:       sshPort,
+			PrivateKey: sshPrivateKey,
+		}
+	*/
 	handler := &handler.SmuxHandler{
 		Passphrase: passphrase,
 		ListenPort: listenPort,
@@ -64,6 +75,12 @@ func ensureRemoteEnvironment() {
 		log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", config.SecretLength)
 	}
 	copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
+
+	sshPrivateKeyStr := os.Getenv("SSH_PRIVATE_KEY")
+	sshPrivateKey, err = hex.DecodeString(sshPrivateKeyStr)
+	if err != nil {
+		log.Fatalf("SSH_PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
+	}
 
 	if listenPort == "" {
 		listenPort = "10000"
@@ -132,7 +149,7 @@ func handleDeath() {
 	}(c)
 }
 
-func sessionHandler(conn *kcp.UDPSession) {
+func sessionHandler(conn io.ReadWriteCloser) {
 	mux, err := smux.EncryptedServer(conn, smuxConfig)
 	if err != nil {
 		log.Errorln(err)
@@ -212,6 +229,54 @@ func sessionHandler(conn *kcp.UDPSession) {
 			return
 		}
 	}
+}
+
+func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
+	// Before use, a handshake must be performed on the incoming net.Conn.
+	sess := session.NewSshSession(nodeID, redisPool, sessions, conn, config)
+	err := sess.RequireStream()
+	if err != nil {
+		log.Errorln("error getting a stream:", err)
+		return
+	}
+
+	err = sess.RequireAuthentication()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	log.Println("Client authenticated.")
+
+	defer sess.RegisterDisconnection()
+
+	ln, err := listenTCP()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	defer ln.Close()
+
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	endpoint := &Endpoint{
+		BackendID: sess.BackendID,
+		SessionID: sess.ID,
+		Socket:    localhost + ":" + port,
+		ReleaseID: "none", // we don't have Release over SSH yet - sess.Release.ID,
+	}
+
+	if err = endpoint.Register(); err != nil {
+		log.Errorln("Error registering endpoint:", err)
+		return
+	}
+	defer endpoint.Remove()
+
+	sess.EndpointAddr = endpoint.Socket
+	go sess.UpdateAttribute("endpoint_addr", endpoint.Socket)
+	log.Println("Listening on:", endpoint.Socket)
+
+	sess.HandleRequests(ln)
 }
 
 func listenTCP() (*net.TCPListener, error) {

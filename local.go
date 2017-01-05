@@ -19,8 +19,6 @@ import (
 	"github.com/superfly/wormhole/messages"
 	config "github.com/superfly/wormhole/shared"
 
-	"github.com/superfly/wormhole/utils"
-
 	log "github.com/Sirupsen/logrus"
 )
 
@@ -177,15 +175,25 @@ func StartLocal(pass, ver string) {
 	b := &backoff.Backoff{
 		Max: 2 * time.Minute,
 	}
-	handler := &handler.SmuxHandler{Passphrase: passphrase,
+	/*
+		handler := &handler.SmuxHandler{
+			Passphrase: passphrase,
+			RemoteEndpoint: remoteEndpoint,
+			LocalEndpoint:  localEndpoint,
+			Config:         smuxConfig,
+			FlyToken:       flyToken,
+			Release:        release,
+			Version:        version,
+		}
+		go DebugSNMP()
+	*/
+	handler := &handler.SshHandler{
+		FlyToken:       flyToken,
 		RemoteEndpoint: remoteEndpoint,
 		LocalEndpoint:  localEndpoint,
-		Config:         smuxConfig,
-		FlyToken:       flyToken,
 		Release:        release,
 		Version:        version,
 	}
-	go utils.DebugSNMP()
 	for {
 		err := handler.InitializeConnection()
 		if err != nil {

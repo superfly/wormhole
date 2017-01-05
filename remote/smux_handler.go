@@ -1,6 +1,8 @@
 package handler
 
 import (
+	"io"
+
 	log "github.com/Sirupsen/logrus"
 
 	config "github.com/superfly/wormhole/shared"
@@ -53,13 +55,14 @@ func (s *SmuxHandler) Close() {
 	s.ln.Close()
 }
 
-func (s *SmuxHandler) ListenAndServe(fn func(*kcp.UDPSession)) {
+func (s *SmuxHandler) ListenAndServe(fn func(io.ReadWriteCloser)) {
 	for {
 		kcpconn, err := s.ln.AcceptKCP()
 		if err != nil {
 			log.Errorln("error accepting KCP:", err)
 			break
 		}
+		setRemoteConnOptions(kcpconn)
 		go handleConn(kcpconn, fn)
 		log.Println("Accepted connection from:", kcpconn.RemoteAddr())
 	}
@@ -75,8 +78,7 @@ func setRemoteConnOptions(kcpconn *kcp.UDPSession) {
 	kcpconn.SetKeepAlive(config.KeepAlive)
 }
 
-func handleConn(kcpconn *kcp.UDPSession, fn func(*kcp.UDPSession)) {
+func handleConn(kcpconn io.ReadWriteCloser, fn func(io.ReadWriteCloser)) {
 	defer kcpconn.Close()
-	setRemoteConnOptions(kcpconn)
 	fn(kcpconn)
 }

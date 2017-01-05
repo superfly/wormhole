@@ -31,7 +31,7 @@ func (s *SshHandler) InitializeConnection() error {
 
 	config := &ssh.ClientConfig{
 		User:          hostname,
-		ClientVersion: s.Version,
+		ClientVersion: "wormhole " + s.Version,
 		Auth: []ssh.AuthMethod{
 			ssh.Password(s.FlyToken),
 		},
