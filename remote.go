@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -43,23 +44,24 @@ func StartRemote(pass, ver string) {
 	ensureRemoteEnvironment()
 	go handleDeath()
 
+	handler := &handler.SshHandler{
+		Port:       sshPort,
+		PrivateKey: sshPrivateKey,
+	}
 	/*
-		handler := &handler.SshHandler{
-			Port:       sshPort,
-			PrivateKey: sshPrivateKey,
+		handler := &handler.SmuxHandler{
+			Passphrase: passphrase,
+			ListenPort: listenPort,
 		}
 	*/
-	handler := &handler.SmuxHandler{
-		Passphrase: passphrase,
-		ListenPort: listenPort,
-	}
 	err := handler.InitializeConnection()
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer handler.Close()
 
-	handler.ListenAndServe(sessionHandler)
+	handler.ListenAndServe(sshSessionHandler)
+	//handler.ListenAndServe(sessionHandler)
 }
 
 func ensureRemoteEnvironment() {
@@ -76,10 +78,10 @@ func ensureRemoteEnvironment() {
 	}
 	copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
 
-	sshPrivateKeyStr := os.Getenv("SSH_PRIVATE_KEY")
-	sshPrivateKey, err = hex.DecodeString(sshPrivateKeyStr)
+	sshPrivateKeyFile := os.Getenv("SSH_PRIVATE_KEY")
+	sshPrivateKey, err = ioutil.ReadFile(sshPrivateKeyFile)
 	if err != nil {
-		log.Fatalf("SSH_PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
+		log.Fatalf("Failed to load private key (%s)", sshPrivateKeyFile)
 	}
 
 	if listenPort == "" {

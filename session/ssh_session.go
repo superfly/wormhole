@@ -212,8 +212,9 @@ func (s *SshSession) RegisterConnection(t time.Time) error {
 	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), s.ID)
 	redisConn.Send("SADD", "node:"+s.nodeID+":sessions", s.ID)
 	redisConn.Send("SADD", "backend:"+s.BackendID+":sessions", s.ID)
-	redisConn.Send("ZADD", "backend:"+s.BackendID+":releases", "NX", timeToScore(t), s.Release.ID)
-	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID+":release:"+s.Release.ID).AddFlat(s.Release)...)
+	//TODO: add releases
+	//redisConn.Send("ZADD", "backend:"+s.BackendID+":releases", "NX", timeToScore(t), s.Release.ID)
+	//redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID+":release:"+s.Release.ID).AddFlat(s.Release)...)
 	_, err := redisConn.Do("EXEC")
 
 	return err
