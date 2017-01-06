@@ -44,6 +44,25 @@ func (r *RedisSessionStore) RegisterDisconnection(s Session) error {
 	redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), s.ID())
 	redisConn.Send("SREM", "node:"+s.NodeID()+":sessions", s.ID())
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":sessions", s.ID())
+	redisConn.Send("SREM", "backend:"+s.BackendID()+":endpoints")
+	redisConn.Send("DEL", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
+	_, err := redisConn.Do("EXEC")
+	return err
+}
+
+func (r *RedisSessionStore) RegisterEndpoint(s Session) error {
+	redisConn := r.pool.Get()
+	defer redisConn.Close()
+
+	redisConn.Send("MULTI")
+	redisConn.Send("HSET", s.Key(), "endpoint_addr", s.Endpoint())
+	redisConn.Send("SADD", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
+	endpoint := map[string]string{
+		"session_id": s.ID(),
+		"backend_id": s.BackendID(),
+		"socket":     s.Endpoint(),
+	}
+	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":endpoint"+s.Endpoint()).AddFlat(endpoint)...)
 	_, err := redisConn.Do("EXEC")
 	return err
 }

@@ -77,6 +77,10 @@ func (s *SshSession) BackendID() string {
 	return s.backendID
 }
 
+func (s *SshSession) Endpoint() string {
+	return s.EndpointAddr
+}
+
 func (s *SshSession) NodeID() string {
 	return s.nodeID
 }
@@ -223,6 +227,11 @@ func (s *SshSession) RegisterConnection(t time.Time) error {
 // RegisterDisconnection ...
 func (s *SshSession) RegisterDisconnection() error {
 	return s.store.RegisterDisconnection(s)
+}
+
+// RegisterEndpoint ...
+func (s *SshSession) RegisterEndpoint() error {
+	return s.store.RegisterEndpoint(s)
 }
 
 // UpdateAttribute ...

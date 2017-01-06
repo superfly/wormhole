@@ -185,23 +185,14 @@ func sessionHandler(conn io.ReadWriteCloser) {
 	defer ln.Close()
 
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	sess.EndpointAddr = localhost + ":" + port
 
-	endpoint := &Endpoint{
-		BackendID: sess.BackendID(),
-		SessionID: sess.ID(),
-		Socket:    localhost + ":" + port,
-		ReleaseID: sess.Release().ID,
-	}
-
-	if err = endpoint.Register(); err != nil {
+	if err = sess.RegisterEndpoint(); err != nil {
 		log.Errorln("Error registering endpoint:", err)
 		return
 	}
-	defer endpoint.Remove()
 
-	sess.EndpointAddr = endpoint.Socket
-	go sess.UpdateAttribute("endpoint_addr", endpoint.Socket)
-	log.Println("Listening on:", endpoint.Socket)
+	log.Println("Listening on:", sess.Endpoint())
 
 	for {
 		ln.SetDeadline(time.Now().Add(time.Second))
@@ -260,23 +251,14 @@ func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 	defer ln.Close()
 
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	sess.EndpointAddr = localhost + ":" + port
 
-	endpoint := &Endpoint{
-		BackendID: sess.BackendID(),
-		SessionID: sess.ID(),
-		Socket:    localhost + ":" + port,
-		ReleaseID: "none", // we don't have Release over SSH yet - sess.Release.ID,
-	}
-
-	if err = endpoint.Register(); err != nil {
+	if err = sess.RegisterEndpoint(); err != nil {
 		log.Errorln("Error registering endpoint:", err)
 		return
 	}
-	defer endpoint.Remove()
 
-	sess.EndpointAddr = endpoint.Socket
-	go sess.UpdateAttribute("endpoint_addr", endpoint.Socket)
-	log.Println("Listening on:", endpoint.Socket)
+	log.Println("Listening on:", sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }

@@ -62,6 +62,11 @@ func (s *SmuxSession) RegisterDisconnection() error {
 	return s.store.RegisterDisconnection(s)
 }
 
+// RegisterEndpoint ...
+func (s *SmuxSession) RegisterEndpoint() error {
+	return s.store.RegisterEndpoint(s)
+}
+
 // Close ...
 func (s *SmuxSession) Close() {
 	s.mux.Close()
@@ -88,6 +93,10 @@ func (s *SmuxSession) Key() string {
 
 func (s *SmuxSession) BackendID() string {
 	return s.backendID
+}
+
+func (s *SmuxSession) Endpoint() string {
+	return s.EndpointAddr
 }
 
 func (s *SmuxSession) NodeID() string {
