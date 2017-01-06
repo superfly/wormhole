@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"time"
 
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/wormhole/messages"
@@ -105,6 +107,8 @@ func (s *SshSession) HandleRequests(ln *net.TCPListener) {
 				s.handleRemoteForward(req, ln)
 				go s.RegisterDisconnection()
 			}()
+		case "register-release":
+			go s.registerRelease(req)
 		case "keepalive":
 			go s.handleKeepalive(req)
 		}
@@ -238,4 +242,17 @@ func (s *SshSession) handleKeepalive(req *ssh.Request) {
 	}
 	// TODO: we should update redis with last_seen or something like that
 	// go s.RegisterKeepalive(time.Now())
+}
+
+func (s *SshSession) registerRelease(req *ssh.Request) {
+	if req.WantReply {
+		req.Reply(true, nil)
+	}
+	var release messages.Release
+	if err := msgpack.Unmarshal(req.Payload, &release); err == nil {
+		s.release = &release
+		s.store.RegisterRelease(s)
+	} else {
+		log.Warnf("Couldn't process release info: %s", err.Error())
+	}
 }

@@ -6,6 +6,8 @@ import (
 	"sync"
 	"time"
 
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/messages"
 	config "github.com/superfly/wormhole/shared"
@@ -55,6 +57,7 @@ func (s *SshHandler) InitializeConnection() error {
 func (s *SshHandler) ListenAndServe() error {
 	defer s.Close()
 	go s.stayAlive()
+	go s.registerRelease()
 
 	for {
 		conn, err := s.ln.Accept()
@@ -119,4 +122,15 @@ func (s *SshHandler) stayAlive() {
 			}()
 		}
 	}
+}
+
+func (s *SshHandler) registerRelease() {
+	log.Debug("Sending register-release...")
+	releaseBytes, err := msgpack.Marshal(s.Release)
+	_, _, err = s.ssh.SendRequest("register-release", false, releaseBytes)
+	if err != nil {
+		log.Errorln("register-release error:", err)
+		return
+	}
+	log.Debug("register-release sent.")
 }
