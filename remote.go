@@ -187,10 +187,10 @@ func sessionHandler(conn io.ReadWriteCloser) {
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 
 	endpoint := &Endpoint{
-		BackendID: sess.BackendID,
-		SessionID: sess.ID,
+		BackendID: sess.BackendID(),
+		SessionID: sess.ID(),
 		Socket:    localhost + ":" + port,
-		ReleaseID: sess.Release.ID,
+		ReleaseID: sess.Release().ID,
 	}
 
 	if err = endpoint.Register(); err != nil {
@@ -262,8 +262,8 @@ func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 
 	endpoint := &Endpoint{
-		BackendID: sess.BackendID,
-		SessionID: sess.ID,
+		BackendID: sess.BackendID(),
+		SessionID: sess.ID(),
 		Socket:    localhost + ":" + port,
 		ReleaseID: "none", // we don't have Release over SSH yet - sess.Release.ID,
 	}

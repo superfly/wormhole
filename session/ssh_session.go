@@ -21,25 +21,22 @@ const (
 )
 
 type SshSession struct {
-	ID     string `redis:"id,omitempty"`
-	Client string `redis:"client,omitempty"`
-	NodeID string `redis:"node_id,omitempty"`
-
-	BackendID string `redis:"backend_id,omitempty"`
-
-	ClientAddr   string `redis:"client_addr,omitempty"`
+	id           string `redis:"id,omitempty"`
+	client       string `redis:"client,omitempty"`
+	nodeID       string `redis:"node_id,omitempty"`
+	backendID    string `redis:"backend_id,omitempty"`
+	clientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
-	Release *messages.Release
+	release *messages.Release
 
-	sessions  map[string]Session
-	redisPool *redis.Pool
-	nodeID    string
-	config    *ssh.ServerConfig
-	tcpConn   net.Conn
-	conn      *ssh.ServerConn
-	reqs      <-chan *ssh.Request
-	chans     <-chan ssh.NewChannel
+	sessions map[string]Session
+	store    *RedisSessionStore
+	config   *ssh.ServerConfig
+	tcpConn  net.Conn
+	conn     *ssh.ServerConn
+	reqs     <-chan *ssh.Request
+	chans    <-chan ssh.NewChannel
 }
 
 type tcpipForward struct {
@@ -56,14 +53,34 @@ type directForward struct {
 
 func NewSshSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, tcpConn net.Conn, config *ssh.ServerConfig) *SshSession {
 	s := &SshSession{
-		nodeID:    nodeID,
-		tcpConn:   tcpConn,
-		redisPool: redisPool,
-		sessions:  sessions,
+		nodeID:   nodeID,
+		tcpConn:  tcpConn,
+		store:    NewRedisSessionStore(redisPool),
+		sessions: sessions,
 	}
 	config.PasswordCallback = s.authFromToken
 	s.config = config
 	return s
+}
+
+func (s *SshSession) ID() string {
+	return s.id
+}
+
+func (s *SshSession) Key() string {
+	return "session:" + s.id
+}
+
+func (s *SshSession) BackendID() string {
+	return s.backendID
+}
+
+func (s *SshSession) NodeID() string {
+	return s.nodeID
+}
+
+func (s *SshSession) Release() *messages.Release {
+	return s.release
 }
 
 func (s *SshSession) RequireStream() error {
@@ -105,17 +122,17 @@ func (s *SshSession) Close() {
 }
 
 func (s *SshSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-	backendID, err := s.backendIDFromToken(string(pass))
+	backendID, err := s.store.BackendIDFromToken(string(pass))
 	if err != nil {
 		return nil, err
 	}
 	if backendID == "" {
 		return nil, errors.New("token rejected")
 	}
-	s.BackendID = backendID
-	s.Client = string(c.ClientVersion())
-	s.ID = hex.EncodeToString(c.SessionID())
-	s.ClientAddr = c.RemoteAddr().String()
+	s.backendID = backendID
+	s.client = string(c.ClientVersion())
+	s.id = hex.EncodeToString(c.SessionID())
+	s.clientAddr = c.RemoteAddr().String()
 
 	return nil, nil
 }
@@ -193,58 +210,20 @@ func (s *SshSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 	}
 }
 
-func (s *SshSession) backendIDFromToken(token string) (string, error) {
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	return redis.String(redisConn.Do("HGET", "backend_tokens", token))
-}
-
 // RegisterConnection ...
 func (s *SshSession) RegisterConnection(t time.Time) error {
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	s.sessions[s.ID] = s
-
-	redisConn.Send("MULTI")
-	redisConn.Send("HMSET", redis.Args{}.Add(s.redisKey()).AddFlat(s)...)
-	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), s.ID)
-	redisConn.Send("SADD", "node:"+s.nodeID+":sessions", s.ID)
-	redisConn.Send("SADD", "backend:"+s.BackendID+":sessions", s.ID)
-	//TODO: add releases
-	//redisConn.Send("ZADD", "backend:"+s.BackendID+":releases", "NX", timeToScore(t), s.Release.ID)
-	//redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID+":release:"+s.Release.ID).AddFlat(s.Release)...)
-	_, err := redisConn.Do("EXEC")
-
-	return err
+	s.sessions[s.id] = s
+	return s.store.RegisterConnection(s)
 }
 
 // RegisterDisconnection ...
 func (s *SshSession) RegisterDisconnection() error {
-	t := time.Now()
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	redisConn.Send("MULTI")
-	redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), s.ID)
-	redisConn.Send("SREM", "node:"+s.nodeID+":sessions", s.ID)
-	redisConn.Send("SREM", "backend:"+s.BackendID+":sessions", s.ID)
-	_, err := redisConn.Do("EXEC")
-	return err
+	return s.store.RegisterDisconnection(s)
 }
 
 // UpdateAttribute ...
 func (s *SshSession) UpdateAttribute(name string, value interface{}) error {
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	_, err := redisConn.Do("HSET", s.redisKey(), name, value)
-	return err
-}
-
-func (s *SshSession) redisKey() string {
-	return "session:" + s.ID
+	return s.store.UpdateAttribute(s, name, value)
 }
 
 func handleChannels(chans <-chan ssh.NewChannel) {

@@ -21,58 +21,45 @@ const (
 
 // Session ...
 type SmuxSession struct {
-	ID     string `redis:"id,omitempty"`
-	Client string `redis:"client,omitempty"`
-	NodeID string `redis:"node_id,omitempty"`
-
-	BackendID string `redis:"backend_id,omitempty"`
-
-	ClientAddr   string `redis:"client_addr,omitempty"`
+	id           string `redis:"id,omitempty"`
+	client       string `redis:"client,omitempty"`
+	nodeID       string `redis:"node_id,omitempty"`
+	backendID    string `redis:"backend_id,omitempty"`
+	clientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
-	Release *messages.Release
+	release *messages.Release
 
 	stream *smux.Stream
 	mux    *smux.Session
 
-	sessions  map[string]Session
-	redisPool *redis.Pool
-	nodeID    string
+	sessions map[string]Session
+	store    *RedisSessionStore
 
 	close chan bool
 }
 
+// NewSmuxSession ...
+func NewSmuxSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, mux *smux.Session) *SmuxSession {
+	return &SmuxSession{
+		id:       xid.New().String(),
+		mux:      mux,
+		close:    make(chan bool),
+		sessions: sessions,
+		store:    NewRedisSessionStore(redisPool),
+		nodeID:   nodeID,
+	}
+}
+
 // RegisterConnection ...
 func (s *SmuxSession) RegisterConnection(t time.Time) error {
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	s.sessions[s.ID] = s
-
-	redisConn.Send("MULTI")
-	redisConn.Send("HMSET", redis.Args{}.Add(s.redisKey()).AddFlat(s)...)
-	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), s.ID)
-	redisConn.Send("SADD", "node:"+s.nodeID+":sessions", s.ID)
-	redisConn.Send("SADD", "backend:"+s.BackendID+":sessions", s.ID)
-	redisConn.Send("ZADD", "backend:"+s.BackendID+":releases", "NX", timeToScore(t), s.Release.ID)
-	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID+":release:"+s.Release.ID).AddFlat(s.Release)...)
-	_, err := redisConn.Do("EXEC")
-
-	return err
+	s.sessions[s.id] = s
+	return s.store.RegisterConnection(s)
 }
 
 // RegisterDisconnection ...
 func (s *SmuxSession) RegisterDisconnection() error {
-	t := time.Now()
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	redisConn.Send("MULTI")
-	redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), s.ID)
-	redisConn.Send("SREM", "node:"+s.nodeID+":sessions", s.ID)
-	redisConn.Send("SREM", "backend:"+s.BackendID+":sessions", s.ID)
-	_, err := redisConn.Do("EXEC")
-	return err
+	return s.store.RegisterDisconnection(s)
 }
 
 // Close ...
@@ -88,31 +75,27 @@ func (s *SmuxSession) IsClosed() bool {
 
 // UpdateAttribute ...
 func (s *SmuxSession) UpdateAttribute(name string, value interface{}) error {
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	_, err := redisConn.Do("HSET", s.redisKey(), name, value)
-	return err
+	return s.store.UpdateAttribute(s, name, value)
 }
 
-func (s *SmuxSession) redisKey() string {
-	return "session:" + s.ID
+func (s *SmuxSession) ID() string {
+	return s.id
 }
 
-func timeToScore(t time.Time) int64 {
-	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
+func (s *SmuxSession) Key() string {
+	return "session:" + s.id
 }
 
-// NewSmuxSession ...
-func NewSmuxSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, mux *smux.Session) *SmuxSession {
-	return &SmuxSession{
-		ID:        xid.New().String(),
-		mux:       mux,
-		close:     make(chan bool),
-		sessions:  sessions,
-		redisPool: redisPool,
-		nodeID:    nodeID,
-	}
+func (s *SmuxSession) BackendID() string {
+	return s.backendID
+}
+
+func (s *SmuxSession) NodeID() string {
+	return s.nodeID
+}
+
+func (s *SmuxSession) Release() *messages.Release {
+	return s.release
 }
 
 // RequireStream ...
@@ -132,7 +115,7 @@ func (s *SmuxSession) setStream(stream *smux.Stream) (err error) {
 		}
 	}()
 	s.stream = stream
-	s.ClientAddr = stream.RemoteAddr().String() // sometime panics
+	s.clientAddr = stream.RemoteAddr().String() // sometime panics
 	return
 }
 
@@ -152,11 +135,10 @@ func (s *SmuxSession) RequireAuthentication() error {
 
 	var resp messages.Response
 
-	s.Client = am.Client
-	s.NodeID = s.nodeID
-	s.Release = am.Release
+	s.client = am.Client
+	s.release = am.Release
 
-	backendID, err := s.backendIDFromToken(am.Token)
+	backendID, err := s.store.BackendIDFromToken(am.Token)
 	if err != nil {
 		resp.Ok = false
 		resp.Errors = []string{"Error retrieving token."}
@@ -170,7 +152,7 @@ func (s *SmuxSession) RequireAuthentication() error {
 		return errors.New("could not find token")
 	}
 
-	s.BackendID = backendID
+	s.backendID = backendID
 	resp.Ok = true
 
 	go s.RegisterConnection(time.Now())
@@ -218,11 +200,4 @@ func initPing(stream *smux.Stream) (err error) {
 		time.Sleep(1 * time.Second)
 	}
 	return err
-}
-
-func (s *SmuxSession) backendIDFromToken(token string) (string, error) {
-	redisConn := s.redisPool.Get()
-	defer redisConn.Close()
-
-	return redis.String(redisConn.Do("HGET", "backend_tokens", token))
 }
