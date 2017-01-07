@@ -6,22 +6,28 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
-type SessionStore interface {
+// Store is an interface to session persistence layer, e.g. Redis
+type Store interface {
 	RegisterConnection(s Session) error
 	RegisterDisconnection(s Session) error
+	RegisterRelease(s Session) error
 	UpdateAttribute(s Session, name string, value interface{}) error
 	BackendIDFromToken(token string) (string, error)
 }
 
-type RedisSessionStore struct {
+// RedisStore is session persistence using Redis
+type RedisStore struct {
 	pool *redis.Pool
 }
 
-func NewRedisSessionStore(pool *redis.Pool) *RedisSessionStore {
-	return &RedisSessionStore{pool: pool}
+// NewRedisStore returns RedisStore struct
+func NewRedisStore(pool *redis.Pool) *RedisStore {
+	return &RedisStore{pool: pool}
 }
 
-func (r *RedisSessionStore) RegisterConnection(s Session) error {
+// RegisterConnection writes Session connection info in Redis
+// Should be called when a client connects.
+func (r *RedisStore) RegisterConnection(s Session) error {
 	t := time.Now()
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
@@ -35,7 +41,9 @@ func (r *RedisSessionStore) RegisterConnection(s Session) error {
 	return err
 }
 
-func (r *RedisSessionStore) RegisterDisconnection(s Session) error {
+// RegisterDisconnection removes Session connection info from Redis
+// Should be called when a client disconnects.
+func (r *RedisStore) RegisterDisconnection(s Session) error {
 	t := time.Now()
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
@@ -50,7 +58,9 @@ func (r *RedisSessionStore) RegisterDisconnection(s Session) error {
 	return err
 }
 
-func (r *RedisSessionStore) RegisterEndpoint(s Session) error {
+// RegisterEndpoint updates the client endoint addr in stored session and adds
+// Endpoint to the list of endpoints stored in Redis
+func (r *RedisStore) RegisterEndpoint(s Session) error {
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
 
@@ -67,20 +77,8 @@ func (r *RedisSessionStore) RegisterEndpoint(s Session) error {
 	return err
 }
 
-// UpdateAttribute ...
-func (r *RedisSessionStore) UpdateAttribute(s Session, name string, value interface{}) error {
-	redisConn := r.pool.Get()
-	defer redisConn.Close()
-
-	_, err := redisConn.Do("HSET", s.Key(), name, value)
-	return err
-}
-
-func timeToScore(t time.Time) int64 {
-	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
-}
-
-func (r *RedisSessionStore) RegisterRelease(s Session) error {
+// RegisterRelease updates VCS (e.g git) info collected by the client
+func (r *RedisStore) RegisterRelease(s Session) error {
 	t := time.Now()
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
@@ -92,9 +90,23 @@ func (r *RedisSessionStore) RegisterRelease(s Session) error {
 	return err
 }
 
-func (r *RedisSessionStore) BackendIDFromToken(token string) (string, error) {
+// BackendIDFromToken returns a backendID for the token or errors out if none found
+func (r *RedisStore) BackendIDFromToken(token string) (string, error) {
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
 
 	return redis.String(redisConn.Do("HGET", "backend_tokens", token))
+}
+
+// UpdateAttribute updates a single Session attribute in Redis
+func (r *RedisStore) UpdateAttribute(s Session, name string, value interface{}) error {
+	redisConn := r.pool.Get()
+	defer redisConn.Close()
+
+	_, err := redisConn.Do("HSET", s.Key(), name, value)
+	return err
+}
+
+func timeToScore(t time.Time) int64 {
+	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
 }

@@ -23,22 +23,16 @@ const (
 )
 
 type SshSession struct {
-	id           string `redis:"id,omitempty"`
-	client       string `redis:"client,omitempty"`
-	nodeID       string `redis:"node_id,omitempty"`
-	backendID    string `redis:"backend_id,omitempty"`
-	clientAddr   string `redis:"client_addr,omitempty"`
-	EndpointAddr string `redis:"endpoint_addr,omitempty"`
+	baseSession
 
-	release *messages.Release
+	client     string `redis:"client,omitempty"`
+	clientAddr string `redis:"client_addr,omitempty"`
 
-	sessions map[string]Session
-	store    *RedisSessionStore
-	config   *ssh.ServerConfig
-	tcpConn  net.Conn
-	conn     *ssh.ServerConn
-	reqs     <-chan *ssh.Request
-	chans    <-chan ssh.NewChannel
+	config  *ssh.ServerConfig
+	tcpConn net.Conn
+	conn    *ssh.ServerConn
+	reqs    <-chan *ssh.Request
+	chans   <-chan ssh.NewChannel
 }
 
 type tcpipForward struct {
@@ -53,40 +47,20 @@ type directForward struct {
 	Port2 uint32
 }
 
+// NewSshSession creates new SshSession struct
 func NewSshSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, tcpConn net.Conn, config *ssh.ServerConfig) *SshSession {
-	s := &SshSession{
+	base := baseSession{
 		nodeID:   nodeID,
-		tcpConn:  tcpConn,
-		store:    NewRedisSessionStore(redisPool),
+		store:    NewRedisStore(redisPool),
 		sessions: sessions,
+	}
+	s := &SshSession{
+		tcpConn:     tcpConn,
+		baseSession: base,
 	}
 	config.PasswordCallback = s.authFromToken
 	s.config = config
 	return s
-}
-
-func (s *SshSession) ID() string {
-	return s.id
-}
-
-func (s *SshSession) Key() string {
-	return "session:" + s.id
-}
-
-func (s *SshSession) BackendID() string {
-	return s.backendID
-}
-
-func (s *SshSession) Endpoint() string {
-	return s.EndpointAddr
-}
-
-func (s *SshSession) NodeID() string {
-	return s.nodeID
-}
-
-func (s *SshSession) Release() *messages.Release {
-	return s.release
 }
 
 func (s *SshSession) RequireStream() error {
@@ -218,27 +192,6 @@ func (s *SshSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 	}
 }
 
-// RegisterConnection ...
-func (s *SshSession) RegisterConnection(t time.Time) error {
-	s.sessions[s.id] = s
-	return s.store.RegisterConnection(s)
-}
-
-// RegisterDisconnection ...
-func (s *SshSession) RegisterDisconnection() error {
-	return s.store.RegisterDisconnection(s)
-}
-
-// RegisterEndpoint ...
-func (s *SshSession) RegisterEndpoint() error {
-	return s.store.RegisterEndpoint(s)
-}
-
-// UpdateAttribute ...
-func (s *SshSession) UpdateAttribute(name string, value interface{}) error {
-	return s.store.UpdateAttribute(s, name, value)
-}
-
 func handleChannels(chans <-chan ssh.NewChannel) {
 	for _ = range chans {
 		// nothing for now.
@@ -264,4 +217,25 @@ func (s *SshSession) registerRelease(req *ssh.Request) {
 	} else {
 		log.Warnf("Couldn't process release info: %s", err.Error())
 	}
+}
+
+// RegisterConnection ...
+func (s *SshSession) RegisterConnection(t time.Time) error {
+	s.sessions[s.id] = s
+	return s.store.RegisterConnection(s)
+}
+
+// RegisterDisconnection ...
+func (s *SshSession) RegisterDisconnection() error {
+	return s.store.RegisterDisconnection(s)
+}
+
+// RegisterEndpoint ...
+func (s *SshSession) RegisterEndpoint() error {
+	return s.store.RegisterEndpoint(s)
+}
+
+// UpdateAttribute ...
+func (s *SshSession) UpdateAttribute(name string, value interface{}) error {
+	return s.store.UpdateAttribute(s, name, value)
 }

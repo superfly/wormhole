@@ -34,7 +34,7 @@ type SmuxSession struct {
 	mux    *smux.Session
 
 	sessions map[string]Session
-	store    *RedisSessionStore
+	store    *RedisStore
 
 	close chan bool
 }
@@ -46,7 +46,7 @@ func NewSmuxSession(nodeID string, redisPool *redis.Pool, sessions map[string]Se
 		mux:      mux,
 		close:    make(chan bool),
 		sessions: sessions,
-		store:    NewRedisSessionStore(redisPool),
+		store:    NewRedisStore(redisPool),
 		nodeID:   nodeID,
 	}
 }
