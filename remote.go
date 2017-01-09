@@ -34,7 +34,6 @@ var (
 	redisPool     *redis.Pool
 	kcpln         *kcp.Listener
 	sshPrivateKey []byte
-	sshPort       = "22222"
 )
 
 // StartRemote ...
@@ -45,7 +44,7 @@ func StartRemote(pass, ver string) {
 	go handleDeath()
 
 	handler := &handler.SshHandler{
-		Port:       sshPort,
+		Port:       listenPort,
 		PrivateKey: sshPrivateKey,
 	}
 	/*
