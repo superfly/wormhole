@@ -1,7 +1,6 @@
 package wormhole
 
 import (
-	"encoding/hex"
 	"errors"
 	"io"
 	"io/ioutil"
@@ -19,7 +18,6 @@ import (
 	"github.com/superfly/smux"
 	handler "github.com/superfly/wormhole/remote"
 	"github.com/superfly/wormhole/session"
-	config "github.com/superfly/wormhole/shared"
 	"github.com/superfly/wormhole/utils"
 	kcp "github.com/xtaci/kcp-go"
 )
@@ -65,18 +63,22 @@ func StartRemote(pass, ver string) {
 
 func ensureRemoteEnvironment() {
 	ensureEnvironment()
-	if privateKey == "" {
-		log.Fatalln("PRIVATE_KEY is required.")
-	}
-	privateKeyBytes, err := hex.DecodeString(privateKey)
-	if err != nil {
-		log.Fatalf("PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
-	}
-	if len(privateKeyBytes) != config.SecretLength {
-		log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", config.SecretLength)
-	}
-	copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
-
+	// we don't need private key for SSH
+	// TODO: delete when smux goes away
+	/*
+		if privateKey == "" {
+			log.Fatalln("PRIVATE_KEY is required.")
+		}
+		privateKeyBytes, err := hex.DecodeString(privateKey)
+		if err != nil {
+			log.Fatalf("PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
+		}
+		if len(privateKeyBytes) != config.SecretLength {
+			log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", config.SecretLength)
+		}
+		copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
+	*/
+	var err error
 	sshPrivateKeyFile := os.Getenv("SSH_PRIVATE_KEY")
 	sshPrivateKey, err = ioutil.ReadFile(sshPrivateKeyFile)
 	if err != nil {
