@@ -72,7 +72,7 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 		"backend_id": s.BackendID(),
 		"socket":     s.Endpoint(),
 	}
-	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":endpoint"+s.Endpoint()).AddFlat(endpoint)...)
+	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":endpoint:"+s.Endpoint()).AddFlat(endpoint)...)
 	_, err := redisConn.Do("EXEC")
 	return err
 }
