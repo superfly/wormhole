@@ -94,6 +94,13 @@ func ensureRemoteEnvironment() {
 
 	redisPool = newRedisPool(redisURL)
 
+	redisConn := redisPool.Get()
+	defer redisConn.Close()
+	_, err = redisConn.Do("PING")
+	if err != nil {
+		log.Fatalf("Couldn't connect to Redis: %s", err.Error())
+	}
+
 	if nodeID == "" {
 		nodeID, _ = os.Hostname()
 	}
