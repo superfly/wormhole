@@ -2,6 +2,8 @@ package wormhole
 
 import (
 	"errors"
+	"io"
+	"io/ioutil"
 	"net"
 	"net/url"
 	"os"
@@ -9,20 +11,27 @@ import (
 	"syscall"
 	"time"
 
+	"golang.org/x/crypto/ssh"
+
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/smux"
+	handler "github.com/superfly/wormhole/remote"
+	"github.com/superfly/wormhole/session"
+	"github.com/superfly/wormhole/utils"
 	kcp "github.com/xtaci/kcp-go"
-	"github.com/xtaci/smux"
 )
 
 var (
-	listenPort = os.Getenv("PORT")
-	nodeID     = os.Getenv("NODE_ID")
-	redisURL   = os.Getenv("REDIS_URL")
-	localhost  = os.Getenv("LOCALHOST")
-	sessions   map[string]*Session
-	redisPool  *redis.Pool
-	kcpln      *kcp.Listener
+	listenPort    = os.Getenv("PORT")
+	nodeID        = os.Getenv("NODE_ID")
+	redisURL      = os.Getenv("REDIS_URL")
+	localhost     = os.Getenv("LOCALHOST")
+	privateKey    = os.Getenv("PRIVATE_KEY")
+	sessions      map[string]session.Session
+	redisPool     *redis.Pool
+	kcpln         *kcp.Listener
+	sshPrivateKey []byte
 )
 
 // StartRemote ...
@@ -31,44 +40,51 @@ func StartRemote(pass, ver string) {
 	version = ver
 	ensureRemoteEnvironment()
 	go handleDeath()
-	block, _ := kcp.NewAESBlockCrypt([]byte(passphrase)[:SecretLength])
-	ln, err := kcp.ListenWithOptions(":"+listenPort, block, KCPShards, KCPParity)
-	if err != nil {
-		log.Fatalln("KCP Server:", err)
-	}
 
-	if err = ln.SetDSCP(DSCP); err != nil {
-		log.Warnln("SetDSCP:", err)
+	handler := &handler.SshHandler{
+		Port:       listenPort,
+		PrivateKey: sshPrivateKey,
 	}
-	if err = ln.SetReadBuffer(MaxBuffer); err != nil {
-		log.Fatalln("SetReadBuffer:", err)
-	}
-	if err = ln.SetWriteBuffer(MaxBuffer); err != nil {
-		log.Fatalln("SetWriteBuffer:", err)
-	}
-	kcpln = ln
-	if err != nil {
-		panic(err)
-	}
-	defer kcpln.Close()
-	log.Println("Listening on", kcpln.Addr().String())
-
-	go DebugSNMP()
-
-	for {
-		kcpconn, err := kcpln.AcceptKCP()
-		if err != nil {
-			log.Errorln("error accepting KCP:", err)
-			break
+	/*
+		handler := &handler.SmuxHandler{
+			Passphrase: passphrase,
+			ListenPort: listenPort,
 		}
-		go handleConn(kcpconn)
-		log.Println("Accepted connection from:", kcpconn.RemoteAddr())
+	*/
+	err := handler.InitializeConnection()
+	if err != nil {
+		log.Fatal(err)
 	}
-	log.Println("Stopping server KCP...")
+	defer handler.Close()
+
+	handler.ListenAndServe(sshSessionHandler)
+	//handler.ListenAndServe(sessionHandler)
 }
 
 func ensureRemoteEnvironment() {
 	ensureEnvironment()
+	// we don't need private key for SSH
+	// TODO: delete when smux goes away
+	/*
+		if privateKey == "" {
+			log.Fatalln("PRIVATE_KEY is required.")
+		}
+		privateKeyBytes, err := hex.DecodeString(privateKey)
+		if err != nil {
+			log.Fatalf("PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
+		}
+		if len(privateKeyBytes) != config.SecretLength {
+			log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", config.SecretLength)
+		}
+		copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
+	*/
+	var err error
+	sshPrivateKeyFile := os.Getenv("SSH_PRIVATE_KEY")
+	sshPrivateKey, err = ioutil.ReadFile(sshPrivateKeyFile)
+	if err != nil {
+		log.Fatalf("Failed to load private key (%s)", sshPrivateKeyFile)
+	}
+
 	if listenPort == "" {
 		listenPort = "10000"
 	}
@@ -82,124 +98,7 @@ func ensureRemoteEnvironment() {
 		nodeID, _ = os.Hostname()
 	}
 
-	sessions = make(map[string]*Session)
-}
-
-func setRemoteConnOptions(kcpconn *kcp.UDPSession) {
-	kcpconn.SetStreamMode(true)
-	kcpconn.SetNoDelay(NoDelay, Interval, Resend, NoCongestion)
-	kcpconn.SetMtu(1350)
-	kcpconn.SetWindowSize(128, 1024)
-	kcpconn.SetACKNoDelay(true)
-	kcpconn.SetKeepAlive(KeepAlive)
-}
-
-func handleConn(kcpconn *kcp.UDPSession) {
-	defer kcpconn.Close()
-	setRemoteConnOptions(kcpconn)
-
-	mux, err := smux.Server(kcpconn, smuxConfig)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	defer mux.Close()
-
-	sess := NewSession(mux)
-	err = sess.RequireStream()
-	if err != nil {
-		log.Errorln("error getting a stream:", err)
-		return
-	}
-
-	err = sess.RequireAuthentication()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	log.Println("Client authenticated.")
-
-	defer sess.RegisterDisconnection()
-	go sess.LivenessLoop()
-
-	ln, err := listenTCP()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	defer ln.Close()
-
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
-
-	endpoint := &Endpoint{
-		BackendID: sess.BackendID,
-		SessionID: sess.ID,
-		Socket:    localhost + ":" + port,
-		ReleaseID: sess.Release.ID,
-	}
-
-	if err = endpoint.Register(); err != nil {
-		log.Errorln("Error registering endpoint:", err)
-		return
-	}
-	defer endpoint.Remove()
-
-	sess.EndpointAddr = endpoint.Socket
-	go sess.UpdateAttribute("endpoint_addr", endpoint.Socket)
-	log.Println("Listening on:", endpoint.Socket)
-
-	for {
-		ln.SetDeadline(time.Now().Add(time.Second))
-		tcpConn, err := ln.AcceptTCP()
-
-		if sess.IsClosed() {
-			log.Println("session is closed, breaking listen loop")
-			return
-		}
-
-		if err != nil {
-			netErr, ok := err.(net.Error)
-
-			//If this is a timeout, then continue to wait for
-			//new connections
-			if ok && netErr.Timeout() && netErr.Temporary() {
-				continue
-			}
-			log.Errorln("Could not accept tcp conn:", err)
-			return
-		}
-		log.Debugln("Accepted tcp connection from:", tcpConn.RemoteAddr())
-
-		err = handleTCPConn(mux, tcpConn)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-	}
-}
-
-func listenTCP() (*net.TCPListener, error) {
-	addr, err := net.ResolveTCPAddr("tcp4", ":0")
-	if err != nil {
-		return nil, errors.New("could not parse TCP addr: " + err.Error())
-	}
-	ln, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		return nil, errors.New("could not listen on: " + err.Error())
-	}
-	return ln, nil
-}
-
-func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
-	stream, err := mux.OpenStream()
-	if err != nil {
-		return err
-	}
-	log.Debug("Opened a stream...")
-
-	go CopyCloseIO(tcpConn, stream)
-	return nil
+	sessions = make(map[string]session.Session)
 }
 
 func newRedisPool(redisURL string) *redis.Pool {
@@ -243,37 +142,147 @@ func handleDeath() {
 	go func(c <-chan os.Signal) {
 		for _ = range c {
 			log.Print("Cleaning up before exit...")
-			// _ = kcpln.Close()
-			// log.Info("Closed KCP listener.")
-			redisConn := redisPool.Get()
-			defer redisConn.Close()
-
-			t := time.Now()
-
-			// Register their disconnection, massively.
-			redisConn.Send("MULTI")
 			for id, session := range sessions {
-				redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), id)
-				redisConn.Send("SREM", "node:"+nodeID+":sessions", id)
-				redisConn.Send("SREM", "backend:"+session.BackendID+":endpoints", session.EndpointAddr)
-				redisConn.Send("SREM", "backend:"+session.BackendID+":sessions", session.ID)
-			}
-			_, err := redisConn.Do("EXEC")
-			if err != nil {
-				log.Errorln("Cleaning up redis failed:", err)
-			} else {
-				log.Print("Cleaned up Redis.")
-			}
-
-			// Actually closes the muxes
-			for id, session := range sessions {
-				if !session.IsClosed() {
-					session.Close()
-				}
+				session.Close()
 				delete(sessions, id)
 			}
 			log.Print("Cleaned up connections.")
 			os.Exit(1)
 		}
 	}(c)
+}
+
+func sessionHandler(conn io.ReadWriteCloser) {
+	mux, err := smux.EncryptedServer(conn, smuxConfig)
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	defer mux.Close()
+
+	sess := session.NewSmuxSession(nodeID, redisPool, sessions, mux)
+	err = sess.RequireStream()
+	if err != nil {
+		log.Errorln("error getting a stream:", err)
+		return
+	}
+
+	err = sess.RequireAuthentication()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	log.Println("Client authenticated.")
+
+	defer sess.RegisterDisconnection()
+	go sess.LivenessLoop()
+
+	ln, err := listenTCP()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	defer ln.Close()
+
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	sess.EndpointAddr = localhost + ":" + port
+
+	if err = sess.RegisterEndpoint(); err != nil {
+		log.Errorln("Error registering endpoint:", err)
+		return
+	}
+
+	log.Println("Listening on:", sess.Endpoint())
+
+	for {
+		ln.SetDeadline(time.Now().Add(time.Second))
+		tcpConn, err := ln.AcceptTCP()
+
+		if sess.IsClosed() {
+			log.Println("session is closed, breaking listen loop")
+			return
+		}
+
+		if err != nil {
+			netErr, ok := err.(net.Error)
+
+			//If this is a timeout, then continue to wait for
+			//new connections
+			if ok && netErr.Timeout() && netErr.Temporary() {
+				continue
+			}
+			log.Errorln("Could not accept tcp conn:", err)
+			return
+		}
+		log.Debugln("Accepted tcp connection from:", tcpConn.RemoteAddr())
+
+		err = handleTCPConn(mux, tcpConn)
+		if err != nil {
+			log.Error(err)
+			return
+		}
+	}
+}
+
+func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
+	// Before use, a handshake must be performed on the incoming net.Conn.
+	sess := session.NewSshSession(nodeID, redisPool, sessions, conn, config)
+	err := sess.RequireStream()
+	if err != nil {
+		log.Errorln("error getting a stream:", err)
+		return
+	}
+
+	err = sess.RequireAuthentication()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	log.Println("Client authenticated.")
+
+	defer sess.RegisterDisconnection()
+
+	ln, err := listenTCP()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+	defer ln.Close()
+
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	sess.EndpointAddr = localhost + ":" + port
+
+	if err = sess.RegisterEndpoint(); err != nil {
+		log.Errorln("Error registering endpoint:", err)
+		return
+	}
+
+	log.Println("Listening on:", sess.Endpoint())
+
+	sess.HandleRequests(ln)
+}
+
+func listenTCP() (*net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr("tcp4", ":0")
+	if err != nil {
+		return nil, errors.New("could not parse TCP addr: " + err.Error())
+	}
+	ln, err := net.ListenTCP("tcp4", addr)
+	if err != nil {
+		return nil, errors.New("could not listen on: " + err.Error())
+	}
+	return ln, nil
+}
+
+func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
+	stream, err := mux.OpenStream()
+	if err != nil {
+		return err
+	}
+	log.Debug("Opened a stream...")
+
+	go utils.CopyCloseIO(tcpConn, stream)
+	return nil
 }

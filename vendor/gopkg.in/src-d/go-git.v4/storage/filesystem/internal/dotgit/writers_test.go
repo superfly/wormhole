@@ -9,7 +9,8 @@ import (
 	"strconv"
 
 	"gopkg.in/src-d/go-git.v4/fixtures"
-	osfs "gopkg.in/src-d/go-git.v4/utils/fs/os"
+
+	osfs "srcd.works/go-billy.v1/os"
 
 	. "gopkg.in/check.v1"
 )
@@ -42,6 +43,27 @@ func (s *SuiteDotGit) TestNewObjectPack(c *C) {
 	stat, err = fs.Stat(fmt.Sprintf("objects/pack/pack-%s.idx", f.PackfileHash))
 	c.Assert(err, IsNil)
 	c.Assert(stat.Size(), Equals, int64(1940))
+}
+
+func (s *SuiteDotGit) TestNewObjectPackUnused(c *C) {
+	dir, err := ioutil.TempDir("", "example")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	defer os.RemoveAll(dir)
+
+	fs := osfs.New(dir)
+	dot := New(fs)
+
+	w, err := dot.NewObjectPack()
+	c.Assert(err, IsNil)
+
+	c.Assert(w.Close(), IsNil)
+
+	info, err := fs.ReadDir("objects/pack")
+	c.Assert(err, IsNil)
+	c.Assert(info, HasLen, 0)
 }
 
 func (s *SuiteDotGit) TestSyncedReader(c *C) {

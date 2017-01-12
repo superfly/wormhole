@@ -1,18 +1,13 @@
 package git
 
 import (
-	"errors"
-	"io"
-	"os"
+	"fmt"
 	"testing"
 
 	"gopkg.in/src-d/go-git.v4/fixtures"
-	"gopkg.in/src-d/go-git.v4/plumbing"
-	"gopkg.in/src-d/go-git.v4/plumbing/client"
-	"gopkg.in/src-d/go-git.v4/plumbing/client/common"
 	"gopkg.in/src-d/go-git.v4/plumbing/format/packfile"
-	"gopkg.in/src-d/go-git.v4/plumbing/format/packp"
-	"gopkg.in/src-d/go-git.v4/storage/filesystem"
+	"gopkg.in/src-d/go-git.v4/plumbing/storer"
+	"gopkg.in/src-d/go-git.v4/plumbing/transport/client"
 
 	. "gopkg.in/check.v1"
 )
@@ -21,149 +16,73 @@ func Test(t *testing.T) { TestingT(t) }
 
 type BaseSuite struct {
 	fixtures.Suite
+	Repository *Repository
+	Storer     storer.EncodedObjectStorer
 
-	Repository   *Repository
-	Repositories map[string]*Repository
+	cache map[string]*Repository
 }
 
 func (s *BaseSuite) SetUpSuite(c *C) {
 	s.Suite.SetUpSuite(c)
 	s.installMockProtocol(c)
-	s.buildRepository(c)
+	s.buildBasicRepository(c)
 
-	s.Repositories = make(map[string]*Repository, 0)
-	s.buildRepositories(c, fixtures.Basic().ByTag("packfile"))
+	s.cache = make(map[string]*Repository, 0)
+}
+
+func (s *BaseSuite) buildBasicRepository(c *C) {
+	f := fixtures.Basic().One()
+	s.Repository = s.NewRepository(f)
+	s.Storer = s.Repository.s
+}
+
+func (s *BaseSuite) NewRepository(f *fixtures.Fixture) *Repository {
+	r, err := NewFilesystemRepository(f.DotGit().Base())
+	if err != nil {
+		panic(err)
+	}
+
+	return r
+}
+
+func (s *BaseSuite) NewRepositoryFromPackfile(f *fixtures.Fixture) *Repository {
+	h := f.PackfileHash.String()
+	if r, ok := s.cache[h]; ok {
+		return r
+	}
+
+	r := NewMemoryRepository()
+
+	p := f.Packfile()
+	defer p.Close()
+
+	n := packfile.NewScanner(p)
+	d, err := packfile.NewDecoder(n, r.s)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = d.Decode()
+	if err != nil {
+		panic(err)
+	}
+
+	s.cache[h] = r
+	return r
 }
 
 func (s *BaseSuite) installMockProtocol(c *C) {
-	clients.InstallProtocol("https", func(end common.Endpoint) common.GitUploadPackService {
-		return &MockGitUploadPackService{endpoint: end}
-	})
+	client.InstallProtocol("https", nil)
 }
 
-func (s *BaseSuite) buildRepository(c *C) {
-	f := fixtures.Basic().One()
-
-	var err error
-	s.Repository, err = NewFilesystemRepository(f.DotGit().Base())
-	c.Assert(err, IsNil)
+func (s *BaseSuite) GetBasicLocalRepositoryURL() string {
+	fixture := fixtures.Basic().One()
+	return s.GetLocalRepositoryURL(fixture)
 }
 
-func (s *BaseSuite) buildRepositories(c *C, f fixtures.Fixtures) {
-	for _, fixture := range f {
-		r := NewMemoryRepository()
-
-		f := fixture.Packfile()
-		defer f.Close()
-
-		n := packfile.NewScanner(f)
-		d, err := packfile.NewDecoder(n, r.s)
-		c.Assert(err, IsNil)
-		_, err = d.Decode()
-		c.Assert(err, IsNil)
-
-		s.Repositories[fixture.URL] = r
-	}
-}
-
-const RepositoryFixture = "https://github.com/git-fixtures/basic.git"
-
-type MockGitUploadPackService struct {
-	connected bool
-	endpoint  common.Endpoint
-	auth      common.AuthMethod
-}
-
-func (p *MockGitUploadPackService) Connect() error {
-	p.connected = true
-	return nil
-}
-
-func (p *MockGitUploadPackService) SetAuth(auth common.AuthMethod) error {
-	p.auth = auth
-	return nil
-}
-
-func (p *MockGitUploadPackService) Info() (*common.GitUploadPackInfo, error) {
-	if !p.connected {
-		return nil, errors.New("not connected")
-	}
-
-	h := fixtures.ByURL(p.endpoint.String()).One().Head
-
-	c := packp.NewCapabilities()
-	c.Decode("6ecf0ef2c2dffb796033e5a02219af86ec6584e5 HEADmulti_ack thin-pack side-band side-band-64k ofs-delta shallow no-progress include-tag multi_ack_detailed no-done symref=HEAD:refs/heads/master agent=git/2:2.4.8~dbussink-fix-enterprise-tokens-compilation-1167-gc7006cf")
-
-	ref := plumbing.ReferenceName("refs/heads/master")
-	branch := plumbing.ReferenceName("refs/heads/branch")
-	tag := plumbing.ReferenceName("refs/tags/v1.0.0")
-
-	return &common.GitUploadPackInfo{
-		Capabilities: c,
-		Refs: map[plumbing.ReferenceName]*plumbing.Reference{
-			plumbing.HEAD: plumbing.NewSymbolicReference(plumbing.HEAD, ref),
-			ref:           plumbing.NewHashReference(ref, h),
-			tag:           plumbing.NewHashReference(tag, h),
-			branch:        plumbing.NewHashReference(branch, plumbing.NewHash("e8d3ffab552895c19b9fcf7aa264d277cde33881")),
-		},
-	}, nil
-}
-
-func (p *MockGitUploadPackService) Fetch(r *common.GitUploadPackRequest) (io.ReadCloser, error) {
-	if !p.connected {
-		return nil, errors.New("not connected")
-	}
-
-	f := fixtures.ByURL(p.endpoint.String())
-
-	if len(r.Wants) == 1 {
-		return f.Exclude("single-branch").One().Packfile(), nil
-	}
-
-	return f.One().Packfile(), nil
-}
-
-func (p *MockGitUploadPackService) Disconnect() error {
-	p.connected = false
-	return nil
-}
-
-type packedFixture struct {
-	url      string
-	packfile string
-}
-
-var fixtureRepos = []packedFixture{
-	{"https://github.com/tyba/git-fixture.git", "formats/packfile/fixtures/git-fixture.ofs-delta"},
-	{"https://github.com/jamesob/desk.git", "formats/packfile/fixtures/jamesob-desk.pack"},
-	{"https://github.com/spinnaker/spinnaker.git", "formats/packfile/fixtures/spinnaker-spinnaker.pack"},
-}
-
-func unpackFixtures(c *C, fixtures ...[]packedFixture) map[string]*Repository {
-	repos := make(map[string]*Repository, 0)
-	for _, group := range fixtures {
-		for _, fixture := range group {
-			if _, existing := repos[fixture.url]; existing {
-				continue
-			}
-
-			comment := Commentf("fixture packfile: %q", fixture.packfile)
-
-			repos[fixture.url] = NewMemoryRepository()
-
-			f, err := os.Open(fixture.packfile)
-			c.Assert(err, IsNil, comment)
-
-			r := packfile.NewScanner(f)
-			d, err := packfile.NewDecoder(r, repos[fixture.url].s)
-			c.Assert(err, IsNil, comment)
-			_, err = d.Decode()
-			c.Assert(err, IsNil, comment)
-			c.Assert(f.Close(), IsNil, comment)
-		}
-	}
-
-	return repos
+func (s *BaseSuite) GetLocalRepositoryURL(f *fixtures.Fixture) string {
+	path := f.DotGit().Base()
+	return fmt.Sprintf("file://%s", path)
 }
 
 type SuiteCommon struct{}
@@ -190,27 +109,4 @@ func (s *SuiteCommon) TestCountLines(c *C) {
 		o := countLines(t.i)
 		c.Assert(o, Equals, t.e, Commentf("subtest %d, input=%q", i, t.i))
 	}
-}
-
-func (s *BaseSuite) Clone(url string) *Repository {
-	r := NewMemoryRepository()
-	if err := r.Clone(&CloneOptions{URL: url}); err != nil {
-		panic(err)
-	}
-
-	return r
-}
-
-func (s *BaseSuite) NewRepository(f *fixtures.Fixture) *Repository {
-	storage, err := filesystem.NewStorage(f.DotGit())
-	if err != nil {
-		panic(err)
-	}
-
-	r, err := NewRepository(storage)
-	if err != nil {
-		panic(err)
-	}
-
-	return r
 }
