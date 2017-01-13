@@ -12,6 +12,7 @@ fi
 export LOG_LEVEL=debug
 export FLY_TOKEN=fla
 export REDIS_URL=redis://localhost:6379
+export CLUSTER_URL=localhost
 
 WORMHOLE_BIN=$GOPATH/src/github.com/superfly/wormhole/cmd/wormhole/wormhole
 SITE_ID=13

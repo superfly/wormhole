@@ -74,11 +74,13 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 
 	redisConn.Send("MULTI")
 	redisConn.Send("HSET", s.Key(), "endpoint_addr", s.Endpoint())
+	redisConn.Send("HSET", s.Key(), "cluster", s.Cluster())
 	redisConn.Send("SADD", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
 	endpoint := map[string]string{
 		"session_id": s.ID(),
 		"backend_id": s.BackendID(),
 		"socket":     s.Endpoint(),
+		"cluster":    s.Cluster(),
 	}
 	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":endpoint:"+s.Endpoint()).AddFlat(endpoint)...)
 	_, err := redisConn.Do("EXEC")

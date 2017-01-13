@@ -24,6 +24,7 @@ var (
 	redisURL      = os.Getenv("REDIS_URL")
 	localhost     = os.Getenv("LOCALHOST")
 	privateKey    = os.Getenv("PRIVATE_KEY")
+	clusterURL    = os.Getenv("CLUSTER_URL")
 	sessions      map[string]session.Session
 	redisPool     *redis.Pool
 	sshPrivateKey []byte
@@ -58,6 +59,9 @@ func ensureRemoteEnvironment() {
 		log.Fatalf("Failed to load private key (%s)", sshPrivateKeyFile)
 	}
 
+	if clusterURL == "" {
+		log.Fatalln("CLUSTER_URL is required.")
+	}
 	if listenPort == "" {
 		listenPort = "10000"
 	}
@@ -160,6 +164,7 @@ func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 	sess.EndpointAddr = localhost + ":" + port
+	sess.ClusterURL = clusterURL
 
 	if err = sess.RegisterEndpoint(); err != nil {
 		log.Errorln("Error registering endpoint:", err)

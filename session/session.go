@@ -8,6 +8,7 @@ type Session interface {
 	BackendID() string
 	NodeID() string
 	Client() string
+	Cluster() string
 	Endpoint() string
 	Key() string
 	Release() *messages.Release
@@ -22,6 +23,7 @@ type baseSession struct {
 	backendID    string `redis:"backend_id,omitempty"`
 	clientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
+	ClusterURL   string `redis:"cluster_url,omitempty"`
 
 	release *messages.Release
 	store   *RedisStore
@@ -43,6 +45,10 @@ func (s *baseSession) NodeID() string {
 
 func (s *baseSession) Client() string {
 	return s.clientAddr
+}
+
+func (s *baseSession) Cluster() string {
+	return s.ClusterURL
 }
 
 func (s *baseSession) Endpoint() string {
