@@ -7,6 +7,7 @@ type Session interface {
 	ID() string
 	BackendID() string
 	NodeID() string
+	Client() string
 	Endpoint() string
 	Key() string
 	Release() *messages.Release
@@ -19,6 +20,7 @@ type baseSession struct {
 	id           string `redis:"id,omitempty"`
 	nodeID       string `redis:"node_id,omitempty"`
 	backendID    string `redis:"backend_id,omitempty"`
+	clientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
 	release *messages.Release
@@ -37,6 +39,10 @@ func (s *baseSession) BackendID() string {
 
 func (s *baseSession) NodeID() string {
 	return s.nodeID
+}
+
+func (s *baseSession) Client() string {
+	return s.clientAddr
 }
 
 func (s *baseSession) Endpoint() string {

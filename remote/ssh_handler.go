@@ -40,10 +40,10 @@ func (s *SshHandler) ListenAndServe(fn func(net.Conn, *ssh.ServerConfig)) {
 	for {
 		tcpConn, err := s.ln.Accept()
 		if err != nil {
-			log.Errorf("Failed to accept incoming connection (%s)", err)
+			log.Errorf("Failed to accept wormhole connection (%s)", err)
 			break
 		}
-		defer tcpConn.Close()
+		log.Debugln("Accepted wormhole TCP conn from:", tcpConn.RemoteAddr())
 
 		fn(tcpConn, s.config)
 	}

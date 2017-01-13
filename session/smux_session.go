@@ -23,9 +23,9 @@ const (
 type SmuxSession struct {
 	id           string `redis:"id,omitempty"`
 	client       string `redis:"client,omitempty"`
+	clientAddr   string `redis:"client_addr,omitempty"`
 	nodeID       string `redis:"node_id,omitempty"`
 	backendID    string `redis:"backend_id,omitempty"`
-	clientAddr   string `redis:"client_addr,omitempty"`
 	EndpointAddr string `redis:"endpoint_addr,omitempty"`
 
 	release *messages.Release
@@ -97,6 +97,10 @@ func (s *SmuxSession) BackendID() string {
 
 func (s *SmuxSession) Endpoint() string {
 	return s.EndpointAddr
+}
+
+func (s *SmuxSession) Client() string {
+	return s.clientAddr
 }
 
 func (s *SmuxSession) NodeID() string {

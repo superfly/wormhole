@@ -25,8 +25,7 @@ const (
 type SshSession struct {
 	baseSession
 
-	client     string `redis:"client,omitempty"`
-	clientAddr string `redis:"client_addr,omitempty"`
+	client string `redis:"client,omitempty"`
 
 	config  *ssh.ServerConfig
 	tcpConn net.Conn
@@ -67,7 +66,7 @@ func (s *SshSession) RequireStream() error {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sshConn, chans, reqs, err := ssh.NewServerConn(s.tcpConn, s.config)
 	if err != nil {
-		log.Printf("Failed to handshake (%s)", err)
+		log.Printf("Failed to handshake %s (%s): %s", s.nodeID, s.tcpConn.RemoteAddr(), err)
 		return err
 	}
 	s.conn = sshConn
@@ -83,7 +82,6 @@ func (s *SshSession) HandleRequests(ln *net.TCPListener) {
 		case sshRemoteForwardRequest:
 			go func() {
 				s.handleRemoteForward(req, ln)
-				go s.RegisterDisconnection()
 			}()
 		case "register-release":
 			go s.registerRelease(req)
@@ -100,7 +98,7 @@ func (s *SshSession) RequireAuthentication() error {
 }
 
 func (s *SshSession) Close() {
-	s.RegisterDisconnection()
+	s.conn.Close()
 }
 
 func (s *SshSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
@@ -146,13 +144,6 @@ func (s *SshSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 		ln.SetDeadline(time.Now().Add(time.Second))
 		tcpConn, err := ln.AcceptTCP()
 
-		/*
-			if sess.IsClosed() {
-				log.Println("session is closed, breaking listen loop")
-				return
-			}
-		*/
-
 		if err != nil {
 			netErr, ok := err.(net.Error)
 
@@ -161,10 +152,10 @@ func (s *SshSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 			if ok && netErr.Timeout() && netErr.Temporary() {
 				continue
 			}
-			log.Errorln("Could not accept tcp conn:", err)
+			log.Errorln("Could not accept Ingress TCP conn:", err)
 			return
 		}
-		log.Debugln("Accepted tcp connection from:", tcpConn.RemoteAddr())
+		log.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
 
 		host, port, err := net.SplitHostPort(tcpConn.RemoteAddr().String())
 		if err != nil {

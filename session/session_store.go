@@ -6,6 +6,10 @@ import (
 	"github.com/garyburd/redigo/redis"
 )
 
+const (
+	sessionTTL = 60 * 60 * 24 // 24h
+)
+
 // Store is an interface to session persistence layer, e.g. Redis
 type Store interface {
 	RegisterConnection(s Session) error
@@ -55,7 +59,7 @@ func (r *RedisStore) RegisterDisconnection(s Session) error {
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":sessions", s.ID())
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
 	redisConn.Send("DEL", "backend:"+s.BackendID()+":endpoint:"+s.Endpoint())
-	redisConn.Send("DEL", s.Key())
+	redisConn.Send("EXPIRE", s.Key(), sessionTTL)
 	_, err := redisConn.Do("EXEC")
 	return err
 }

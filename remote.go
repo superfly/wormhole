@@ -266,7 +266,7 @@ func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 		return
 	}
 
-	log.Println("Listening on:", sess.Endpoint())
+	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }
