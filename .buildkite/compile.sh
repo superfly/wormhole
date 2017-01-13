@@ -9,11 +9,10 @@ if [[ "$unamestr" == 'Darwin' ]]; then
 fi
 
 VERSION=${VERSION:-"latest"}
-[ -z "$PASSPHRASE" ] && echo "Need to set PASSPHRASE" && exit 1;
 
 echo "Compiling version: ${VERSION}"
 
-LDFLAGS="-X 'main.version=$VERSION' -X 'main.passphrase=$PASSPHRASE' -s -w"
+LDFLAGS="-X 'main.version=$VERSION' -s -w"
 GCFLAGS=""
 
 # Cleanup

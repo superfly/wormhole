@@ -2,7 +2,6 @@ package wormhole
 
 import (
 	"errors"
-	"io"
 	"io/ioutil"
 	"net"
 	"net/url"
@@ -15,11 +14,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
-	"github.com/superfly/smux"
 	handler "github.com/superfly/wormhole/remote"
 	"github.com/superfly/wormhole/session"
-	"github.com/superfly/wormhole/utils"
-	kcp "github.com/xtaci/kcp-go"
 )
 
 var (
@@ -30,13 +26,11 @@ var (
 	privateKey    = os.Getenv("PRIVATE_KEY")
 	sessions      map[string]session.Session
 	redisPool     *redis.Pool
-	kcpln         *kcp.Listener
 	sshPrivateKey []byte
 )
 
 // StartRemote ...
-func StartRemote(pass, ver string) {
-	passphrase = pass
+func StartRemote(ver string) {
 	version = ver
 	ensureRemoteEnvironment()
 	go handleDeath()
@@ -45,12 +39,7 @@ func StartRemote(pass, ver string) {
 		Port:       listenPort,
 		PrivateKey: sshPrivateKey,
 	}
-	/*
-		handler := &handler.SmuxHandler{
-			Passphrase: passphrase,
-			ListenPort: listenPort,
-		}
-	*/
+
 	err := handler.InitializeConnection()
 	if err != nil {
 		log.Fatal(err)
@@ -58,26 +47,10 @@ func StartRemote(pass, ver string) {
 	defer handler.Close()
 
 	handler.ListenAndServe(sshSessionHandler)
-	//handler.ListenAndServe(sessionHandler)
 }
 
 func ensureRemoteEnvironment() {
 	ensureEnvironment()
-	// we don't need private key for SSH
-	// TODO: delete when smux goes away
-	/*
-		if privateKey == "" {
-			log.Fatalln("PRIVATE_KEY is required.")
-		}
-		privateKeyBytes, err := hex.DecodeString(privateKey)
-		if err != nil {
-			log.Fatalf("PRIVATE_KEY needs to be in hex format. Details: %s", err.Error())
-		}
-		if len(privateKeyBytes) != config.SecretLength {
-			log.Fatalf("PRIVATE_KEY needs to be %d bytes long\n", config.SecretLength)
-		}
-		copy(smuxConfig.ServerPrivateKey[:], privateKeyBytes)
-	*/
 	var err error
 	sshPrivateKeyFile := os.Getenv("SSH_PRIVATE_KEY")
 	sshPrivateKey, err = ioutil.ReadFile(sshPrivateKeyFile)
@@ -159,79 +132,6 @@ func handleDeath() {
 	}(c)
 }
 
-func sessionHandler(conn io.ReadWriteCloser) {
-	mux, err := smux.EncryptedServer(conn, smuxConfig)
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	defer mux.Close()
-
-	sess := session.NewSmuxSession(nodeID, redisPool, sessions, mux)
-	err = sess.RequireStream()
-	if err != nil {
-		log.Errorln("error getting a stream:", err)
-		return
-	}
-
-	err = sess.RequireAuthentication()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	log.Println("Client authenticated.")
-
-	defer sess.RegisterDisconnection()
-	go sess.LivenessLoop()
-
-	ln, err := listenTCP()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-	defer ln.Close()
-
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
-	sess.EndpointAddr = localhost + ":" + port
-
-	if err = sess.RegisterEndpoint(); err != nil {
-		log.Errorln("Error registering endpoint:", err)
-		return
-	}
-
-	log.Println("Listening on:", sess.Endpoint())
-
-	for {
-		ln.SetDeadline(time.Now().Add(time.Second))
-		tcpConn, err := ln.AcceptTCP()
-
-		if sess.IsClosed() {
-			log.Println("session is closed, breaking listen loop")
-			return
-		}
-
-		if err != nil {
-			netErr, ok := err.(net.Error)
-
-			//If this is a timeout, then continue to wait for
-			//new connections
-			if ok && netErr.Timeout() && netErr.Temporary() {
-				continue
-			}
-			log.Errorln("Could not accept tcp conn:", err)
-			return
-		}
-		log.Debugln("Accepted tcp connection from:", tcpConn.RemoteAddr())
-
-		err = handleTCPConn(mux, tcpConn)
-		if err != nil {
-			log.Error(err)
-			return
-		}
-	}
-}
-
 func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sess := session.NewSshSession(nodeID, redisPool, sessions, conn, config)
@@ -281,15 +181,4 @@ func listenTCP() (*net.TCPListener, error) {
 		return nil, errors.New("could not listen on: " + err.Error())
 	}
 	return ln, nil
-}
-
-func handleTCPConn(mux *smux.Session, tcpConn *net.TCPConn) error {
-	stream, err := mux.OpenStream()
-	if err != nil {
-		return err
-	}
-	log.Debug("Opened a stream...")
-
-	go utils.CopyCloseIO(tcpConn, stream)
-	return nil
 }

@@ -7,7 +7,9 @@ import (
 )
 
 const (
-	sessionTTL = 60 * 60 * 24 // 24h
+	sessionTTL              = 60 * 60 * 24 // 24h
+	connectedSessionsKey    = "sessions:connected"
+	disconnectedSessionsKey = "sessions:disconnected"
 )
 
 // Store is an interface to session persistence layer, e.g. Redis

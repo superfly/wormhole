@@ -14,7 +14,6 @@ docker run --rm \
   --entrypoint /go/src/github.com/superfly/wormhole/.buildkite/compile.sh \
   --workdir /go/src/github.com/superfly/wormhole \
   -e VERSION=${BUILDKITE_TAG} \
-  -e PASSPHRASE=${PASSPHRASE} \
   golang
 
 GHR='./github-release'

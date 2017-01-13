@@ -13,11 +13,9 @@ import (
 	git "gopkg.in/src-d/go-git.v4"
 
 	"github.com/jpillora/backoff"
-	"github.com/superfly/smux"
 
 	handler "github.com/superfly/wormhole/local"
 	"github.com/superfly/wormhole/messages"
-	config "github.com/superfly/wormhole/shared"
 
 	log "github.com/Sirupsen/logrus"
 )
@@ -25,7 +23,6 @@ import (
 var (
 	localEndpoint  = os.Getenv("LOCAL_ENDPOINT")
 	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
-	controlStream  *smux.Stream
 	cmd            *exec.Cmd
 	flyToken       = os.Getenv("FLY_TOKEN")
 
@@ -35,7 +32,6 @@ var (
 )
 
 func ensureLocalEnvironment() {
-	smuxConfig = smux.DefaultConfig()
 	ensureEnvironment()
 	if flyToken == "" {
 		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
@@ -49,9 +45,6 @@ func ensureLocalEnvironment() {
 		releaseDescVar = "FLY_RELEASE_DESC"
 	}
 
-	smuxConfig.MaxReceiveBuffer = config.MaxBuffer
-	smuxConfig.KeepAliveInterval = config.KeepAlive * time.Second
-	// smuxConfig.KeepAliveTimeout = Interval * time.Second
 	textFormatter := &log.TextFormatter{FullTimestamp: true}
 	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
@@ -146,8 +139,7 @@ func runProgram(program string) (localPort string, err error) {
 }
 
 // StartLocal ...
-func StartLocal(pass, ver string) {
-	passphrase = pass
+func StartLocal(ver string) {
 	version = ver
 	ensureLocalEnvironment()
 	args := os.Args[1:]
@@ -175,18 +167,7 @@ func StartLocal(pass, ver string) {
 	b := &backoff.Backoff{
 		Max: 2 * time.Minute,
 	}
-	/*
-		handler := &handler.SmuxHandler{
-			Passphrase: passphrase,
-			RemoteEndpoint: remoteEndpoint,
-			LocalEndpoint:  localEndpoint,
-			Config:         smuxConfig,
-			FlyToken:       flyToken,
-			Release:        release,
-			Version:        version,
-		}
-		go DebugSNMP()
-	*/
+
 	handler := &handler.SshHandler{
 		FlyToken:       flyToken,
 		RemoteEndpoint: remoteEndpoint,

@@ -10,10 +10,14 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/messages"
-	config "github.com/superfly/wormhole/shared"
 	"github.com/superfly/wormhole/utils"
 	"golang.org/x/crypto/ssh"
 )
+
+type ConnectionHandler interface {
+	InitializeConnection() error
+	Close() error
+}
 
 type SshHandler struct {
 	RemoteEndpoint string
@@ -91,15 +95,6 @@ func forwardConnection(conn net.Conn, local string) error {
 	}
 
 	log.Debugln("dialed local connection")
-
-	if err = localConn.(*net.TCPConn).SetReadBuffer(config.MaxBuffer); err != nil {
-		log.Errorln("TCP SetReadBuffer error:", err)
-	}
-	if err = localConn.(*net.TCPConn).SetWriteBuffer(config.MaxBuffer); err != nil {
-		log.Errorln("TCP SetWriteBuffer error:", err)
-	}
-
-	log.Debugln("local connection settings has been set...")
 
 	err = utils.CopyCloseIO(localConn, conn)
 	return err

@@ -1,5 +1,5 @@
-hash: 08aedeaf92a4f77b05135fc59279ce49f776be8079135ade8023f7779eaee540
-updated: 2017-01-03T11:54:03.598515849-08:00
+hash: eff6ffe05e0178cff7d9f10f9e10c6d412a50ddebd3a91f0cf003a936cc89713
+updated: 2017-01-12T18:19:19.429803187-08:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -14,10 +14,6 @@ imports:
   version: a6f64285fd4072883335339357436b78d62c96a4
 - name: github.com/klauspost/cpuid
   version: 09cded8978dc9e80714c4d85b0322337b0a1e5e0
-- name: github.com/klauspost/crc32
-  version: cb6bfca970f6908083f26f39a79009d608efd5cd
-- name: github.com/klauspost/reedsolomon
-  version: d0a56f72c0d40a6cdde43a1575ad9686a0098b70
 - name: github.com/pkg/errors
   version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
 - name: github.com/rs/xid
@@ -36,37 +32,22 @@ imports:
   - types
 - name: github.com/superfly/smux
   version: c34bbd53d50f4b7450eb0a4c8bcfe6e576dd2014
-  vcs: git
-- name: github.com/xtaci/kcp-go
-  version: 2a9a3f742303ffb01acd1704d198a805238135fd
-  vcs: git
 - name: golang.org/x/crypto
   version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
   subpackages:
-  - blowfish
-  - cast5
   - curve25519
   - ed25519
   - ed25519/internal/edwards25519
   - nacl/box
   - nacl/secretbox
-  - pbkdf2
   - poly1305
-  - salsa20
   - salsa20/salsa
   - ssh
   - ssh/agent
-  - tea
-  - twofish
-  - xtea
 - name: golang.org/x/net
   version: 4971afdc2f162e82d185353533d3cf16188a9f4e
   subpackages:
-  - bpf
   - context
-  - internal/iana
-  - internal/netreflect
-  - ipv4
 - name: golang.org/x/sys
   version: d5645953809d8b4752afb2c3224b1f1ad73dfa70
   subpackages:

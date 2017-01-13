@@ -7,7 +7,6 @@ import (
 )
 
 var (
-	passphrase string
 	version    string
 	serverMode = flag.Bool("server", false, "Run the wormhole in server mode.")
 )
@@ -15,8 +14,8 @@ var (
 func main() {
 	flag.Parse()
 	if *serverMode {
-		wormhole.StartRemote(passphrase, version)
+		wormhole.StartRemote(version)
 	} else {
-		wormhole.StartLocal(passphrase, version)
+		wormhole.StartLocal(version)
 	}
 }

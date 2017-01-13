@@ -1,12 +1,6 @@
 package utils
 
-import (
-	"io"
-	"log"
-	"time"
-
-	kcp "github.com/xtaci/kcp-go"
-)
+import "io"
 
 // CopyCloseIO ...
 func CopyCloseIO(c1, c2 io.ReadWriteCloser) (err error) {
@@ -36,15 +30,4 @@ func CopyCloseIO(c1, c2 io.ReadWriteCloser) (err error) {
 	}
 	err = <-errCh
 	return err
-}
-
-// DebugSNMP ...
-func DebugSNMP() {
-	for _ = range time.Tick(120 * time.Second) {
-		outputSNMP()
-	}
-}
-
-func outputSNMP() {
-	log.Printf("KCP SNMP:%+v", kcp.DefaultSnmp.Copy())
 }
