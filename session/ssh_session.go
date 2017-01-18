@@ -4,6 +4,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"errors"
+	"io"
 	"net"
 	"strconv"
 	"time"
@@ -138,49 +139,74 @@ func (s *SshSession) setSshPort(req *ssh.Request, ln net.Listener) tcpipForward 
 }
 
 func (s *SshSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) {
+	defer func() {
+		err := ln.Close()
+		if err != nil {
+			log.Debugf("Couldn't close ingress conn: %s", err)
+			return
+		}
+		log.Debugf("Closed ingress conn: %s", ln.Addr().String())
+	}()
+
 	t := s.setSshPort(req, ln)
 	p := directForward{}
-	for {
-		ln.SetDeadline(time.Now().Add(time.Second))
-		tcpConn, err := ln.AcceptTCP()
+	quit := make(chan bool)
+	go func(ln *net.TCPListener) { // Handle incoming connections on this new listener
+		for {
+			select {
+			case <-quit:
+				return
+			default:
+				ln.SetDeadline(time.Now().Add(time.Second))
+				tcpConn, err := ln.AcceptTCP()
 
-		if err != nil {
-			netErr, ok := err.(net.Error)
+				if err != nil {
+					netErr, ok := err.(net.Error)
 
-			//If this is a timeout, then continue to wait for
-			//new connections
-			if ok && netErr.Timeout() && netErr.Temporary() {
-				continue
+					//If this is a timeout, then continue to wait for
+					//new connections
+					if ok && netErr.Timeout() && netErr.Temporary() {
+						continue
+					}
+					log.Errorln("Could not accept Ingress TCP conn:", err)
+					return
+				}
+				log.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
+
+				host, port, err := net.SplitHostPort(tcpConn.RemoteAddr().String())
+				if err != nil {
+					return
+				}
+				portnum, err := strconv.Atoi(port)
+				if err != nil {
+					return
+				}
+
+				p.Host1 = t.Host
+				p.Port1 = t.Port
+				p.Host2 = host
+				p.Port2 = uint32(portnum)
+
+				ch, reqs, sshErr := s.conn.OpenChannel(sshForwardedTCPReturnRequest, ssh.Marshal(p))
+				if sshErr != nil {
+					log.WithFields(log.Fields{
+						"err": err.Error(),
+					}).Error("Open forwarded Channel error:")
+					return
+				}
+				go ssh.DiscardRequests(reqs)
+				go func() {
+					err := utils.CopyCloseIO(tcpConn, ch)
+					if err != nil && err != io.EOF {
+						log.Error(err)
+					}
+				}()
 			}
-			log.Errorln("Could not accept Ingress TCP conn:", err)
-			return
 		}
-		log.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
+	}(ln)
 
-		host, port, err := net.SplitHostPort(tcpConn.RemoteAddr().String())
-		if err != nil {
-			return
-		}
-		portnum, err := strconv.Atoi(port)
-		if err != nil {
-			return
-		}
-
-		p.Host1 = t.Host
-		p.Port1 = t.Port
-		p.Host2 = host
-		p.Port2 = uint32(portnum)
-
-		ch, reqs, sshErr := s.conn.OpenChannel(sshForwardedTCPReturnRequest, ssh.Marshal(p))
-		if sshErr != nil {
-			log.WithFields(log.Fields{
-				"err": err.Error(),
-			}).Error("Open forwarded Channel error:")
-			return
-		}
-		go ssh.DiscardRequests(reqs)
-		go utils.CopyCloseIO(tcpConn, ch)
-	}
+	s.conn.Wait()
+	quit <- true
 }
 
 func handleChannels(chans <-chan ssh.NewChannel) {

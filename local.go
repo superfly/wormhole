@@ -185,7 +185,10 @@ func StartLocal(ver string) {
 		}
 		handleOsSignal(handler)
 		b.Reset()
-		handler.ListenAndServe()
+		err = handler.ListenAndServe()
+		if err != nil {
+			log.Error(err)
+		}
 	}
 }
 

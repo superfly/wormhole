@@ -153,14 +153,16 @@ func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 
 	log.Println("Client authenticated.")
 
-	defer sess.RegisterDisconnection()
+	defer func() {
+		sess.RegisterDisconnection()
+		log.Infof("Closed session %s for %s (%s).", sess.ID(), sess.NodeID(), sess.Client())
+	}()
 
 	ln, err := listenTCP()
 	if err != nil {
 		log.Errorln(err)
 		return
 	}
-	defer ln.Close()
 
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 	sess.EndpointAddr = localhost + ":" + port

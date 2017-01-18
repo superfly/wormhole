@@ -45,7 +45,7 @@ func (s *SshHandler) ListenAndServe(fn func(net.Conn, *ssh.ServerConfig)) {
 		}
 		log.Debugln("Accepted wormhole TCP conn from:", tcpConn.RemoteAddr())
 
-		fn(tcpConn, s.config)
+		go fn(tcpConn, s.config)
 	}
 }
 

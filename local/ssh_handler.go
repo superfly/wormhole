@@ -1,9 +1,10 @@
 package handler
 
 import (
+	"fmt"
+	"io"
 	"net"
 	"os"
-	"sync"
 	"time"
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
@@ -59,15 +60,16 @@ func (s *SshHandler) InitializeConnection() error {
 }
 
 func (s *SshHandler) ListenAndServe() error {
-	defer s.Close()
 	go s.stayAlive()
 	go s.registerRelease()
 
 	for {
 		conn, err := s.ln.Accept()
-		if err != nil { // Unable to accept new connection - listener likely closed
-			log.Errorln("Error accepting stream:", err)
-			return err
+		if err != nil {
+			if err != io.EOF {
+				return fmt.Errorf("Error accepting stream: %s", err)
+			}
+			return nil
 		}
 
 		go forwardConnection(conn, s.LocalEndpoint)
@@ -75,29 +77,31 @@ func (s *SshHandler) ListenAndServe() error {
 }
 
 func (s *SshHandler) Close() error {
-	return s.ssh.Close()
+	err := s.ssh.Close()
+	if err != nil {
+		log.Errorf("SSH conn close: %s", err)
+	}
+	err = s.ln.Close()
+	if err != nil {
+		log.Errorf("SSH listener close: %s", err)
+	}
+	return err
 }
 
-var copyBufPool = sync.Pool{
-	New: func() interface{} {
-		b := make([]byte, 32*1024)
-		return &b
-	},
-}
-
-func forwardConnection(conn net.Conn, local string) error {
+func forwardConnection(conn net.Conn, local string) {
 	log.Debugln("Accepted SSH tunnel")
 
 	localConn, err := net.DialTimeout("tcp", local, 5*time.Second)
 	if err != nil {
 		log.Errorln(err)
-		return err
 	}
 
 	log.Debugln("dialed local connection")
 
 	err = utils.CopyCloseIO(localConn, conn)
-	return err
+	if err != nil && err != io.EOF {
+		log.Error(err)
+	}
 }
 
 func (s *SshHandler) stayAlive() {

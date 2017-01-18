@@ -1,12 +1,30 @@
 package utils
 
-import "io"
+import (
+	"io"
+
+	log "github.com/Sirupsen/logrus"
+)
 
 // CopyCloseIO ...
 func CopyCloseIO(c1, c2 io.ReadWriteCloser) (err error) {
-	defer c1.Close()
-	defer c2.Close()
-	errCh := make(chan error)
+	defer func() {
+		log.Debug("closing c1")
+		err1 := c1.Close()
+		if err != nil {
+			log.Errorf("CopyCloseIO err : %s", err1)
+		}
+	}()
+
+	defer func() {
+		log.Debug("closing c2")
+		err2 := c2.Close()
+		if err != nil {
+			log.Errorf("CopyCloseIO err : %s", err2)
+		}
+	}()
+
+	errCh := make(chan error, 1)
 
 	// start tunnel
 	c1die := make(chan struct{})
