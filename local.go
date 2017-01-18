@@ -1,7 +1,6 @@
 package wormhole
 
 import (
-	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -16,8 +15,14 @@ import (
 
 	handler "github.com/superfly/wormhole/local"
 	"github.com/superfly/wormhole/messages"
+)
 
-	log "github.com/Sirupsen/logrus"
+const (
+	defaultLocalPort      = "5000"
+	defaultLocalHost      = "127.0.0.1"
+	defaultRemoteEndpoint = "wormhole.fly.io:30000"
+	localServerRetry      = 200 * time.Millisecond // how often to retry local server until ready
+	maxWormholeBackoff    = 2 * time.Minute        // max backoff between retries to wormhole server
 )
 
 var (
@@ -45,10 +50,8 @@ func ensureLocalEnvironment() {
 		releaseDescVar = "FLY_RELEASE_DESC"
 	}
 
-	textFormatter := &log.TextFormatter{FullTimestamp: true}
-	log.SetFormatter(textFormatter)
 	if remoteEndpoint == "" {
-		remoteEndpoint = "wormhole.fly.io:30000"
+		remoteEndpoint = defaultRemoteEndpoint
 	}
 	computeRelease()
 }
@@ -94,7 +97,7 @@ func computeRelease() {
 	if release.Description == "" && release.VCSRevisionMessage != "" {
 		release.Description = release.VCSRevisionMessage
 	}
-	log.Println("current release:", release)
+	log.Println("Current release:", release)
 }
 
 func runProgram(program string) (localPort string, err error) {
@@ -105,8 +108,8 @@ func runProgram(program string) (localPort string, err error) {
 	cmd.Stderr = os.Stderr
 	localPort = os.Getenv("PORT")
 	if localPort == "" {
-		localPort = "5000"
-		cmd.Env = append(os.Environ(), fmt.Sprintf("PORT=%d", 5000))
+		localPort = defaultLocalPort
+		cmd.Env = append(os.Environ(), defaultLocalPort)
 	} else {
 		cmd.Env = os.Environ()
 	}
@@ -149,7 +152,7 @@ func StartLocal(ver string) {
 			log.Errorln("Error running program:", err)
 			return
 		}
-		localEndpoint = "127.0.0.1:" + localPort
+		localEndpoint = defaultLocalHost + ":" + localPort
 
 		for {
 			conn, err := net.Dial("tcp", localEndpoint)
@@ -160,7 +163,7 @@ func StartLocal(ver string) {
 				log.Println("Local server is ready on:", localEndpoint)
 				break
 			}
-			time.Sleep(200 * time.Millisecond)
+			time.Sleep(localServerRetry)
 		}
 	}
 
@@ -178,7 +181,7 @@ func StartLocal(ver string) {
 	for {
 		err := handler.InitializeConnection()
 		if err != nil {
-			log.Errorln("Could not make connection:", err)
+			log.Error(err)
 			d := b.Duration()
 			time.Sleep(d)
 			continue

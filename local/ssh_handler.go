@@ -74,7 +74,7 @@ func (s *SSHHandler) InitializeConnection() error {
 	// SSH into wormhole server
 	conn, err := ssh.Dial("tcp", s.RemoteEndpoint, config)
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to establish SSH connection: %s", err.Error())
 	}
 	log.Info("Established SSH connection.")
 	s.ssh = conn
@@ -82,7 +82,7 @@ func (s *SSHHandler) InitializeConnection() error {
 	// open a port on wormhole server that we can listen on
 	ln, err := s.ssh.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
-		return err
+		return fmt.Errorf("Failed to open SSH tunnel: %s", err.Error())
 	}
 	s.ln = ln
 	log.Infof("Opened SSH tunnel on %s", ln.Addr().String())
@@ -99,7 +99,7 @@ func (s *SSHHandler) ListenAndServe() error {
 		conn, err := s.ln.Accept()
 		if err != nil {
 			if err != io.EOF {
-				return fmt.Errorf("Error accepting stream: %s", err)
+				return fmt.Errorf("Failed to accept SSH Session: %s", err.Error())
 			}
 			return nil
 		}
@@ -139,7 +139,7 @@ func forwardConnection(conn net.Conn, local string) {
 
 func (s *SSHHandler) stayAlive() {
 	ticker := time.NewTicker(sshKeepaliveInterval)
-	log.Debug("Sending keepalive every %s seconds", sshKeepaliveInterval.Seconds())
+	log.Debug("Sending keepalive every %d seconds", sshKeepaliveInterval.Seconds())
 	defer ticker.Stop()
 	for {
 		select {

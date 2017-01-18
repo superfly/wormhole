@@ -3,8 +3,9 @@ package wormhole
 import (
 	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/superfly/smux"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
@@ -12,17 +13,20 @@ var (
 
 	logLevel   = os.Getenv("LOG_LEVEL")
 	smuxConfig *smux.Config
+	logger     = logrus.New()
+	log        *logrus.Entry
 )
 
 func init() {
+	logger.Formatter = new(prefixed.TextFormatter)
 	if logLevel == "" {
-		log.SetLevel(log.InfoLevel)
+		logger.Level = logrus.InfoLevel
 	} else if logLevel == "debug" {
-		log.SetLevel(log.DebugLevel)
+		logger.Level = logrus.DebugLevel
 	}
-	// logging
-	textFormatter := &log.TextFormatter{FullTimestamp: true}
-	log.SetFormatter(textFormatter)
+	log = logger.WithFields(logrus.Fields{
+		"prefix": "wormhole",
+	})
 }
 
 func ensureEnvironment() {

@@ -12,7 +12,6 @@ import (
 
 	"golang.org/x/crypto/ssh"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	handler "github.com/superfly/wormhole/remote"
 	"github.com/superfly/wormhole/session"
