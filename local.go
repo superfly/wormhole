@@ -168,7 +168,7 @@ func StartLocal(ver string) {
 		Max: 2 * time.Minute,
 	}
 
-	handler := &handler.SshHandler{
+	handler := &handler.SSHHandler{
 		FlyToken:       flyToken,
 		RemoteEndpoint: remoteEndpoint,
 		LocalEndpoint:  localEndpoint,

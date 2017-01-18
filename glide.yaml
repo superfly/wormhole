@@ -1,6 +1,8 @@
 package: github.com/superfly/wormhole
 import:
 - package: github.com/jpillora/backoff
+- package: github.com/Sirupsen/logrus
+- package: github.com/x-cray/logrus-prefixed-formatter
 - package: github.com/garyburd/redigo
   version: ~1.0.0
 - package: gopkg.in/vmihailenco/msgpack.v2

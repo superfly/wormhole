@@ -9,18 +9,41 @@ import (
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/crypto/ssh"
 )
 
+const (
+	sshConnTimeout       = 10 * time.Second
+	localConnTimeout     = 5 * time.Second
+	sshKeepaliveInterval = 30 * time.Second
+)
+
+var logger = logrus.New()
+var log *logrus.Entry
+
+func init() {
+	logger.Formatter = new(prefixed.TextFormatter)
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		logger.Level = logrus.DebugLevel
+	}
+	log = logger.WithFields(logrus.Fields{
+		"prefix": "SSHHandler",
+	})
+}
+
+// ConnectionHandler specifies interface for handler connecting to wormhole server
 type ConnectionHandler interface {
 	InitializeConnection() error
 	Close() error
 }
 
-type SshHandler struct {
+// SSHHandler type represents the handler that SSHs to wormhole server and serves
+// incoming requests
+type SSHHandler struct {
 	RemoteEndpoint string
 	LocalEndpoint  string
 	FlyToken       string
@@ -30,7 +53,10 @@ type SshHandler struct {
 	ln             net.Listener
 }
 
-func (s *SshHandler) InitializeConnection() error {
+// InitializeConnection connects to wormhole server, performs SSH handshake, and
+// opens a port on wormhole server that SshHandler can listen on.
+// SSH uses FLY_TOKEN for authentication
+func (s *SSHHandler) InitializeConnection() error {
 	hostname, err := os.Hostname()
 	if err != nil {
 		hostname = "unknown"
@@ -42,24 +68,30 @@ func (s *SshHandler) InitializeConnection() error {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(s.FlyToken),
 		},
-		Timeout: 10 * time.Second,
+		Timeout: sshConnTimeout,
 	}
+
+	// SSH into wormhole server
 	conn, err := ssh.Dial("tcp", s.RemoteEndpoint, config)
 	if err != nil {
 		return err
 	}
-	log.Info("Connected to the tunnel.")
+	log.Info("Established SSH connection.")
 	s.ssh = conn
 
+	// open a port on wormhole server that we can listen on
 	ln, err := s.ssh.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
 		return err
 	}
 	s.ln = ln
+	log.Infof("Opened SSH tunnel on %s", ln.Addr().String())
 	return nil
 }
 
-func (s *SshHandler) ListenAndServe() error {
+// ListenAndServe accepts requests coming from wormhole server
+// and forwards them to the local server
+func (s *SSHHandler) ListenAndServe() error {
 	go s.stayAlive()
 	go s.registerRelease()
 
@@ -76,7 +108,8 @@ func (s *SshHandler) ListenAndServe() error {
 	}
 }
 
-func (s *SshHandler) Close() error {
+// Close closes the listener and SSH connection
+func (s *SSHHandler) Close() error {
 	err := s.ssh.Close()
 	if err != nil {
 		log.Errorf("SSH conn close: %s", err)
@@ -89,14 +122,14 @@ func (s *SshHandler) Close() error {
 }
 
 func forwardConnection(conn net.Conn, local string) {
-	log.Debugln("Accepted SSH tunnel")
+	log.Debugf("Accepted SSH session on %s", conn.RemoteAddr())
 
-	localConn, err := net.DialTimeout("tcp", local, 5*time.Second)
+	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
 	if err != nil {
-		log.Errorln(err)
+		log.Errorf("Failed to reach local server: %s", err.Error())
 	}
 
-	log.Debugln("dialed local connection")
+	log.Debugf("Dialed local server on %s", local)
 
 	err = utils.CopyCloseIO(localConn, conn)
 	if err != nil && err != io.EOF {
@@ -104,32 +137,31 @@ func forwardConnection(conn net.Conn, local string) {
 	}
 }
 
-func (s *SshHandler) stayAlive() {
-	ticker := time.NewTicker(30 * time.Second)
+func (s *SSHHandler) stayAlive() {
+	ticker := time.NewTicker(sshKeepaliveInterval)
+	log.Debug("Sending keepalive every %s seconds", sshKeepaliveInterval.Seconds())
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
 			go func() {
-				log.Debug("Sending keepalive...")
 				_, _, err := s.ssh.SendRequest("keepalive", false, nil)
 				if err != nil {
-					log.Errorln("Keepalive error:", err)
+					log.Errorf("Keepalive failed: %s", err.Error())
 					return
 				}
-				log.Debug("Keepalive sent.")
 			}()
 		}
 	}
 }
 
-func (s *SshHandler) registerRelease() {
-	log.Debug("Sending register-release...")
+func (s *SSHHandler) registerRelease() {
+	log.Info("Sending release info...")
 	releaseBytes, err := msgpack.Marshal(s.Release)
 	_, _, err = s.ssh.SendRequest("register-release", false, releaseBytes)
 	if err != nil {
-		log.Errorln("register-release error:", err)
+		log.Errorf("Failed to send release info: %s", err.Error())
 		return
 	}
-	log.Debug("register-release sent.")
+	log.Debug("Release info sent.")
 }
