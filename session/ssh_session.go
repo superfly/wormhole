@@ -99,6 +99,8 @@ func (s *SshSession) RequireAuthentication() error {
 }
 
 func (s *SshSession) Close() {
+	s.RegisterDisconnection()
+	log.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
 	s.conn.Close()
 }
 

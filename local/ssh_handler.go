@@ -139,7 +139,7 @@ func forwardConnection(conn net.Conn, local string) {
 
 func (s *SSHHandler) stayAlive() {
 	ticker := time.NewTicker(sshKeepaliveInterval)
-	log.Debug("Sending keepalive every %d seconds", sshKeepaliveInterval.Seconds())
+	log.Debugf("Sending keepalive every %.1f seconds", sshKeepaliveInterval.Seconds())
 	defer ticker.Stop()
 	for {
 		select {

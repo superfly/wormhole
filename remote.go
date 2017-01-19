@@ -152,10 +152,7 @@ func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 
 	log.Println("Client authenticated.")
 
-	defer func() {
-		sess.RegisterDisconnection()
-		log.Infof("Closed session %s for %s (%s).", sess.ID(), sess.NodeID(), sess.Client())
-	}()
+	defer sess.Close()
 
 	ln, err := listenTCP()
 	if err != nil {
