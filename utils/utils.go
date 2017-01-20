@@ -11,16 +11,16 @@ func CopyCloseIO(c1, c2 io.ReadWriteCloser) (err error) {
 	defer func() {
 		log.Debug("closing c1")
 		err1 := c1.Close()
-		if err != nil {
-			log.Errorf("CopyCloseIO err : %s", err1)
+		if err1 != nil && err1 != io.EOF {
+			log.Errorf("CopyCloseIO err1 : %s", err1.Error())
 		}
 	}()
 
 	defer func() {
 		log.Debug("closing c2")
 		err2 := c2.Close()
-		if err != nil {
-			log.Errorf("CopyCloseIO err : %s", err2)
+		if err2 != nil && err2 != io.EOF {
+			log.Errorf("CopyCloseIO err2 : %s", err2.Error())
 		}
 	}()
 
