@@ -1,11 +1,14 @@
-package handler
+package remote
 
 import (
+	"errors"
 	"fmt"
 	"net"
 	"os"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/wormhole/session"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/crypto/ssh"
 )
@@ -30,55 +33,96 @@ func init() {
 
 // SSHHandler type represents the handler that accepts incoming wormhole connections
 type SSHHandler struct {
-	ln         net.Listener
 	config     *ssh.ServerConfig
-	Port       string
-	PrivateKey []byte
+	nodeID     string
+	localhost  string
+	clusterURL string
+	sessions   map[string]session.Session
+	pool       *redis.Pool
 }
 
-// InitializeConnection starts a listener for incoming wormhole connections
-func (s *SSHHandler) InitializeConnection() error {
-	config, err := s.makeConfig()
+// NewSSHHandler ...
+func NewSSHHandler(key []byte, localhost, clusterURL, nodeID string, pool *redis.Pool, sessions map[string]session.Session) (*SSHHandler, error) {
+	config, err := makeConfig(key)
 	if err != nil {
-		return fmt.Errorf("Failed to build ssh server config: %s", err)
+		return nil, fmt.Errorf("Couldn't create SSH Server Config: %s", err.Error())
 	}
-	s.config = config
 
-	listener, err := net.Listen("tcp", ":"+s.Port)
-	if err != nil {
-		return fmt.Errorf("Failed to listen on %s (%s)", s.Port, err)
+	s := SSHHandler{
+		nodeID:     nodeID,
+		sessions:   sessions,
+		localhost:  localhost,
+		clusterURL: clusterURL,
+		pool:       pool,
+		config:     config,
 	}
-	s.ln = listener
-
-	return nil
+	return &s, nil
 }
 
-// ListenAndServe accepts incoming wormhole connections and passes them to the handler
-func (s *SSHHandler) ListenAndServe(fn func(net.Conn, *ssh.ServerConfig)) {
-	for {
-		tcpConn, err := s.ln.Accept()
-		if err != nil {
-			log.Errorf("Failed to accept wormhole connection (%s)", err)
-			break
-		}
-		log.Debugln("Accepted wormhole TCP conn from:", tcpConn.RemoteAddr())
-
-		go fn(tcpConn, s.config)
-	}
+// Serve accepts incoming wormhole connections and passes them to the handler
+func (s *SSHHandler) Serve(conn net.Conn) {
+	s.sshSessionHandler(conn)
 }
 
-func (s *SSHHandler) Close() error {
-	return nil
-}
-
-func (s *SSHHandler) makeConfig() (*ssh.ServerConfig, error) {
+func makeConfig(key []byte) (*ssh.ServerConfig, error) {
 	config := &ssh.ServerConfig{}
 
-	if private, err := ssh.ParsePrivateKey(s.PrivateKey); err == nil {
+	if private, err := ssh.ParsePrivateKey(key); err == nil {
 		config.AddHostKey(private)
 	} else {
 		return nil, err
 	}
 
 	return config, nil
+}
+
+func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
+	// Before use, a handshake must be performed on the incoming net.Conn.
+	sess := session.NewSSHSession(s.nodeID, s.pool, s.sessions, conn, s.config)
+	err := sess.RequireStream()
+	if err != nil {
+		log.Errorln("error getting a stream:", err)
+		return
+	}
+
+	err = sess.RequireAuthentication()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	log.Println("Client authenticated.")
+
+	defer sess.Close()
+
+	ln, err := listenTCP()
+	if err != nil {
+		log.Errorln(err)
+		return
+	}
+
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+	sess.EndpointAddr = s.localhost + ":" + port
+	sess.ClusterURL = s.clusterURL
+
+	if err = sess.RegisterEndpoint(); err != nil {
+		log.Errorln("Error registering endpoint:", err)
+		return
+	}
+
+	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
+
+	sess.HandleRequests(ln)
+}
+
+func listenTCP() (*net.TCPListener, error) {
+	addr, err := net.ResolveTCPAddr("tcp4", ":0")
+	if err != nil {
+		return nil, errors.New("could not parse TCP addr: " + err.Error())
+	}
+	ln, err := net.ListenTCP("tcp4", addr)
+	if err != nil {
+		return nil, errors.New("could not listen on: " + err.Error())
+	}
+	return ln, nil
 }

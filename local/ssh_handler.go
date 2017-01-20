@@ -1,4 +1,4 @@
-package handler
+package local
 
 import (
 	"fmt"
@@ -9,10 +9,8 @@ import (
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -21,25 +19,6 @@ const (
 	localConnTimeout     = 5 * time.Second
 	sshKeepaliveInterval = 30 * time.Second
 )
-
-var logger = logrus.New()
-var log *logrus.Entry
-
-func init() {
-	logger.Formatter = new(prefixed.TextFormatter)
-	if os.Getenv("LOG_LEVEL") == "debug" {
-		logger.Level = logrus.DebugLevel
-	}
-	log = logger.WithFields(logrus.Fields{
-		"prefix": "SSHHandler",
-	})
-}
-
-// ConnectionHandler specifies interface for handler connecting to wormhole server
-type ConnectionHandler interface {
-	InitializeConnection() error
-	Close() error
-}
 
 // SSHHandler type represents the handler that SSHs to wormhole server and serves
 // incoming requests

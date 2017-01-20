@@ -1,16 +1,12 @@
 package wormhole
 
 import (
-	"errors"
 	"io/ioutil"
-	"net"
 	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
-
-	"golang.org/x/crypto/ssh"
 
 	"github.com/garyburd/redigo/redis"
 	handler "github.com/superfly/wormhole/remote"
@@ -35,18 +31,12 @@ func StartRemote(ver string) {
 	ensureRemoteEnvironment()
 	go handleDeath()
 
-	handler := &handler.SSHHandler{
-		Port:       listenPort,
-		PrivateKey: sshPrivateKey,
-	}
-
-	err := handler.InitializeConnection()
+	sshHandler, err := handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool, sessions)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer handler.Close()
 
-	handler.ListenAndServe(sshSessionHandler)
+	handler.ListenAndServe(":"+listenPort, sshHandler)
 }
 
 func ensureRemoteEnvironment() {
@@ -133,55 +123,4 @@ func handleDeath() {
 			os.Exit(1)
 		}
 	}(c)
-}
-
-func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
-	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewSSHSession(nodeID, redisPool, sessions, conn, config)
-	err := sess.RequireStream()
-	if err != nil {
-		log.Errorln("error getting a stream:", err)
-		return
-	}
-
-	err = sess.RequireAuthentication()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	log.Println("Client authenticated.")
-
-	defer sess.Close()
-
-	ln, err := listenTCP()
-	if err != nil {
-		log.Errorln(err)
-		return
-	}
-
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
-	sess.EndpointAddr = localhost + ":" + port
-	sess.ClusterURL = clusterURL
-
-	if err = sess.RegisterEndpoint(); err != nil {
-		log.Errorln("Error registering endpoint:", err)
-		return
-	}
-
-	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
-
-	sess.HandleRequests(ln)
-}
-
-func listenTCP() (*net.TCPListener, error) {
-	addr, err := net.ResolveTCPAddr("tcp4", ":0")
-	if err != nil {
-		return nil, errors.New("could not parse TCP addr: " + err.Error())
-	}
-	ln, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		return nil, errors.New("could not listen on: " + err.Error())
-	}
-	return ln, nil
 }
