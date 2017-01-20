@@ -196,7 +196,7 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 				}
 				go ssh.DiscardRequests(reqs)
 				go func() {
-					err := utils.CopyCloseIO(tcpConn, ch)
+					err := utils.CopyCloseIO(ch, tcpConn)
 					if err != nil && err != io.EOF {
 						log.Error(err)
 					}
