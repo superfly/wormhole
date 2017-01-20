@@ -3,8 +3,10 @@ package handler
 import (
 	"fmt"
 	"net"
+	"os"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
+	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -13,14 +15,29 @@ const (
 	sshForwardedTCPReturnRequest = "forwarded-tcpip"
 )
 
-type SshHandler struct {
+var logger = logrus.New()
+var log *logrus.Entry
+
+func init() {
+	logger.Formatter = new(prefixed.TextFormatter)
+	if os.Getenv("LOG_LEVEL") == "debug" {
+		logger.Level = logrus.DebugLevel
+	}
+	log = logger.WithFields(logrus.Fields{
+		"prefix": "SSHHandler",
+	})
+}
+
+// SSHHandler type represents the handler that accepts incoming wormhole connections
+type SSHHandler struct {
 	ln         net.Listener
 	config     *ssh.ServerConfig
 	Port       string
 	PrivateKey []byte
 }
 
-func (s *SshHandler) InitializeConnection() error {
+// InitializeConnection starts a listener for incoming wormhole connections
+func (s *SSHHandler) InitializeConnection() error {
 	config, err := s.makeConfig()
 	if err != nil {
 		return fmt.Errorf("Failed to build ssh server config: %s", err)
@@ -36,7 +53,8 @@ func (s *SshHandler) InitializeConnection() error {
 	return nil
 }
 
-func (s *SshHandler) ListenAndServe(fn func(net.Conn, *ssh.ServerConfig)) {
+// ListenAndServe accepts incoming wormhole connections and passes them to the handler
+func (s *SSHHandler) ListenAndServe(fn func(net.Conn, *ssh.ServerConfig)) {
 	for {
 		tcpConn, err := s.ln.Accept()
 		if err != nil {
@@ -49,11 +67,11 @@ func (s *SshHandler) ListenAndServe(fn func(net.Conn, *ssh.ServerConfig)) {
 	}
 }
 
-func (s *SshHandler) Close() error {
+func (s *SSHHandler) Close() error {
 	return nil
 }
 
-func (s *SshHandler) makeConfig() (*ssh.ServerConfig, error) {
+func (s *SSHHandler) makeConfig() (*ssh.ServerConfig, error) {
 	config := &ssh.ServerConfig{}
 
 	if private, err := ssh.ParsePrivateKey(s.PrivateKey); err == nil {

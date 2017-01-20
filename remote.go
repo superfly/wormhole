@@ -35,7 +35,7 @@ func StartRemote(ver string) {
 	ensureRemoteEnvironment()
 	go handleDeath()
 
-	handler := &handler.SshHandler{
+	handler := &handler.SSHHandler{
 		Port:       listenPort,
 		PrivateKey: sshPrivateKey,
 	}
@@ -137,7 +137,7 @@ func handleDeath() {
 
 func sshSessionHandler(conn net.Conn, config *ssh.ServerConfig) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewSshSession(nodeID, redisPool, sessions, conn, config)
+	sess := session.NewSSHSession(nodeID, redisPool, sessions, conn, config)
 	err := sess.RequireStream()
 	if err != nil {
 		log.Errorln("error getting a stream:", err)

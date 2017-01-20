@@ -23,10 +23,8 @@ const (
 	sshForwardedTCPReturnRequest = "forwarded-tcpip"
 )
 
-type SshSession struct {
+type SSHSession struct {
 	baseSession
-
-	client string `redis:"client,omitempty"`
 
 	config  *ssh.ServerConfig
 	tcpConn net.Conn
@@ -47,14 +45,14 @@ type directForward struct {
 	Port2 uint32
 }
 
-// NewSshSession creates new SshSession struct
-func NewSshSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, tcpConn net.Conn, config *ssh.ServerConfig) *SshSession {
+// NewSSHSession creates new SshSession struct
+func NewSSHSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
 	base := baseSession{
 		nodeID:   nodeID,
 		store:    NewRedisStore(redisPool),
 		sessions: sessions,
 	}
-	s := &SshSession{
+	s := &SSHSession{
 		tcpConn:     tcpConn,
 		baseSession: base,
 	}
@@ -63,7 +61,7 @@ func NewSshSession(nodeID string, redisPool *redis.Pool, sessions map[string]Ses
 	return s
 }
 
-func (s *SshSession) RequireStream() error {
+func (s *SSHSession) RequireStream() error {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sshConn, chans, reqs, err := ssh.NewServerConn(s.tcpConn, s.config)
 	if err != nil {
@@ -77,7 +75,7 @@ func (s *SshSession) RequireStream() error {
 	return nil
 }
 
-func (s *SshSession) HandleRequests(ln *net.TCPListener) {
+func (s *SSHSession) HandleRequests(ln *net.TCPListener) {
 	for req := range s.reqs {
 		switch req.Type {
 		case sshRemoteForwardRequest:
@@ -92,19 +90,19 @@ func (s *SshSession) HandleRequests(ln *net.TCPListener) {
 	}
 }
 
-func (s *SshSession) RequireAuthentication() error {
+func (s *SSHSession) RequireAuthentication() error {
 	// done as a hook to ssh handshake
 	go s.RegisterConnection(time.Now())
 	return nil
 }
 
-func (s *SshSession) Close() {
+func (s *SSHSession) Close() {
 	s.RegisterDisconnection()
 	log.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
 	s.conn.Close()
 }
 
-func (s *SshSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
+func (s *SSHSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	backendID, err := s.store.BackendIDFromToken(string(pass))
 	if err != nil {
 		return nil, err
@@ -113,14 +111,14 @@ func (s *SshSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permis
 		return nil, errors.New("token rejected")
 	}
 	s.backendID = backendID
-	s.client = string(c.ClientVersion())
+	s.agent = string(c.ClientVersion())
 	s.id = hex.EncodeToString(c.SessionID())
 	s.clientAddr = c.RemoteAddr().String()
 
 	return nil, nil
 }
 
-func (s *SshSession) setSshPort(req *ssh.Request, ln net.Listener) tcpipForward {
+func (s *SSHSession) setSshPort(req *ssh.Request, ln net.Listener) tcpipForward {
 	t := tcpipForward{}
 	ssh.Unmarshal(req.Payload, &t)
 
@@ -140,7 +138,7 @@ func (s *SshSession) setSshPort(req *ssh.Request, ln net.Listener) tcpipForward 
 	return t
 }
 
-func (s *SshSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) {
+func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) {
 	defer func() {
 		err := ln.Close()
 		if err != nil {
@@ -217,7 +215,7 @@ func handleChannels(chans <-chan ssh.NewChannel) {
 	}
 }
 
-func (s *SshSession) handleKeepalive(req *ssh.Request) {
+func (s *SSHSession) handleKeepalive(req *ssh.Request) {
 	if req.WantReply {
 		req.Reply(true, nil)
 	}
@@ -225,7 +223,7 @@ func (s *SshSession) handleKeepalive(req *ssh.Request) {
 	// go s.RegisterKeepalive(time.Now())
 }
 
-func (s *SshSession) registerRelease(req *ssh.Request) {
+func (s *SSHSession) registerRelease(req *ssh.Request) {
 	if req.WantReply {
 		req.Reply(true, nil)
 	}
@@ -239,22 +237,22 @@ func (s *SshSession) registerRelease(req *ssh.Request) {
 }
 
 // RegisterConnection ...
-func (s *SshSession) RegisterConnection(t time.Time) error {
+func (s *SSHSession) RegisterConnection(t time.Time) error {
 	s.sessions[s.id] = s
 	return s.store.RegisterConnection(s)
 }
 
 // RegisterDisconnection ...
-func (s *SshSession) RegisterDisconnection() error {
+func (s *SSHSession) RegisterDisconnection() error {
 	return s.store.RegisterDisconnection(s)
 }
 
 // RegisterEndpoint ...
-func (s *SshSession) RegisterEndpoint() error {
+func (s *SSHSession) RegisterEndpoint() error {
 	return s.store.RegisterEndpoint(s)
 }
 
 // UpdateAttribute ...
-func (s *SshSession) UpdateAttribute(name string, value interface{}) error {
+func (s *SSHSession) UpdateAttribute(name string, value interface{}) error {
 	return s.store.UpdateAttribute(s, name, value)
 }

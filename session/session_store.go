@@ -35,10 +35,18 @@ func NewRedisStore(pool *redis.Pool) *RedisStore {
 // Should be called when a client connects.
 func (r *RedisStore) RegisterConnection(s Session) error {
 	t := time.Now()
+	session := map[string]string{
+		"id":          s.ID(),
+		"node_id":     s.NodeID(),
+		"backend_id":  s.BackendID(),
+		"cluster":     s.Cluster(),
+		"client_addr": s.Client(),
+		"agent":       s.Agent(),
+	}
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
 
-	redisConn.Send("HMSET", redis.Args{}.Add(s.Key()).AddFlat(s)...)
+	redisConn.Send("HMSET", redis.Args{}.Add(s.Key()).AddFlat(session)...)
 	redisConn.Send("ZADD", connectedSessionsKey, timeToScore(t), s.ID())
 	redisConn.Send("SADD", "node:"+s.NodeID()+":sessions", s.ID())
 	redisConn.Send("SADD", "backend:"+s.BackendID()+":sessions", s.ID())

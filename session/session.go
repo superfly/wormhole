@@ -5,6 +5,7 @@ import "github.com/superfly/wormhole/messages"
 // Session hold information about connected client
 type Session interface {
 	ID() string
+	Agent() string
 	BackendID() string
 	NodeID() string
 	Client() string
@@ -18,12 +19,13 @@ type Session interface {
 }
 
 type baseSession struct {
-	id           string `redis:"id,omitempty"`
-	nodeID       string `redis:"node_id,omitempty"`
-	backendID    string `redis:"backend_id,omitempty"`
-	clientAddr   string `redis:"client_addr,omitempty"`
-	EndpointAddr string `redis:"endpoint_addr,omitempty"`
-	ClusterURL   string `redis:"cluster_url,omitempty"`
+	id           string
+	agent        string
+	nodeID       string
+	backendID    string
+	clientAddr   string
+	EndpointAddr string
+	ClusterURL   string
 
 	release *messages.Release
 	store   *RedisStore
@@ -33,6 +35,10 @@ type baseSession struct {
 
 func (s *baseSession) ID() string {
 	return s.id
+}
+
+func (s *baseSession) Agent() string {
+	return s.agent
 }
 
 func (s *baseSession) BackendID() string {
