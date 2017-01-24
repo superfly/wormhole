@@ -171,13 +171,24 @@ func StartLocal(ver string) {
 		Max: 2 * time.Minute,
 	}
 
-	handler := &handler.SSHHandler{
+	/*
+		handler := &handler.SSHHandler{
+			FlyToken:       flyToken,
+			RemoteEndpoint: remoteEndpoint,
+			LocalEndpoint:  localEndpoint,
+			Release:        release,
+			Version:        version,
+		}
+	*/
+
+	handler := &handler.TCPHandler{
 		FlyToken:       flyToken,
 		RemoteEndpoint: remoteEndpoint,
 		LocalEndpoint:  localEndpoint,
 		Release:        release,
 		Version:        version,
 	}
+
 	for {
 		err := handler.InitializeConnection()
 		if err != nil {

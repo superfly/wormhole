@@ -31,12 +31,19 @@ func StartRemote(ver string) {
 	ensureRemoteEnvironment()
 	go handleDeath()
 
-	sshHandler, err := handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool, sessions)
+	/*
+		sshHandler, err := handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool, sessions)
+		if err != nil {
+			log.Fatal(err)
+		}
+	*/
+
+	tcpHandler, err := handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool, sessions)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	handler.ListenAndServe(":"+listenPort, sshHandler)
+	handler.ListenAndServe(":"+listenPort, tcpHandler)
 }
 
 func ensureRemoteEnvironment() {
