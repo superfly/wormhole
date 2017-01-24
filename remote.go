@@ -60,6 +60,13 @@ func ensureRemoteEnvironment() {
 		log.Fatalf("Failed to load private key (%s)", sshPrivateKeyFile)
 	}
 
+	if localhost == "" {
+		localhost = os.Getenv("IPADDRESS")
+	}
+
+	if localhost == "" {
+		log.Fatalln("LOCALHOST or IPADDRESS are required.")
+	}
 	if clusterURL == "" {
 		log.Fatalln("CLUSTER_URL is required.")
 	}
