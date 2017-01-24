@@ -1,6 +1,7 @@
 package wormhole
 
 import (
+	"flag"
 	"net"
 	"os"
 	"os/exec"
@@ -144,7 +145,7 @@ func runProgram(program string) (localPort string, err error) {
 // StartLocal ...
 func StartLocal(cfg *Config) {
 	ensureLocalEnvironment()
-	args := os.Args[1:]
+	args := flag.Args()
 	if len(args) > 0 {
 		localPort, err := runProgram(strings.Join(args, " "))
 		if err != nil {

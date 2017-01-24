@@ -13,7 +13,9 @@ export LOG_LEVEL=debug
 export FLY_TOKEN=fla
 export REDIS_URL=redis://localhost:6379
 export CLUSTER_URL=localhost
+export LOCALHOST=localhost
 
+PROTO=ssh
 WORMHOLE_BIN=$GOPATH/src/github.com/superfly/wormhole/cmd/wormhole/wormhole
 SITE_ID=13
 BACKEND_ID=7
@@ -22,4 +24,4 @@ BACKEND_ID=7
 redis-cli HSET backend_tokens $FLY_TOKEN $BACKEND_ID
 redis-cli HGET backend_tokens $FLY_TOKEN
 
-$WORMHOLE_BIN -server
+$WORMHOLE_BIN -server -proto $PROTO

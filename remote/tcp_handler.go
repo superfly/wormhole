@@ -3,7 +3,10 @@ package remote
 import (
 	"net"
 
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/session"
 )
 
@@ -18,10 +21,10 @@ type TCPHandler struct {
 }
 
 // NewTCPHandler ...
-func NewTCPHandler(localhost, clusterURL, nodeID string, pool *redis.Pool, sessions map[string]session.Session) (*TCPHandler, error) {
+func NewTCPHandler(localhost, clusterURL, nodeID string, pool *redis.Pool) (*TCPHandler, error) {
 	s := TCPHandler{
 		nodeID:     nodeID,
-		sessions:   sessions,
+		sessions:   make(map[string]session.Session),
 		localhost:  localhost,
 		clusterURL: clusterURL,
 		pool:       pool,
@@ -31,12 +34,36 @@ func NewTCPHandler(localhost, clusterURL, nodeID string, pool *redis.Pool, sessi
 
 // Serve accepts incoming wormhole connections and passes them to the handler
 func (s *TCPHandler) Serve(conn net.Conn) {
-	s.tcpSessionHandler(conn)
+	var controlMsg messages.AuthControl
+	var tunnelMsg messages.AuthTunnel
+
+	buf := make([]byte, 1024)
+	nr, err := conn.Read(buf)
+	if err != nil {
+		log.Errorf("error reading from stream: " + err.Error())
+		return
+	}
+	err = msgpack.Unmarshal(buf[:nr], &controlMsg)
+	if err == nil {
+		go s.tcpSessionHandler(conn)
+		log.Error("unparsable response")
+		return
+	}
+	err = msgpack.Unmarshal(buf[:nr], &tunnelMsg)
+	if err == nil {
+		// open a proxy conn on current session
+		return
+	}
+	log.Error("unparsable response")
+	conn.Close()
+	return
 }
 
 func (s *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewTCPSession(s.nodeID, s.pool, s.sessions, conn)
+	sess := session.NewTCPSession(s.nodeID, s.pool, conn)
+	s.sessions[sess.ID()] = sess
+
 	err := sess.RequireStream()
 	if err != nil {
 		log.Errorln("error getting a stream:", err)
@@ -51,7 +78,7 @@ func (s *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 	log.Println("Client authenticated.")
 
-	defer sess.Close()
+	defer s.closeSession(sess)
 
 	ln, err := listenTCP()
 	if err != nil {
@@ -71,4 +98,16 @@ func (s *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
+}
+
+func (s *TCPHandler) Close() {
+	for _, sess := range s.sessions {
+		sess.Close()
+		delete(s.sessions, sess.ID())
+	}
+}
+
+func (s *TCPHandler) closeSession(sess session.Session) {
+	sess.Close()
+	delete(s.sessions, sess.ID())
 }

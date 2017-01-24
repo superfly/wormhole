@@ -5,6 +5,8 @@ import (
 	"io"
 	"net"
 
+	msgpack "gopkg.in/vmihailenco/msgpack.v2"
+
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
 )
@@ -19,7 +21,8 @@ type TCPHandler struct {
 	Release        *messages.Release
 	Version        string
 	ln             net.Listener
-	conn           net.Conn
+	control        net.Conn
+	conns          []net.Conn
 }
 
 // InitializeConnection connects to wormhole server
@@ -30,7 +33,7 @@ func (s *TCPHandler) InitializeConnection() error {
 		return fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
 	}
 	log.Info("Established TCP connection.")
-	s.conn = conn
+	s.control = conn
 
 	return nil
 }
@@ -38,21 +41,59 @@ func (s *TCPHandler) InitializeConnection() error {
 // ListenAndServe accepts requests coming from wormhole server
 // and forwards them to the local server
 func (s *TCPHandler) ListenAndServe() error {
-	s.forwardConnection(s.LocalEndpoint)
+	ctlAuthMsg := messages.AuthControl{
+		Token: s.FlyToken,
+	}
+	buf, err := msgpack.Marshal(ctlAuthMsg)
+
+	_, err = s.control.Write(buf)
+	if err != nil {
+		return fmt.Errorf("error writing to control: " + err.Error())
+	}
+
+	b := make([]byte, 1024)
+	nr, err := s.control.Read(b)
+	if err != nil {
+		return fmt.Errorf("error reading from control: " + err.Error())
+	}
+
+	var shutdownMsg messages.Shutdown
+	var openTunnel messages.OpenTunnel
+
+	if err = msgpack.Unmarshal(b[:nr], &shutdownMsg); err == nil {
+		return s.Close()
+	}
+
+	if err = msgpack.Unmarshal(b[:nr], &openTunnel); err == nil {
+		conn, err := net.Dial("tcp", s.RemoteEndpoint)
+		if err != nil {
+			return fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
+		}
+		log.Info("Established TCP connection.")
+		s.conns = append(s.conns, conn)
+		s.forwardConnection(conn, s.LocalEndpoint)
+	}
+
 	return nil
 }
 
 // Close closes the listener and TCP connection
 func (s *TCPHandler) Close() error {
-	err := s.conn.Close()
+	err := s.control.Close()
 	if err != nil {
-		log.Errorf("TCP conn close: %s", err)
+		log.Errorf("Control TCP conn close: %s", err)
+	}
+	for _, c := range s.conns {
+		err = c.Close()
+		if err != nil {
+			log.Errorf("Proxy TCP conn close: %s", err)
+		}
 	}
 	return err
 }
 
-func (s *TCPHandler) forwardConnection(local string) {
-	log.Debugf("Accepted TCP session on %s", s.conn.RemoteAddr())
+func (s *TCPHandler) forwardConnection(tunnel net.Conn, local string) {
+	log.Debugf("Accepted TCP session on %s", tunnel.RemoteAddr())
 
 	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
 	if err != nil {
@@ -61,7 +102,7 @@ func (s *TCPHandler) forwardConnection(local string) {
 
 	log.Debugf("Dialed local server on %s", local)
 
-	err = utils.CopyCloseIO(localConn, s.conn)
+	err = utils.CopyCloseIO(localConn, tunnel)
 	if err != nil && err != io.EOF {
 		log.Error(err)
 	}

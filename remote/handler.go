@@ -7,4 +7,5 @@ import "net"
 // and encryption (e.g. SSH)
 type Handler interface {
 	Serve(net.Conn)
+	Close()
 }

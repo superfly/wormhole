@@ -42,7 +42,7 @@ type SSHHandler struct {
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(key []byte, localhost, clusterURL, nodeID string, pool *redis.Pool, sessions map[string]session.Session) (*SSHHandler, error) {
+func NewSSHHandler(key []byte, localhost, clusterURL, nodeID string, pool *redis.Pool) (*SSHHandler, error) {
 	config, err := makeConfig(key)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create SSH Server Config: %s", err.Error())
@@ -50,7 +50,7 @@ func NewSSHHandler(key []byte, localhost, clusterURL, nodeID string, pool *redis
 
 	s := SSHHandler{
 		nodeID:     nodeID,
-		sessions:   sessions,
+		sessions:   make(map[string]session.Session),
 		localhost:  localhost,
 		clusterURL: clusterURL,
 		pool:       pool,
@@ -78,7 +78,8 @@ func makeConfig(key []byte) (*ssh.ServerConfig, error) {
 
 func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewSSHSession(s.nodeID, s.pool, s.sessions, conn, s.config)
+	sess := session.NewSSHSession(s.nodeID, s.pool, conn, s.config)
+	s.sessions[sess.ID()] = sess
 	err := sess.RequireStream()
 	if err != nil {
 		log.Errorln("error getting a stream:", err)
@@ -93,7 +94,7 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 	log.Println("Client authenticated.")
 
-	defer sess.Close()
+	defer s.closeSession(sess)
 
 	ln, err := listenTCP()
 	if err != nil {
@@ -113,6 +114,18 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
+}
+
+func (s *SSHHandler) closeSession(sess session.Session) {
+	sess.Close()
+	delete(s.sessions, sess.ID())
+}
+
+func (s *SSHHandler) Close() {
+	for _, sess := range s.sessions {
+		sess.Close()
+		delete(s.sessions, sess.ID())
+	}
 }
 
 func listenTCP() (*net.TCPListener, error) {

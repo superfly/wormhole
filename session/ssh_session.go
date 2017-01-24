@@ -13,6 +13,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/rs/xid"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
 	"golang.org/x/crypto/ssh"
@@ -46,11 +47,11 @@ type directForward struct {
 }
 
 // NewSSHSession creates new SshSession struct
-func NewSSHSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
+func NewSSHSession(nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
 	base := baseSession{
-		nodeID:   nodeID,
-		store:    NewRedisStore(redisPool),
-		sessions: sessions,
+		id:     xid.New().String(),
+		nodeID: nodeID,
+		store:  NewRedisStore(redisPool),
 	}
 	s := &SSHSession{
 		tcpConn:     tcpConn,
@@ -238,7 +239,6 @@ func (s *SSHSession) registerRelease(req *ssh.Request) {
 
 // RegisterConnection ...
 func (s *SSHSession) RegisterConnection(t time.Time) error {
-	s.sessions[s.id] = s
 	return s.store.RegisterConnection(s)
 }
 

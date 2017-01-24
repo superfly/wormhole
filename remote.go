@@ -10,7 +10,6 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 	handler "github.com/superfly/wormhole/remote"
-	"github.com/superfly/wormhole/session"
 )
 
 var (
@@ -20,7 +19,6 @@ var (
 	localhost     = os.Getenv("LOCALHOST")
 	privateKey    = os.Getenv("PRIVATE_KEY")
 	clusterURL    = os.Getenv("CLUSTER_URL")
-	sessions      map[string]session.Session
 	redisPool     *redis.Pool
 	sshPrivateKey []byte
 )
@@ -28,19 +26,18 @@ var (
 // StartRemote ...
 func StartRemote(cfg *Config) {
 	ensureRemoteEnvironment()
-	go handleDeath()
 
 	var h handler.Handler
 	var err error
 
 	switch cfg.Protocol {
 	case SSH:
-		h, err = handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool, sessions)
+		h, err = handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
 	case TCP:
-		h, err = handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool, sessions)
+		h, err = handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -48,6 +45,7 @@ func StartRemote(cfg *Config) {
 		log.Fatal("Unknown wormhole transport layer protocol selected.")
 	}
 
+	go handleDeath(h)
 	handler.ListenAndServe(":"+listenPort, h)
 }
 
@@ -89,8 +87,6 @@ func ensureRemoteEnvironment() {
 	if nodeID == "" {
 		nodeID, _ = os.Hostname()
 	}
-
-	sessions = make(map[string]session.Session)
 }
 
 func newRedisPool(redisURL string) *redis.Pool {
@@ -128,16 +124,13 @@ func newRedisPool(redisURL string) *redis.Pool {
 }
 
 // IT CAN BE HANDLED!
-func handleDeath() {
+func handleDeath(h handler.Handler) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func(c <-chan os.Signal) {
 		for _ = range c {
 			log.Print("Cleaning up before exit...")
-			for id, session := range sessions {
-				session.Close()
-				delete(sessions, id)
-			}
+			h.Close()
 			log.Print("Cleaned up connections.")
 			os.Exit(1)
 		}

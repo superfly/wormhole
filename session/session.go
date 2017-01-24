@@ -29,8 +29,6 @@ type baseSession struct {
 
 	release *messages.Release
 	store   *RedisStore
-
-	sessions map[string]Session
 }
 
 func (s *baseSession) ID() string {

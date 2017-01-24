@@ -7,6 +7,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/rs/xid"
 	"github.com/superfly/wormhole/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -14,21 +15,22 @@ import (
 type TCPSession struct {
 	baseSession
 
-	config *ssh.ServerConfig
-	conn   net.Conn
-	reqs   <-chan *ssh.Request
-	chans  <-chan ssh.NewChannel
+	config  *ssh.ServerConfig
+	control net.Conn
+	reqs    <-chan *ssh.Request
+	chans   <-chan ssh.NewChannel
+	conns   []net.Conn
 }
 
 // NewTCPSession creates new TCPSession struct
-func NewTCPSession(nodeID string, redisPool *redis.Pool, sessions map[string]Session, conn net.Conn) *TCPSession {
+func NewTCPSession(nodeID string, redisPool *redis.Pool, conn net.Conn) *TCPSession {
 	base := baseSession{
-		nodeID:   nodeID,
-		store:    NewRedisStore(redisPool),
-		sessions: sessions,
+		id:     xid.New().String(),
+		nodeID: nodeID,
+		store:  NewRedisStore(redisPool),
 	}
 	s := &TCPSession{
-		conn:        conn,
+		control:     conn,
 		baseSession: base,
 	}
 	return s
@@ -52,7 +54,7 @@ func (s *TCPSession) RequireAuthentication() error {
 func (s *TCPSession) Close() {
 	s.RegisterDisconnection()
 	log.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
-	s.conn.Close()
+	s.control.Close()
 }
 
 func (s *TCPSession) handleRemoteForward(ln *net.TCPListener) {
@@ -82,7 +84,7 @@ func (s *TCPSession) handleRemoteForward(ln *net.TCPListener) {
 		}
 		log.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
 
-		err = utils.CopyCloseIO(s.conn, tcpConn)
+		err = utils.CopyCloseIO(s.control, tcpConn)
 		if err != nil && err != io.EOF {
 			log.Error(err)
 		}
@@ -91,7 +93,6 @@ func (s *TCPSession) handleRemoteForward(ln *net.TCPListener) {
 
 // RegisterConnection ...
 func (s *TCPSession) RegisterConnection(t time.Time) error {
-	s.sessions[s.id] = s
 	return s.store.RegisterConnection(s)
 }
 
