@@ -13,7 +13,7 @@ import (
 
 	"github.com/jpillora/backoff"
 
-	handler "github.com/superfly/wormhole/local"
+	"github.com/superfly/wormhole/local"
 	"github.com/superfly/wormhole/messages"
 )
 
@@ -142,8 +142,7 @@ func runProgram(program string) (localPort string, err error) {
 }
 
 // StartLocal ...
-func StartLocal(ver string) {
-	version = ver
+func StartLocal(cfg *Config) {
 	ensureLocalEnvironment()
 	args := os.Args[1:]
 	if len(args) > 0 {
@@ -171,22 +170,28 @@ func StartLocal(ver string) {
 		Max: 2 * time.Minute,
 	}
 
-	/*
-		handler := &handler.SSHHandler{
+	var handler local.ConnectionHandler
+
+	switch cfg.Protocol {
+	case SSH:
+		handler = &local.SSHHandler{
+			FlyToken:       flyToken,
+			RemoteEndpoint: remoteEndpoint,
+			LocalEndpoint:  localEndpoint,
+			Release:        release,
+			Version:        cfg.Version,
+		}
+	case TCP:
+		handler = &local.TCPHandler{
 			FlyToken:       flyToken,
 			RemoteEndpoint: remoteEndpoint,
 			LocalEndpoint:  localEndpoint,
 			Release:        release,
 			Version:        version,
 		}
-	*/
 
-	handler := &handler.TCPHandler{
-		FlyToken:       flyToken,
-		RemoteEndpoint: remoteEndpoint,
-		LocalEndpoint:  localEndpoint,
-		Release:        release,
-		Version:        version,
+	default:
+		log.Fatal("Unknown wormhole transport layer protocol selected.")
 	}
 
 	for {
@@ -206,7 +211,7 @@ func StartLocal(ver string) {
 	}
 }
 
-func handleOsSignal(handler handler.ConnectionHandler) {
+func handleOsSignal(handler local.ConnectionHandler) {
 	signalChan := make(chan os.Signal, 2)
 	signal.Notify(signalChan)
 	go func(signalChan <-chan os.Signal) {

@@ -26,24 +26,29 @@ var (
 )
 
 // StartRemote ...
-func StartRemote(ver string) {
-	version = ver
+func StartRemote(cfg *Config) {
 	ensureRemoteEnvironment()
 	go handleDeath()
 
-	/*
-		sshHandler, err := handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool, sessions)
+	var h handler.Handler
+	var err error
+
+	switch cfg.Protocol {
+	case SSH:
+		h, err = handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool, sessions)
 		if err != nil {
 			log.Fatal(err)
 		}
-	*/
-
-	tcpHandler, err := handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool, sessions)
-	if err != nil {
-		log.Fatal(err)
+	case TCP:
+		h, err = handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool, sessions)
+		if err != nil {
+			log.Fatal(err)
+		}
+	default:
+		log.Fatal("Unknown wormhole transport layer protocol selected.")
 	}
 
-	handler.ListenAndServe(":"+listenPort, tcpHandler)
+	handler.ListenAndServe(":"+listenPort, h)
 }
 
 func ensureRemoteEnvironment() {
