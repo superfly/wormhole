@@ -26,9 +26,6 @@ func init() {
 	if os.Getenv("LOG_LEVEL") == "debug" {
 		logger.Level = logrus.DebugLevel
 	}
-	log = logger.WithFields(logrus.Fields{
-		"prefix": "SSHHandler",
-	})
 }
 
 // SSHHandler type represents the handler that accepts incoming wormhole connections
@@ -39,6 +36,7 @@ type SSHHandler struct {
 	clusterURL string
 	sessions   map[string]session.Session
 	pool       *redis.Pool
+	logger     *logrus.Entry
 }
 
 // NewSSHHandler ...
@@ -55,6 +53,7 @@ func NewSSHHandler(key []byte, localhost, clusterURL, nodeID string, pool *redis
 		clusterURL: clusterURL,
 		pool:       pool,
 		config:     config,
+		logger:     logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
 	}
 	return &s, nil
 }
@@ -82,23 +81,23 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	s.sessions[sess.ID()] = sess
 	err := sess.RequireStream()
 	if err != nil {
-		log.Errorln("error getting a stream:", err)
+		s.logger.Errorln("error getting a stream:", err)
 		return
 	}
 
 	err = sess.RequireAuthentication()
 	if err != nil {
-		log.Errorln(err)
+		s.logger.Errorln(err)
 		return
 	}
 
-	log.Println("Client authenticated.")
+	s.logger.Println("Client authenticated.")
 
 	defer s.closeSession(sess)
 
 	ln, err := listenTCP()
 	if err != nil {
-		log.Errorln(err)
+		s.logger.Errorln(err)
 		return
 	}
 
@@ -107,11 +106,11 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	sess.ClusterURL = s.clusterURL
 
 	if err = sess.RegisterEndpoint(); err != nil {
-		log.Errorln("Error registering endpoint:", err)
+		s.logger.Errorln("Error registering endpoint:", err)
 		return
 	}
 
-	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
+	s.logger.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }

@@ -5,8 +5,6 @@ import (
 	"io"
 	"net"
 
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
 )
@@ -41,10 +39,13 @@ func (s *TCPHandler) InitializeConnection() error {
 // ListenAndServe accepts requests coming from wormhole server
 // and forwards them to the local server
 func (s *TCPHandler) ListenAndServe() error {
-	ctlAuthMsg := messages.AuthControl{
+	ctlAuthMsg := &messages.AuthControl{
 		Token: s.FlyToken,
 	}
-	buf, err := msgpack.Marshal(ctlAuthMsg)
+	buf, err := messages.Pack(ctlAuthMsg)
+	if err != nil {
+		return fmt.Errorf("error packing message to control: " + err.Error())
+	}
 
 	_, err = s.control.Write(buf)
 	if err != nil {
@@ -52,29 +53,42 @@ func (s *TCPHandler) ListenAndServe() error {
 	}
 
 	b := make([]byte, 1024)
-	nr, err := s.control.Read(b)
-	if err != nil {
-		return fmt.Errorf("error reading from control: " + err.Error())
-	}
-
-	var shutdownMsg messages.Shutdown
-	var openTunnel messages.OpenTunnel
-
-	if err = msgpack.Unmarshal(b[:nr], &shutdownMsg); err == nil {
-		return s.Close()
-	}
-
-	if err = msgpack.Unmarshal(b[:nr], &openTunnel); err == nil {
-		conn, err := net.Dial("tcp", s.RemoteEndpoint)
-		if err != nil {
-			return fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
+	for {
+		nr, err := s.control.Read(b)
+		if err == io.EOF {
+			continue
 		}
-		log.Info("Established TCP connection.")
-		s.conns = append(s.conns, conn)
-		s.forwardConnection(conn, s.LocalEndpoint)
-	}
+		if err != nil {
+			return fmt.Errorf("error reading from control: " + err.Error())
+		}
+		msg, err := messages.Unpack(b[:nr])
+		if err != nil {
+			return fmt.Errorf("error parsing message from stream: " + err.Error())
+		}
+		switch m := msg.(type) {
+		case *messages.OpenTunnel:
+			log.Debug("Received Open Tunnel message.")
+			conn, err := net.Dial("tcp", s.RemoteEndpoint)
+			if err != nil {
+				return fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
+			}
+			authMsg := &messages.AuthTunnel{ClientID: m.ClientID, Token: s.FlyToken}
+			b, _ := messages.Pack(authMsg)
+			_, err = conn.Write(b)
+			if err != nil {
+				return fmt.Errorf("Failed to auth tunnel: %s", err.Error())
+			}
 
-	return nil
+			log.Infof("Established TCP Tunnel connection for Session: %s", m.ClientID)
+			s.conns = append(s.conns, conn)
+			go s.forwardConnection(conn, s.LocalEndpoint)
+		case *messages.Shutdown:
+			log.Debugf("Received Shutdown message: %s", m.Error)
+			return s.Close()
+		default:
+			log.Warn("Unrecognized command. Ignoring.")
+		}
+	}
 }
 
 // Close closes the listener and TCP connection

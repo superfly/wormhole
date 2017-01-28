@@ -3,10 +3,13 @@ package remote
 import (
 	"fmt"
 	"net"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // ListenAndServe accepts incoming wormhole connections and passes them to the handler
 func ListenAndServe(addr string, handler Handler) error {
+	log := logger.WithFields(logrus.Fields{"prefix": "Server"})
 	listener, err := net.Listen("tcp", addr)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s (%s)", addr, err.Error())

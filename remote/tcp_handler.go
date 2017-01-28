@@ -3,8 +3,7 @@ package remote
 import (
 	"net"
 
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-
+	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/session"
@@ -18,96 +17,103 @@ type TCPHandler struct {
 	clusterURL string
 	sessions   map[string]session.Session
 	pool       *redis.Pool
+	logger     *logrus.Entry
 }
 
 // NewTCPHandler ...
 func NewTCPHandler(localhost, clusterURL, nodeID string, pool *redis.Pool) (*TCPHandler, error) {
-	s := TCPHandler{
+	h := TCPHandler{
 		nodeID:     nodeID,
 		sessions:   make(map[string]session.Session),
 		localhost:  localhost,
 		clusterURL: clusterURL,
 		pool:       pool,
+		logger:     logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
-	return &s, nil
+	return &h, nil
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
-func (s *TCPHandler) Serve(conn net.Conn) {
-	var controlMsg messages.AuthControl
-	var tunnelMsg messages.AuthTunnel
-
+func (h *TCPHandler) Serve(conn net.Conn) {
 	buf := make([]byte, 1024)
 	nr, err := conn.Read(buf)
 	if err != nil {
-		log.Errorf("error reading from stream: " + err.Error())
+		h.logger.Errorf("error reading from stream: " + err.Error())
 		return
 	}
-	err = msgpack.Unmarshal(buf[:nr], &controlMsg)
-	if err == nil {
-		go s.tcpSessionHandler(conn)
-		log.Error("unparsable response")
+	msg, err := messages.Unpack(buf[:nr])
+	if err != nil {
+		h.logger.Errorf("error parsing message from stream: " + err.Error())
 		return
 	}
-	err = msgpack.Unmarshal(buf[:nr], &tunnelMsg)
-	if err == nil {
-		// open a proxy conn on current session
-		return
+	switch m := msg.(type) {
+	case *messages.AuthControl:
+		go h.tcpSessionHandler(conn)
+	case *messages.AuthTunnel:
+		if sess, ok := h.sessions[m.ClientID]; !ok {
+			h.logger.Error("New tunnel conn not associated with any session. Closing")
+			conn.Close()
+		} else {
+			// open a proxy conn on current session
+			h.logger.Debugf("Adding New tunnel conn to session: %s", sess.ID())
+			tcpSess := sess.(*session.TCPSession)
+			tcpSess.AddTunnel(conn)
+		}
+	default:
+		h.logger.Error("unparsable response")
+		conn.Close()
 	}
-	log.Error("unparsable response")
-	conn.Close()
-	return
 }
 
-func (s *TCPHandler) tcpSessionHandler(conn net.Conn) {
+func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewTCPSession(s.nodeID, s.pool, conn)
-	s.sessions[sess.ID()] = sess
+	sess := session.NewTCPSession(h.nodeID, h.pool, conn)
+	h.sessions[sess.ID()] = sess
 
 	err := sess.RequireStream()
 	if err != nil {
-		log.Errorln("error getting a stream:", err)
+		h.logger.Errorln("error getting a stream:", err)
 		return
 	}
 
 	err = sess.RequireAuthentication()
 	if err != nil {
-		log.Errorln(err)
+		h.logger.Errorln(err)
 		return
 	}
 
-	log.Println("Client authenticated.")
+	h.logger.Println("Client authenticated.")
 
-	defer s.closeSession(sess)
+	defer h.closeSession(sess)
 
 	ln, err := listenTCP()
 	if err != nil {
-		log.Errorln(err)
+		h.logger.Errorln(err)
 		return
 	}
 
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
-	sess.EndpointAddr = s.localhost + ":" + port
-	sess.ClusterURL = s.clusterURL
+	sess.EndpointAddr = h.localhost + ":" + port
+	sess.ClusterURL = h.clusterURL
 
 	if err = sess.RegisterEndpoint(); err != nil {
-		log.Errorln("Error registering endpoint:", err)
+		h.logger.Errorln("Error registering endpoint:", err)
 		return
 	}
 
-	log.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
+	h.logger.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }
 
-func (s *TCPHandler) Close() {
-	for _, sess := range s.sessions {
+func (h *TCPHandler) Close() {
+	for _, sess := range h.sessions {
 		sess.Close()
-		delete(s.sessions, sess.ID())
+		delete(h.sessions, sess.ID())
 	}
 }
 
-func (s *TCPHandler) closeSession(sess session.Session) {
+func (h *TCPHandler) closeSession(sess session.Session) {
 	sess.Close()
-	delete(s.sessions, sess.ID())
+	delete(h.sessions, sess.ID())
 }
