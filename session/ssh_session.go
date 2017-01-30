@@ -220,8 +220,11 @@ func (s *SSHSession) handleKeepalive(req *ssh.Request) {
 	if req.WantReply {
 		req.Reply(true, nil)
 	}
-	// TODO: we should update redis with last_seen or something like that
-	// go s.RegisterKeepalive(time.Now())
+	go func() {
+		if err := s.RegisterHeartbeat(); err != nil {
+			log.Warnf("Failed to register session heartbeat: %s", err.Error())
+		}
+	}()
 }
 
 func (s *SSHSession) registerRelease(req *ssh.Request) {
@@ -255,4 +258,9 @@ func (s *SSHSession) RegisterEndpoint() error {
 // UpdateAttribute ...
 func (s *SSHSession) UpdateAttribute(name string, value interface{}) error {
 	return s.store.UpdateAttribute(s, name, value)
+}
+
+// RegisterHeartbeat ...
+func (s *SSHSession) RegisterHeartbeat() error {
+	return s.store.RegisterHeartbeat(s)
 }

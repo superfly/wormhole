@@ -36,12 +36,14 @@ func NewRedisStore(pool *redis.Pool) *RedisStore {
 func (r *RedisStore) RegisterConnection(s Session) error {
 	t := time.Now()
 	session := map[string]string{
-		"id":          s.ID(),
-		"node_id":     s.NodeID(),
-		"backend_id":  s.BackendID(),
-		"cluster":     s.Cluster(),
-		"client_addr": s.Client(),
-		"agent":       s.Agent(),
+		"id":           s.ID(),
+		"node_id":      s.NodeID(),
+		"backend_id":   s.BackendID(),
+		"cluster":      s.Cluster(),
+		"client_addr":  s.Client(),
+		"agent":        s.Agent(),
+		"connected_at": t.String(),
+		"last_seen_at": t.String(),
 	}
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
@@ -77,6 +79,7 @@ func (r *RedisStore) RegisterDisconnection(s Session) error {
 // RegisterEndpoint updates the client endoint addr in stored session and adds
 // Endpoint to the list of endpoints stored in Redis
 func (r *RedisStore) RegisterEndpoint(s Session) error {
+	t := time.Now()
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
 
@@ -85,10 +88,12 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 	redisConn.Send("HSET", s.Key(), "cluster", s.Cluster())
 	redisConn.Send("SADD", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
 	endpoint := map[string]string{
-		"session_id": s.ID(),
-		"backend_id": s.BackendID(),
-		"socket":     s.Endpoint(),
-		"cluster":    s.Cluster(),
+		"session_id":   s.ID(),
+		"backend_id":   s.BackendID(),
+		"socket":       s.Endpoint(),
+		"cluster":      s.Cluster(),
+		"connected_at": t.String(),
+		"last_seen_at": t.String(),
 	}
 	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":endpoint:"+s.Endpoint()).AddFlat(endpoint)...)
 	_, err := redisConn.Do("EXEC")
@@ -104,6 +109,19 @@ func (r *RedisStore) RegisterRelease(s Session) error {
 	redisConn.Send("MULTI")
 	redisConn.Send("ZADD", "backend:"+s.BackendID()+":releases", "NX", timeToScore(t), s.Release().ID)
 	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":release:"+s.Release().ID).AddFlat(s.Release())...)
+	_, err := redisConn.Do("EXEC")
+	return err
+}
+
+// RegisterHeartbeat updates timestamps for session and endpoint keys
+func (r *RedisStore) RegisterHeartbeat(s Session) error {
+	t := time.Now()
+	redisConn := r.pool.Get()
+	defer redisConn.Close()
+
+	redisConn.Send("MULTI")
+	redisConn.Send("HSET", s.Key(), "last_seen_at", t.String())
+	redisConn.Send("HSET", "backend:"+s.BackendID()+":endpoint:"+s.Endpoint(), "last_seen_at", t.String())
 	_, err := redisConn.Do("EXEC")
 	return err
 }
