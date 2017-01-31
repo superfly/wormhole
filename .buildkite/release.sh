@@ -52,3 +52,13 @@ for i in "${tag_versions[@]}"; do
   docker tag $base_image_name "${base_image_name}:${i}"
   docker push "${base_image_name}:${i}"
 done
+
+# TODO: figure a good way to determining if a build is stable or not
+# then tag it and push it
+stable=true
+if [ $stable ]; then
+  docker_tag="${base_image_name}:stable"
+  echo "Tagging and pushing $docker_tag"
+  docker tag $base_image_name $docker_tag
+  docker push $docker_tag
+fi
