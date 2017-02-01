@@ -1,5 +1,5 @@
 hash: cb7cee5d4b6e930f5a35698a899dda8e123dfbd4508ea6b27c985cb856701c41
-updated: 2017-02-01T14:25:23.517375182-08:00
+updated: 2017-02-01T14:43:23.348007577-08:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -16,8 +16,6 @@ imports:
   version: 09cded8978dc9e80714c4d85b0322337b0a1e5e0
 - name: github.com/mgutz/ansi
   version: c286dcecd19ff979eeb73ea444e479b903f2cfcb
-- name: github.com/pkg/errors
-  version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
 - name: github.com/rs/xid
   version: e39c3571542a72a9d44559fc96e2a80ed896682b
 - name: github.com/sergi/go-diff
@@ -32,8 +30,6 @@ imports:
   - scanner
   - token
   - types
-- name: github.com/superfly/smux
-  version: c34bbd53d50f4b7450eb0a4c8bcfe6e576dd2014
 - name: github.com/x-cray/logrus-prefixed-formatter
   version: a35e641b1da09880f6432c2c7e814ef0817663f7
 - name: golang.org/x/crypto
@@ -42,14 +38,10 @@ imports:
   - curve25519
   - ed25519
   - ed25519/internal/edwards25519
-  - nacl/box
-  - nacl/secretbox
-  - poly1305
-  - salsa20/salsa
   - ssh
   - ssh/agent
 - name: golang.org/x/net
-  version: 357296a76395d3f9674040a23305b3a59153b698
+  version: 007e530097ad7f954752df63046b4036f98ba6a6
   subpackages:
   - context
 - name: golang.org/x/sys

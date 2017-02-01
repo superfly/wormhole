@@ -4,17 +4,15 @@ import (
 	"os"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/superfly/smux"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
 
 var (
 	version string
 
-	logLevel   = os.Getenv("LOG_LEVEL")
-	smuxConfig *smux.Config
-	logger     = logrus.New()
-	log        *logrus.Entry
+	logLevel = os.Getenv("LOG_LEVEL")
+	logger   = logrus.New()
+	log      *logrus.Entry
 )
 
 func init() {
