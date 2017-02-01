@@ -1,0 +1,9 @@
+steps:
+  - name: ":go: test"
+    command: "go get -t -d && go test -race -v"
+    env:
+     BUILDKITE_DOCKER_COMPOSE_CONTAINER: "app"
+  - name: ":go: benchmark"
+    command: "go get -t -d && go test -run=XXX -bench=."
+    env:
+     BUILDKITE_DOCKER_COMPOSE_CONTAINER: "app"

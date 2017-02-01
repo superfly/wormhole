@@ -1,5 +1,5 @@
 hash: cb7cee5d4b6e930f5a35698a899dda8e123dfbd4508ea6b27c985cb856701c41
-updated: 2017-01-31T18:22:27.349438615-08:00
+updated: 2017-02-01T14:25:23.517375182-08:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -11,7 +11,7 @@ imports:
   subpackages:
   - proto
 - name: github.com/jpillora/backoff
-  version: a6f64285fd4072883335339357436b78d62c96a4
+  version: f24585d1c70490c0920ab34924f54f726e1416c7
 - name: github.com/klauspost/cpuid
   version: 09cded8978dc9e80714c4d85b0322337b0a1e5e0
 - name: github.com/mgutz/ansi
@@ -19,13 +19,13 @@ imports:
 - name: github.com/pkg/errors
   version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
 - name: github.com/rs/xid
-  version: 057f3c928c207d1e7e318929eeac93bb46e319e3
+  version: e39c3571542a72a9d44559fc96e2a80ed896682b
 - name: github.com/sergi/go-diff
-  version: 83532ca1c1caa393179c677b6facf48e61f4ca5d
+  version: 24e2351369ec4949b2ed0dc5c477afdd4c4034e8
   subpackages:
   - diffmatchpatch
 - name: github.com/Sirupsen/logrus
-  version: d26492970760ca5d33129d2d799e34be5c4782eb
+  version: 61e43dc76f7ee59a82bdf3d71033dc12bea4c77d
 - name: github.com/src-d/gcfg
   version: f187355171c936ac84a82793659ebb4936bc1c23
   subpackages:
@@ -37,7 +37,7 @@ imports:
 - name: github.com/x-cray/logrus-prefixed-formatter
   version: a35e641b1da09880f6432c2c7e814ef0817663f7
 - name: golang.org/x/crypto
-  version: 9477e0b78b9ac3d0b03822fd95422e2fe07627cd
+  version: dc137beb6cce2043eb6b5f223ab8bf51c32459f4
   subpackages:
   - curve25519
   - ed25519
@@ -49,15 +49,15 @@ imports:
   - ssh
   - ssh/agent
 - name: golang.org/x/net
-  version: 4971afdc2f162e82d185353533d3cf16188a9f4e
+  version: 357296a76395d3f9674040a23305b3a59153b698
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: d5645953809d8b4752afb2c3224b1f1ad73dfa70
+  version: 7a6e5648d140666db5d920909e082ca00a87ba2c
   subpackages:
   - unix
 - name: google.golang.org/appengine
-  version: ca59ef35f409df61fa4a5f8290ff289b37eccfb8
+  version: a2c54d2174c17540446e0ced57d9d459af61bc1c
   subpackages:
   - datastore
   - internal
@@ -67,9 +67,20 @@ imports:
   - internal/log
   - internal/modules
   - internal/remote_api
-- name: gopkg.in/src-d/go-git.v4
-  version: ff449c6a58ef0d7416083f0dca67f49b591f9628
+- name: gopkg.in/vmihailenco/msgpack.v2
+  version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
   subpackages:
+  - codes
+- name: gopkg.in/warnings.v0
+  version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
+- name: srcd.works/go-billy.v1
+  version: 1dfacf9a4b2ac372f16acd6b1aab9a50df955a2a
+  subpackages:
+  - osfs
+- name: srcd.works/go-git.v4
+  version: 09ac55657efcc3bb40db780ce9441095aea0d64c
+  subpackages:
+  - cache
   - config
   - plumbing
   - plumbing/format/config
@@ -82,6 +93,7 @@ imports:
   - plumbing/protocol/packp
   - plumbing/protocol/packp/capability
   - plumbing/protocol/packp/sideband
+  - plumbing/revlist
   - plumbing/storer
   - plumbing/transport
   - plumbing/transport/client
@@ -89,6 +101,7 @@ imports:
   - plumbing/transport/git
   - plumbing/transport/http
   - plumbing/transport/internal/common
+  - plumbing/transport/server
   - plumbing/transport/ssh
   - storage/filesystem
   - storage/filesystem/internal/dotgit
@@ -96,16 +109,4 @@ imports:
   - utils/binary
   - utils/diff
   - utils/ioutil
-- name: gopkg.in/vmihailenco/msgpack.v2
-  version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
-  subpackages:
-  - codes
-- name: gopkg.in/warnings.v0
-  version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
-- name: srcd.works/go-billy.v1
-  version: 1dfacf9a4b2ac372f16acd6b1aab9a50df955a2a
-  subpackages:
-  - os
-- name: srcd.works/go-git.v4
-  version: efcbcaa59580ddef96fb69b2b3ffac7755141406
 testImports: []
