@@ -1,5 +1,5 @@
-hash: da0ea1f905620151edfc72a25b9a58704e77f98da80dc65c89904d8113a36aae
-updated: 2017-01-18T15:20:18.577061282-06:00
+hash: cb7cee5d4b6e930f5a35698a899dda8e123dfbd4508ea6b27c985cb856701c41
+updated: 2017-01-31T18:22:27.349438615-08:00
 imports:
 - name: github.com/garyburd/redigo
   version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
@@ -103,7 +103,9 @@ imports:
 - name: gopkg.in/warnings.v0
   version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
 - name: srcd.works/go-billy.v1
-  version: 6ca1fd6ba86f5929a23633719f5fd413a0046998
+  version: 1dfacf9a4b2ac372f16acd6b1aab9a50df955a2a
   subpackages:
   - os
+- name: srcd.works/go-git.v4
+  version: efcbcaa59580ddef96fb69b2b3ffac7755141406
 testImports: []

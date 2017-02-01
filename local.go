@@ -10,7 +10,8 @@ import (
 	"syscall"
 	"time"
 
-	git "gopkg.in/src-d/go-git.v4"
+	git "srcd.works/go-git.v4"
+	"srcd.works/go-git.v4/plumbing"
 
 	"github.com/jpillora/backoff"
 
@@ -66,26 +67,41 @@ func computeRelease() {
 		release.Description = releaseDesc
 	}
 
+	var branches []string
 	if _, err := os.Stat(".git"); !os.IsNotExist(err) {
 		release.VCSType = "git"
-		repo, err := git.NewFilesystemRepository(".git")
+		repo, err := git.PlainOpen(".")
 		if err != nil {
 			log.Warnln("Could not open repository:", err)
 			return
 		}
-		ref, err := repo.Head()
+		head, err := repo.Head()
 		if err != nil {
 			log.Warnln("Could not get repo head:", err)
 			return
 		}
 
-		oid := ref.Hash()
+		oid := head.Hash()
 		release.VCSRevision = oid.String()
 		tip, err := repo.Commit(oid)
 		if err != nil {
 			log.Warnln("Could not get current commit:", err)
 			return
 		}
+
+		refs, err := repo.References()
+		if err != nil {
+			log.Warnln("Could not get current refs:", err)
+			return
+		}
+		refs.ForEach(func(ref *plumbing.Reference) error {
+			if ref.IsBranch() && head.Hash().String() == ref.Hash().String() {
+				branch := strings.TrimPrefix(ref.Name().String(), "refs/heads/")
+				branches = append(branches, branch)
+			}
+			return nil
+		})
+
 		author := tip.Author
 		release.VCSRevisionAuthorEmail = author.Email
 		release.VCSRevisionAuthorName = author.Name
@@ -97,6 +113,10 @@ func computeRelease() {
 	}
 	if release.Description == "" && release.VCSRevisionMessage != "" {
 		release.Description = release.VCSRevisionMessage
+	}
+	// TODO: be smarter about branches, and maybe let users override this
+	if len(branches) > 0 {
+		release.Branch = branches[0]
 	}
 	log.Println("Current release:", release)
 }
