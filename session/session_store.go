@@ -66,7 +66,7 @@ func (r *RedisStore) RegisterDisconnection(s Session) error {
 
 	redisConn.Send("MULTI")
 	redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), s.ID())
-	redisConn.Send("ZREM", connectedSessionsKey, timeToScore(t), s.ID())
+	redisConn.Send("ZREM", connectedSessionsKey, s.ID())
 	redisConn.Send("SREM", "node:"+s.NodeID()+":sessions", s.ID())
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":sessions", s.ID())
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
