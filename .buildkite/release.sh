@@ -7,14 +7,16 @@ if [ -z "$BUILDKITE_TAG" ]; then
   exit 0
 fi
 
-echo "+++ Compiling :go: binaries"
+echo "+++ Fetching :go: binaries"
 
-docker run --rm \
-  -v $(pwd):/go/src/github.com/superfly/wormhole:rw \
-  --entrypoint /go/src/github.com/superfly/wormhole/.buildkite/compile.sh \
-  --workdir /go/src/github.com/superfly/wormhole \
-  -e VERSION=${BUILDKITE_TAG} \
-  golang
+buildkite-agent artifact download "pkg/wormhole*" pkg/
+num_binaries=`ls pkg/wormhole* | wc -l`
+
+# right now we support 32- and 64-bit builds for Windows, macOS, Linux and FreeBSD
+if [ "$num_builds" -lt "8" ]; then
+  echo "Missing some wormhole binaries. Cannot make a release."
+  exit 1
+fi
 
 GHR='./github-release'
 
@@ -34,7 +36,14 @@ echo "+++ Building and pushing to Docker Hub"
 
 base_image_name="flyio/wormhole"
 
-yes | cp -f pkg/wormhole_linux_amd64 app
+# ensure we have the binary before building an image
+wormhole_linux_bin=pkg/wormhole_linux_amd64
+if [ ! -f "$wormhole_linux_bin" ]; then
+  echo "missing wormhole binary in $wormhole_linux_bin"
+  exit 1
+fi
+
+yes | cp -f $wormhole_linux_bin app
 docker build -t $base_image_name .
 
 semver=${BUILDKITE_TAG:1}
