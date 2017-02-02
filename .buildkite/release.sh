@@ -34,7 +34,7 @@ $GHR $BUILDKITE_TAG pkg/* --commit $BUILDKITE_COMMIT \
 
 echo "+++ Pushing binaries to S3"
 
-buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/$BUILDKITE_TAG`
+buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/$BUILDKITE_TAG
 
 echo "+++ Building and pushing to Docker Hub"
 
