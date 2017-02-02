@@ -95,7 +95,7 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 		"connected_at": t.String(),
 		"last_seen_at": t.String(),
 	}
-	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":endpoint:"+s.Endpoint()).AddFlat(endpoint)...)
+	redisConn.Send("HMSET", redis.Args{}.Add(endpointKey(s)).AddFlat(endpoint)...)
 	_, err := redisConn.Do("EXEC")
 	return err
 }
@@ -109,6 +109,7 @@ func (r *RedisStore) RegisterRelease(s Session) error {
 	redisConn.Send("MULTI")
 	redisConn.Send("ZADD", "backend:"+s.BackendID()+":releases", "NX", timeToScore(t), s.Release().ID)
 	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":release:"+s.Release().ID).AddFlat(s.Release())...)
+	redisConn.Send("HSET", endpointKey(s), "branch", s.Release().Branch)
 	_, err := redisConn.Do("EXEC")
 	return err
 }
@@ -121,7 +122,7 @@ func (r *RedisStore) RegisterHeartbeat(s Session) error {
 
 	redisConn.Send("MULTI")
 	redisConn.Send("HSET", s.Key(), "last_seen_at", t.String())
-	redisConn.Send("HSET", "backend:"+s.BackendID()+":endpoint:"+s.Endpoint(), "last_seen_at", t.String())
+	redisConn.Send("HSET", endpointKey(s), "last_seen_at", t.String())
 	_, err := redisConn.Do("EXEC")
 	return err
 }
@@ -145,4 +146,8 @@ func (r *RedisStore) UpdateAttribute(s Session, name string, value interface{}) 
 
 func timeToScore(t time.Time) int64 {
 	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
+}
+
+func endpointKey(s Session) string {
+	return "backend:" + s.BackendID() + ":endpoint:" + s.Endpoint()
 }
