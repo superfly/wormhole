@@ -32,6 +32,10 @@ $GHR $BUILDKITE_TAG pkg/* --commit $BUILDKITE_COMMIT \
                           --github-repository "superfly/wormhole" \
                           --github-access-token $GITHUB_ACCESS_TOKEN
 
+echo "+++ Pushing binaries to S3"
+
+buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/$BUILDKITE_TAG`
+
 echo "+++ Building and pushing to Docker Hub"
 
 base_image_name="flyio/wormhole"
