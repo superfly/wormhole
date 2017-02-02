@@ -1,4 +1,7 @@
 steps:
+  - name: ":golang: compile binaries"
+    command: .buildkite/build.sh
+  - wait
   - name: ":github: create release (tag pushed)"
     command: .buildkite/release.sh
     branches: v*.* # tags
