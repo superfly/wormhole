@@ -188,8 +188,8 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 				p.Host2 = host
 				p.Port2 = uint32(portnum)
 
-				ch, reqs, sshErr := s.conn.OpenChannel(sshForwardedTCPReturnRequest, ssh.Marshal(p))
-				if sshErr != nil {
+				ch, reqs, err := s.conn.OpenChannel(sshForwardedTCPReturnRequest, ssh.Marshal(p))
+				if err != nil {
 					log.WithFields(log.Fields{
 						"err": err.Error(),
 					}).Error("Open forwarded Channel error:")
