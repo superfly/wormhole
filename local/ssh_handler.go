@@ -45,55 +45,24 @@ func NewSSHHandler(token, remoteEndpoint, localEndpoint, version string, release
 	}
 }
 
-// InitializeConnection connects to wormhole server, performs SSH handshake, and
-// opens a port on wormhole server that SshHandler can listen on.
-// SSH uses FLY_TOKEN for authentication
-func (s *SSHHandler) InitializeConnection() error {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = "unknown"
-	}
-
-	config := &ssh.ClientConfig{
-		User:          hostname,
-		ClientVersion: "wormhole " + s.Version,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(s.FlyToken),
-		},
-		Timeout: sshConnTimeout,
-	}
-
-	// SSH into wormhole server
-	conn, err := ssh.Dial("tcp", s.RemoteEndpoint, config)
-	if err != nil {
-		return fmt.Errorf("Failed to establish SSH connection: %s", err.Error())
-	}
-	log.Info("Established SSH connection.")
-	s.ssh = conn
-
-	// open a port on wormhole server that we can listen on
-	ln, err := s.ssh.Listen("tcp", "0.0.0.0:0")
-	if err != nil {
-		return fmt.Errorf("Failed to open SSH tunnel: %s", err.Error())
-	}
-	s.ln = ln
-	log.Infof("Opened SSH tunnel on %s", ln.Addr().String())
-	return nil
-}
-
 // ListenAndServe accepts requests coming from wormhole server
 // and forwards them to the local server
 func (s *SSHHandler) ListenAndServe() error {
+	ssh, ln, err := s.dial()
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	defer ssh.Close()
+	s.ssh = ssh
+	s.ln = ln
+
 	go s.stayAlive()
 	go s.registerRelease()
 
 	for {
 		select {
 		case <-s.shutdown.WaitBeginCh():
-			err := s.ln.Close()
-			if err != nil {
-				log.Errorf("SSH listener close: %s", err)
-			}
 			s.shutdown.Complete()
 			return nil
 		default:
@@ -114,12 +83,41 @@ func (s *SSHHandler) ListenAndServe() error {
 func (s *SSHHandler) Close() error {
 	s.shutdown.Begin()
 	s.shutdown.WaitComplete()
+	return nil
+}
 
-	err := s.ssh.Close()
+// connects to wormhole server, performs SSH handshake, and
+// opens a port on wormhole server that SshHandler can listen on.
+// SSH uses FLY_TOKEN for authentication
+func (s *SSHHandler) dial() (*ssh.Client, net.Listener, error) {
+	hostname, err := os.Hostname()
 	if err != nil {
-		log.Errorf("SSH conn close: %s", err)
+		hostname = "unknown"
 	}
-	return err
+
+	config := &ssh.ClientConfig{
+		User:          hostname,
+		ClientVersion: "wormhole " + s.Version,
+		Auth: []ssh.AuthMethod{
+			ssh.Password(s.FlyToken),
+		},
+		Timeout: sshConnTimeout,
+	}
+
+	// SSH into wormhole server
+	conn, err := ssh.Dial("tcp", s.RemoteEndpoint, config)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to establish SSH connection: %s", err.Error())
+	}
+	log.Info("Established SSH connection.")
+
+	// open a port on wormhole server that we can listen on
+	ln, err := conn.Listen("tcp", "0.0.0.0:0")
+	if err != nil {
+		return nil, nil, fmt.Errorf("Failed to open SSH tunnel: %s", err.Error())
+	}
+	log.Infof("Opened SSH tunnel on %s", ln.Addr().String())
+	return conn, ln, nil
 }
 
 func forwardConnection(conn net.Conn, local string) {
@@ -149,9 +147,12 @@ func (s *SSHHandler) stayAlive() {
 				_, _, err := s.ssh.SendRequest("keepalive", false, nil)
 				if err != nil {
 					log.Errorf("Keepalive failed: %s", err.Error())
+					s.shutdown.Begin()
 					return
 				}
 			}()
+		case <-s.shutdown.WaitBeginCh():
+			return
 		}
 	}
 }

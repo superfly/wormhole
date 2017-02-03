@@ -23,22 +23,16 @@ type TCPHandler struct {
 	conns          []net.Conn
 }
 
-// InitializeConnection connects to wormhole server
-func (s *TCPHandler) InitializeConnection() error {
-	// TCP into wormhole server
-	conn, err := net.Dial("tcp", s.RemoteEndpoint)
-	if err != nil {
-		return fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
-	}
-	log.Info("Established TCP connection.")
-	s.control = conn
-
-	return nil
-}
-
 // ListenAndServe accepts requests coming from wormhole server
 // and forwards them to the local server
 func (s *TCPHandler) ListenAndServe() error {
+	control, err := s.dial()
+	if err != nil {
+		return err
+	}
+	defer control.Close()
+
+	s.control = control
 	ctlAuthMsg := &messages.AuthControl{
 		Token: s.FlyToken,
 	}
@@ -104,6 +98,18 @@ func (s *TCPHandler) Close() error {
 		}
 	}
 	return err
+}
+
+// connects to wormhole server
+func (s *TCPHandler) dial() (net.Conn, error) {
+	// TCP into wormhole server
+	conn, err := net.Dial("tcp", s.RemoteEndpoint)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
+	}
+	log.Info("Established TCP connection.")
+
+	return conn, nil
 }
 
 func (s *TCPHandler) forwardConnection(tunnel net.Conn, local string) {

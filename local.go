@@ -110,7 +110,7 @@ func StartLocal(cfg *Config) {
 	}
 
 	for {
-		err := handler.InitializeConnection()
+		err := handler.ListenAndServe()
 		if err != nil {
 			log.Error(err)
 			d := b.Duration()
@@ -118,9 +118,5 @@ func StartLocal(cfg *Config) {
 			continue
 		}
 		b.Reset()
-		err = handler.ListenAndServe()
-		if err != nil {
-			log.Error(err)
-		}
 	}
 }

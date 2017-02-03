@@ -22,7 +22,6 @@ func init() {
 
 // ConnectionHandler specifies interface for handler connecting to wormhole server
 type ConnectionHandler interface {
-	InitializeConnection() error
 	ListenAndServe() error
 	Close() error
 }
