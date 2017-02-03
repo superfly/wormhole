@@ -4,10 +4,7 @@ import (
 	"flag"
 	"net"
 	"os"
-	"os/exec"
-	"os/signal"
 	"strings"
-	"syscall"
 	"time"
 
 	git "srcd.works/go-git.v4"
@@ -29,10 +26,9 @@ const (
 
 var (
 	localEndpoint  = os.Getenv("LOCAL_ENDPOINT")
+	port           = os.Getenv("PORT")
 	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
-	cmd            *exec.Cmd
 	flyToken       = os.Getenv("FLY_TOKEN")
-
 	releaseIDVar   = os.Getenv("FLY_RELEASE_ID_VAR")
 	releaseDescVar = os.Getenv("FLY_RELEASE_DESC_VAR")
 	release        = &messages.Release{}
@@ -54,6 +50,14 @@ func ensureLocalEnvironment() {
 
 	if remoteEndpoint == "" {
 		remoteEndpoint = defaultRemoteEndpoint
+	}
+
+	if localEndpoint == "" {
+		if port == "" {
+			localEndpoint = defaultLocalHost + ":" + defaultLocalPort
+		} else {
+			localEndpoint = defaultLocalHost + ":" + port
+		}
 	}
 	computeRelease()
 }
@@ -121,75 +125,9 @@ func computeRelease() {
 	log.Println("Current release:", release)
 }
 
-func runProgram(program string) (localPort string, err error) {
-	cs := []string{"/bin/sh", "-c", program}
-	cmd = exec.Command(cs[0], cs[1:]...)
-	cmd.Stdin = nil
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	localPort = os.Getenv("PORT")
-	if localPort == "" {
-		localPort = defaultLocalPort
-		cmd.Env = append(os.Environ(), defaultLocalPort)
-	} else {
-		cmd.Env = os.Environ()
-	}
-	log.Println("Starting program:", program)
-	err = cmd.Start()
-	if err != nil {
-		log.Println("Failed to start program:", err)
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				log.Printf("Exit Status: %d", status.ExitStatus())
-				os.Exit(status.ExitStatus())
-			}
-		}
-		return
-	}
-	go func(cmd *exec.Cmd) {
-		err = cmd.Wait()
-		if err != nil {
-			log.Errorln("Program error:", err)
-			if exiterr, ok := err.(*exec.ExitError); ok {
-				if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-					log.Printf("Exit Status: %d", status.ExitStatus())
-					os.Exit(status.ExitStatus())
-				}
-			}
-		}
-		log.Println("Terminating program", program)
-	}(cmd)
-	return
-}
-
 // StartLocal ...
 func StartLocal(cfg *Config) {
 	ensureLocalEnvironment()
-	args := flag.Args()
-	if len(args) > 0 {
-		localPort, err := runProgram(strings.Join(args, " "))
-		if err != nil {
-			log.Errorln("Error running program:", err)
-			return
-		}
-		localEndpoint = defaultLocalHost + ":" + localPort
-
-		for {
-			conn, err := net.Dial("tcp", localEndpoint)
-			if conn != nil {
-				conn.Close()
-			}
-			if err == nil {
-				log.Println("Local server is ready on:", localEndpoint)
-				break
-			}
-			time.Sleep(localServerRetry)
-		}
-	}
-
-	b := &backoff.Backoff{
-		Max: 2 * time.Minute,
-	}
 
 	var handler local.ConnectionHandler
 
@@ -214,6 +152,32 @@ func StartLocal(cfg *Config) {
 	default:
 		log.Fatal("Unknown wormhole transport layer protocol selected.")
 	}
+	args := flag.Args()
+	if len(args) > 0 {
+		cmd := strings.Join(args, " ")
+		process := NewProcess(cmd, handler)
+		err := process.Run()
+		if err != nil {
+			log.Fatalf("Error running program: %s", err.Error())
+			return
+		}
+
+		for {
+			conn, err := net.Dial("tcp", localEndpoint)
+			if conn != nil {
+				conn.Close()
+			}
+			if err == nil {
+				log.Println("Local server is ready on:", localEndpoint)
+				break
+			}
+			time.Sleep(localServerRetry)
+		}
+	}
+
+	b := &backoff.Backoff{
+		Max: 2 * time.Minute,
+	}
 
 	for {
 		err := handler.InitializeConnection()
@@ -223,50 +187,10 @@ func StartLocal(cfg *Config) {
 			time.Sleep(d)
 			continue
 		}
-		handleOsSignal(handler)
 		b.Reset()
 		err = handler.ListenAndServe()
 		if err != nil {
 			log.Error(err)
 		}
 	}
-}
-
-func handleOsSignal(handler local.ConnectionHandler) {
-	signalChan := make(chan os.Signal, 2)
-	signal.Notify(signalChan)
-	go func(signalChan <-chan os.Signal) {
-		for sig := range signalChan {
-			var exitStatus int
-			var exited bool
-			if cmd != nil {
-				exited, exitStatus, _ = signalProcess(sig)
-			} else {
-				exitStatus = 0
-			}
-			switch sig {
-			case syscall.SIGINT, syscall.SIGTERM:
-				log.Println("Cleaning up local agent.")
-				handler.Close()
-				os.Exit(int(exitStatus))
-			default:
-				if cmd != nil && exited {
-					os.Exit(int(exitStatus))
-				}
-			}
-		}
-	}(signalChan)
-}
-
-func signalProcess(sig os.Signal) (exited bool, exitStatus int, err error) {
-	exited = false
-	err = cmd.Process.Signal(sig)
-	if err != nil {
-		if exiterr, ok := err.(*exec.ExitError); ok {
-			exited = true
-			status, _ := exiterr.Sys().(syscall.WaitStatus)
-			exitStatus = status.ExitStatus()
-		}
-	}
-	return
 }

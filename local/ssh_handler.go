@@ -89,13 +89,13 @@ func (s *SSHHandler) ListenAndServe() error {
 
 // Close closes the listener and SSH connection
 func (s *SSHHandler) Close() error {
-	err := s.ssh.Close()
-	if err != nil {
-		log.Errorf("SSH conn close: %s", err)
-	}
-	err = s.ln.Close()
+	err := s.ln.Close()
 	if err != nil {
 		log.Errorf("SSH listener close: %s", err)
+	}
+	err = s.ssh.Close()
+	if err != nil {
+		log.Errorf("SSH conn close: %s", err)
 	}
 	return err
 }
