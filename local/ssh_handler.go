@@ -30,6 +30,19 @@ type SSHHandler struct {
 	Version        string
 	ssh            *ssh.Client
 	ln             net.Listener
+	shutdown       *utils.Shutdown
+}
+
+// NewSSHHandler initializes SSHHandler
+func NewSSHHandler(token, remoteEndpoint, localEndpoint, version string, release *messages.Release) ConnectionHandler {
+	return &SSHHandler{
+		FlyToken:       token,
+		RemoteEndpoint: remoteEndpoint,
+		LocalEndpoint:  localEndpoint,
+		Release:        release,
+		Version:        version,
+		shutdown:       utils.NewShutdown(),
+	}
 }
 
 // InitializeConnection connects to wormhole server, performs SSH handshake, and
@@ -75,25 +88,34 @@ func (s *SSHHandler) ListenAndServe() error {
 	go s.registerRelease()
 
 	for {
-		conn, err := s.ln.Accept()
-		if err != nil {
-			if err != io.EOF {
-				return fmt.Errorf("Failed to accept SSH Session: %s", err.Error())
+		select {
+		case <-s.shutdown.WaitBeginCh():
+			err := s.ln.Close()
+			if err != nil {
+				log.Errorf("SSH listener close: %s", err)
 			}
+			s.shutdown.Complete()
 			return nil
-		}
+		default:
+			conn, err := s.ln.Accept()
+			if err != nil {
+				if err != io.EOF {
+					return fmt.Errorf("Failed to accept SSH Session: %s", err.Error())
+				}
+				return nil
+			}
 
-		go forwardConnection(conn, s.LocalEndpoint)
+			go forwardConnection(conn, s.LocalEndpoint)
+		}
 	}
 }
 
 // Close closes the listener and SSH connection
 func (s *SSHHandler) Close() error {
-	err := s.ln.Close()
-	if err != nil {
-		log.Errorf("SSH listener close: %s", err)
-	}
-	err = s.ssh.Close()
+	s.shutdown.Begin()
+	s.shutdown.WaitComplete()
+
+	err := s.ssh.Close()
 	if err != nil {
 		log.Errorf("SSH conn close: %s", err)
 	}

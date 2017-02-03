@@ -69,13 +69,7 @@ func StartLocal(cfg *Config) {
 
 	switch cfg.Protocol {
 	case SSH:
-		handler = &local.SSHHandler{
-			FlyToken:       flyToken,
-			RemoteEndpoint: remoteEndpoint,
-			LocalEndpoint:  localEndpoint,
-			Release:        release,
-			Version:        cfg.Version,
-		}
+		handler = local.NewSSHHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
 	case TCP:
 		handler = &local.TCPHandler{
 			FlyToken:       flyToken,

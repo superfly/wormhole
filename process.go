@@ -8,11 +8,15 @@ import (
 	"syscall"
 )
 
+// Process is a wrapper around external program
+// It handles execution and shutdown of a program and can notify an optional io.Closer
+// when a program is terminated.
 type Process struct {
 	cmd    *exec.Cmd
 	closer io.Closer
 }
 
+// NewProcess returns the Process to execute a named program
 func NewProcess(program string, closer io.Closer) *Process {
 	cs := []string{"/bin/sh", "-c", program}
 	cmd := exec.Command(cs[0], cs[1:]...)
@@ -23,6 +27,10 @@ func NewProcess(program string, closer io.Closer) *Process {
 	return &Process{cmd: cmd, closer: closer}
 }
 
+// Run starts the specified command and returns
+// without waiting for the program to complete.
+// It sets up a os.Signal listener and passes SIGNINT and SIGTERM to the running program.
+// It also closer the Closer if present.
 func (p *Process) Run() (err error) {
 	p.handleOsSignal()
 
@@ -55,7 +63,9 @@ func (p *Process) handleOsSignal() {
 			switch sig {
 			case syscall.SIGINT, syscall.SIGTERM:
 				log.Println("Cleaning up local agent.")
-				p.closer.Close()
+				if p.closer != nil {
+					p.closer.Close()
+				}
 				os.Exit(int(exitStatus))
 			default:
 				if p.cmd != nil && exited {
