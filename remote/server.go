@@ -1,8 +1,10 @@
 package remote
 
 import (
+	"crypto/tls"
 	"fmt"
 	"net"
+	"os"
 
 	"github.com/Sirupsen/logrus"
 )
@@ -10,7 +12,7 @@ import (
 // ListenAndServe accepts incoming wormhole connections and passes them to the handler
 func ListenAndServe(addr string, handler Handler) error {
 	log := logger.WithFields(logrus.Fields{"prefix": "Server"})
-	listener, err := net.Listen("tcp", addr)
+	listener, err := newListener(addr, true)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s (%s)", addr, err.Error())
 	}
@@ -26,4 +28,18 @@ func ListenAndServe(addr string, handler Handler) error {
 		go handler.Serve(conn)
 	}
 	return nil
+}
+
+func newListener(addr string, encrypted bool) (net.Listener, error) {
+	if encrypted {
+		cert, err := tls.LoadX509KeyPair(os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_PRIVATE_KEY_FILE"))
+		if err != nil {
+			return nil, err
+		}
+		return tls.Listen("tcp", addr, &tls.Config{
+			Certificates: []tls.Certificate{cert},
+		})
+	} else {
+		return net.Listen("tcp", addr)
+	}
 }

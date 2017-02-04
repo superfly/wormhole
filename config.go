@@ -14,6 +14,8 @@ const (
 	SSH TunnelProto = iota
 	// TCP connection pool
 	TCP
+	// TLS connection pool
+	TLS
 	_
 	_
 	_
@@ -26,6 +28,8 @@ func ParseTunnelProto(proto string) TunnelProto {
 		return SSH
 	case "tcp":
 		return TCP
+	case "tls":
+		return TLS
 	default:
 		return UNSUPPORTED
 	}

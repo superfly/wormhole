@@ -37,6 +37,7 @@ func StartRemote(cfg *Config) {
 			log.Fatal(err)
 		}
 	case TCP:
+	case TLS:
 		h, err = handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)

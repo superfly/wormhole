@@ -71,17 +71,16 @@ func StartLocal(cfg *Config) {
 	case SSH:
 		handler = local.NewSSHHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
 	case TCP:
-		handler = &local.TCPHandler{
-			FlyToken:       flyToken,
-			RemoteEndpoint: remoteEndpoint,
-			LocalEndpoint:  localEndpoint,
-			Release:        release,
-			Version:        version,
+		handler = local.NewTCPHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
+	case TLS:
+		handler, err = local.NewTLSHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
+		if err != nil {
+			log.Fatal(err)
 		}
-
 	default:
 		log.Fatal("Unknown wormhole transport layer protocol selected.")
 	}
+
 	args := flag.Args()
 	if len(args) > 0 {
 		cmd := strings.Join(args, " ")

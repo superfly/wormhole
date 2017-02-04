@@ -1,9 +1,13 @@
 package local
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"net"
+	"os"
 
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
@@ -11,7 +15,6 @@ import (
 
 // TCPHandler type represents the handler that opens a TCP conn to wormhole server and serves
 // incoming requests
-// WARNING: TCPHandler is insecure and shouldn't be used in production
 type TCPHandler struct {
 	RemoteEndpoint string
 	LocalEndpoint  string
@@ -21,6 +24,45 @@ type TCPHandler struct {
 	ln             net.Listener
 	control        net.Conn
 	conns          []net.Conn
+	encrypted      bool
+	tlsConfig      *tls.Config
+}
+
+// NewTCPHandler returns a TCPHandler struct
+// WARNING: TCPHandler is insecure and shouldn't be used in production
+func NewTCPHandler(token, remote, local, version string, release *messages.Release) *TCPHandler {
+	return &TCPHandler{
+		FlyToken:       token,
+		RemoteEndpoint: remote,
+		LocalEndpoint:  local,
+		Release:        release,
+		Version:        version,
+	}
+}
+
+// NewTLSHandler returns a TCPHandler struct with TLS encryption
+func NewTLSHandler(token, remote, local, version string, release *messages.Release) (*TCPHandler, error) {
+	severCert, err := ioutil.ReadFile(os.Getenv("TLS_CERT_FILE"))
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't load SSL Cert: %s", err.Error())
+	}
+	rootCAs := x509.NewCertPool()
+	ok := rootCAs.AppendCertsFromPEM(severCert)
+	if !ok {
+		return nil, fmt.Errorf("couln't append a root CA")
+	}
+
+	h := &TCPHandler{
+		FlyToken:       token,
+		RemoteEndpoint: remote,
+		LocalEndpoint:  local,
+		Release:        release,
+		Version:        version,
+		encrypted:      true,
+		tlsConfig:      &tls.Config{RootCAs: rootCAs},
+	}
+
+	return h, nil
 }
 
 // ListenAndServe accepts requests coming from wormhole server
@@ -62,9 +104,9 @@ func (s *TCPHandler) ListenAndServe() error {
 		switch m := msg.(type) {
 		case *messages.OpenTunnel:
 			log.Debug("Received Open Tunnel message.")
-			conn, err := net.Dial("tcp", s.RemoteEndpoint)
+			conn, err := s.dial()
 			if err != nil {
-				return fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
+				return err
 			}
 			authMsg := &messages.AuthTunnel{ClientID: m.ClientID, Token: s.FlyToken}
 			b, _ := messages.Pack(authMsg)
@@ -101,9 +143,14 @@ func (s *TCPHandler) Close() error {
 }
 
 // connects to wormhole server
-func (s *TCPHandler) dial() (net.Conn, error) {
+func (s *TCPHandler) dial() (conn net.Conn, err error) {
 	// TCP into wormhole server
-	conn, err := net.Dial("tcp", s.RemoteEndpoint)
+
+	if s.encrypted {
+		conn, err = tls.Dial("tcp", s.RemoteEndpoint, s.tlsConfig)
+	} else {
+		conn, err = net.Dial("tcp", s.RemoteEndpoint)
+	}
 	if err != nil {
 		return nil, fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
 	}
