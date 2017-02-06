@@ -8,9 +8,16 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
+	"sync/atomic"
+	"time"
 
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
+)
+
+const (
+	pingInterval   = 2 * time.Second
+	maxPongLatency = 5 * time.Second
 )
 
 // TCPHandler type represents the handler that opens a TCP conn to wormhole server and serves
@@ -26,6 +33,7 @@ type TCPHandler struct {
 	conns          []net.Conn
 	encrypted      bool
 	tlsConfig      *tls.Config
+	lastPongAt     int64
 }
 
 // NewTCPHandler returns a TCPHandler struct
@@ -88,6 +96,9 @@ func (s *TCPHandler) ListenAndServe() error {
 		return fmt.Errorf("error writing to control: " + err.Error())
 	}
 
+	s.lastPongAt = time.Now().UnixNano()
+	go s.heartbeat()
+
 	b := make([]byte, 1024)
 	for {
 		nr, err := s.control.Read(b)
@@ -121,6 +132,8 @@ func (s *TCPHandler) ListenAndServe() error {
 		case *messages.Shutdown:
 			log.Debugf("Received Shutdown message: %s", m.Error)
 			return s.Close()
+		case *messages.Pong:
+			atomic.StoreInt64(&s.lastPongAt, time.Now().UnixNano())
 		default:
 			log.Warn("Unrecognized command. Ignoring.")
 		}
@@ -157,6 +170,44 @@ func (s *TCPHandler) dial() (conn net.Conn, err error) {
 	log.Info("Established TCP connection.")
 
 	return conn, nil
+}
+
+func (s *TCPHandler) heartbeat() {
+	// set lastPing to something sane
+	lastPing := time.Unix(atomic.LoadInt64(&s.lastPongAt)-1, 0)
+	ping := time.NewTicker(pingInterval)
+	pongCheck := time.NewTicker(time.Second)
+
+	defer func() {
+		s.control.Close()
+		ping.Stop()
+		pongCheck.Stop()
+	}()
+
+	for {
+		select {
+		case <-pongCheck.C:
+			lastPong := time.Unix(0, atomic.LoadInt64(&s.lastPongAt))
+			needPong := lastPong.Sub(lastPing) < 0
+			pongLatency := time.Since(lastPing)
+
+			if needPong && pongLatency > maxPongLatency {
+				log.Infof("Last ping: %v, Last pong: %v", lastPing, lastPong)
+				log.Infof("Connection stale, haven't gotten PongMsg in %d seconds", int(pongLatency.Seconds()))
+				return
+			}
+
+		case <-ping.C:
+			b, err := messages.Pack(&messages.Ping{})
+			_, err = s.control.Write(b)
+			if err != nil {
+				log.Errorf("Got error %v when writing PingMsg", err)
+				return
+			}
+			log.Debug("Sent Ping message")
+			lastPing = time.Now()
+		}
+	}
 }
 
 func (s *TCPHandler) forwardConnection(tunnel net.Conn, local string) {

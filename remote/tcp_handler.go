@@ -46,6 +46,7 @@ func (h *TCPHandler) Serve(conn net.Conn) {
 		h.logger.Errorf("error parsing message from stream: " + err.Error())
 		return
 	}
+
 	switch m := msg.(type) {
 	case *messages.AuthControl:
 		go h.tcpSessionHandler(conn)
@@ -65,9 +66,16 @@ func (h *TCPHandler) Serve(conn net.Conn) {
 	}
 }
 
+func (h *TCPHandler) Close() {
+	for _, sess := range h.sessions {
+		sess.Close()
+		delete(h.sessions, sess.ID())
+	}
+}
+
 func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewTCPSession(h.nodeID, h.pool, conn)
+	sess := session.NewTCPSession(logger, h.nodeID, h.pool, conn)
 	h.sessions[sess.ID()] = sess
 
 	err := sess.RequireStream()
@@ -104,13 +112,6 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	h.logger.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
-}
-
-func (h *TCPHandler) Close() {
-	for _, sess := range h.sessions {
-		sess.Close()
-		delete(h.sessions, sess.ID())
-	}
 }
 
 func (h *TCPHandler) closeSession(sess session.Session) {
