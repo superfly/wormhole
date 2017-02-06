@@ -9,10 +9,15 @@ import (
 	"github.com/Sirupsen/logrus"
 )
 
+// Server contains configuration options for a TCP Server
+type Server struct {
+	Encrypted bool
+}
+
 // ListenAndServe accepts incoming wormhole connections and passes them to the handler
-func ListenAndServe(addr string, handler Handler) error {
+func (s *Server) ListenAndServe(addr string, handler Handler) error {
 	log := logger.WithFields(logrus.Fields{"prefix": "Server"})
-	listener, err := newListener(addr, true)
+	listener, err := newListener(addr, s.Encrypted)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s (%s)", addr, err.Error())
 	}

@@ -29,6 +29,7 @@ func StartRemote(cfg *Config) {
 
 	var h handler.Handler
 	var err error
+	server := &handler.Server{}
 
 	switch cfg.Protocol {
 	case SSH:
@@ -36,8 +37,10 @@ func StartRemote(cfg *Config) {
 		if err != nil {
 			log.Fatal(err)
 		}
-	case TCP:
 	case TLS:
+		server.Encrypted = true
+		fallthrough
+	case TCP:
 		h, err = handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)
@@ -47,7 +50,7 @@ func StartRemote(cfg *Config) {
 	}
 
 	go handleDeath(h)
-	handler.ListenAndServe(":"+listenPort, h)
+	server.ListenAndServe(":"+listenPort, h)
 }
 
 func ensureRemoteEnvironment() {
