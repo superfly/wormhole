@@ -2,6 +2,7 @@ package: github.com/superfly/wormhole
 import:
 - package: github.com/jpillora/backoff
 - package: github.com/Sirupsen/logrus
+  version: ~0.11.2
 - package: github.com/x-cray/logrus-prefixed-formatter
 - package: github.com/garyburd/redigo
   version: ~1.0.0
@@ -11,4 +12,7 @@ import:
 - package: github.com/klauspost/cpuid
   version: ~1.0.0
 - package: srcd.works/go-git.v4
-  version: ~4.0.0-rc9
+  vcs: git
+  repo: git@github.com:src-d/go-git.git
+  version: master
+- package: github.com/spf13/viper

@@ -8,24 +8,21 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	handler "github.com/superfly/wormhole/remote"
 )
 
 var (
-	listenPort    = os.Getenv("PORT")
-	nodeID        = os.Getenv("NODE_ID")
-	redisURL      = os.Getenv("REDIS_URL")
-	localhost     = os.Getenv("LOCALHOST")
-	privateKey    = os.Getenv("PRIVATE_KEY")
-	clusterURL    = os.Getenv("CLUSTER_URL")
 	redisPool     *redis.Pool
 	sshPrivateKey []byte
+	log           *logrus.Entry
 )
 
 // StartRemote ...
-func StartRemote(cfg *Config) {
-	ensureRemoteEnvironment()
+func StartRemote(cfg *ServerConfig) {
+	log = cfg.Logger.WithFields(logrus.Fields{"prefix": "wormhole"})
+	ensureRemoteEnvironment(cfg)
 
 	var h handler.Handler
 	var err error
@@ -33,7 +30,7 @@ func StartRemote(cfg *Config) {
 
 	switch cfg.Protocol {
 	case SSH:
-		h, err = handler.NewSSHHandler(sshPrivateKey, localhost, clusterURL, nodeID, redisPool)
+		h, err = handler.NewSSHHandler(sshPrivateKey, cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -41,7 +38,7 @@ func StartRemote(cfg *Config) {
 		server.Encrypted = true
 		fallthrough
 	case TCP:
-		h, err = handler.NewTCPHandler(localhost, clusterURL, nodeID, redisPool)
+		h, err = handler.NewTCPHandler(cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -50,11 +47,10 @@ func StartRemote(cfg *Config) {
 	}
 
 	go handleDeath(h)
-	server.ListenAndServe(":"+listenPort, h)
+	server.ListenAndServe(":"+cfg.Port, h)
 }
 
-func ensureRemoteEnvironment() {
-	ensureEnvironment()
+func ensureRemoteEnvironment(cfg *ServerConfig) {
 	var err error
 	sshPrivateKeyFile := os.Getenv("SSH_PRIVATE_KEY")
 	sshPrivateKey, err = ioutil.ReadFile(sshPrivateKeyFile)
@@ -62,34 +58,13 @@ func ensureRemoteEnvironment() {
 		log.Fatalf("Failed to load private key (%s)", sshPrivateKeyFile)
 	}
 
-	if localhost == "" {
-		localhost = os.Getenv("IPADDRESS")
-	}
-
-	if localhost == "" {
-		log.Fatalln("LOCALHOST or IPADDRESS are required.")
-	}
-	if clusterURL == "" {
-		log.Fatalln("CLUSTER_URL is required.")
-	}
-	if listenPort == "" {
-		listenPort = "10000"
-	}
-	if redisURL == "" {
-		log.Fatalln("REDIS_URL is required.")
-	}
-
-	redisPool = newRedisPool(redisURL)
+	redisPool = newRedisPool(cfg.RedisURL)
 
 	redisConn := redisPool.Get()
 	defer redisConn.Close()
 	_, err = redisConn.Do("PING")
 	if err != nil {
 		log.Fatalf("Couldn't connect to Redis: %s", err.Error())
-	}
-
-	if nodeID == "" {
-		nodeID, _ = os.Hostname()
 	}
 }
 

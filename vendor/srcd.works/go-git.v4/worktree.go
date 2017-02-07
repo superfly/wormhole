@@ -70,7 +70,7 @@ func (w *Worktree) checkoutFile(f *object.File, idx *index.Index) error {
 	return w.indexFile(f, idx)
 }
 
-var fillSystemInfo func(e *index.Entry, os interface{})
+var fillSystemInfo func(e *index.Entry, sys interface{})
 
 func (w *Worktree) indexFile(f *object.File, idx *index.Index) error {
 	fi, err := w.fs.Stat(f.Name)

@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"srcd.works/go-git.v4/config"
+	"srcd.works/go-git.v4/internal/revision"
 	"srcd.works/go-git.v4/plumbing"
 	"srcd.works/go-git.v4/plumbing/object"
 	"srcd.works/go-git.v4/plumbing/storer"
@@ -26,7 +27,7 @@ var (
 	ErrIsBareRepository        = errors.New("worktree not available in a bare repository")
 )
 
-// Repository giturl string, auth common.AuthMethod repository struct
+// Repository represents a git repository
 type Repository struct {
 	r  map[string]*Remote
 	s  Storer
@@ -119,7 +120,7 @@ func PlainInit(path string, isBare bool) (*Repository, error) {
 	return Init(s, wt)
 }
 
-// PlainOpen opens a git repository from the given path. It detects is the
+// PlainOpen opens a git repository from the given path. It detects if the
 // repository is bare or a normal one. If the path doesn't contain a valid
 // repository ErrRepositoryNotExists is returned
 func PlainOpen(path string) (*Repository, error) {
@@ -185,7 +186,7 @@ func (r *Repository) Remote(name string) (*Remote, error) {
 	return newRemote(r.s, c), nil
 }
 
-// Remotes return all the remotes
+// Remotes returns a list with all the remotes
 func (r *Repository) Remotes() ([]*Remote, error) {
 	cfg, err := r.s.Config()
 	if err != nil {
@@ -511,12 +512,13 @@ func (r *Repository) Push(o *PushOptions) error {
 	return remote.Push(o)
 }
 
-// Commit return the commit with the given hash
+// Commit return a Commit with the given hash. If not found
+// plumbing.ErrObjectNotFound is returned
 func (r *Repository) Commit(h plumbing.Hash) (*object.Commit, error) {
 	return object.GetCommit(r.s, h)
 }
 
-// Commits decode the objects into commits
+// Commits returns an unsorted CommitIter with all the commits in the repository
 func (r *Repository) Commits() (*object.CommitIter, error) {
 	iter, err := r.s.IterEncodedObjects(plumbing.CommitObject)
 	if err != nil {
@@ -526,12 +528,13 @@ func (r *Repository) Commits() (*object.CommitIter, error) {
 	return object.NewCommitIter(r.s, iter), nil
 }
 
-// Tree return the tree with the given hash
+// Tree return a Tree with the given hash. If not found
+// plumbing.ErrObjectNotFound is returned
 func (r *Repository) Tree(h plumbing.Hash) (*object.Tree, error) {
 	return object.GetTree(r.s, h)
 }
 
-// Trees decodes the objects into trees
+// Trees returns an unsorted TreeIter with all the trees in the repository
 func (r *Repository) Trees() (*object.TreeIter, error) {
 	iter, err := r.s.IterEncodedObjects(plumbing.TreeObject)
 	if err != nil {
@@ -541,12 +544,13 @@ func (r *Repository) Trees() (*object.TreeIter, error) {
 	return object.NewTreeIter(r.s, iter), nil
 }
 
-// Blob returns the blob with the given hash
+// Blob returns a Blob with the given hash. If not found
+// plumbing.ErrObjectNotFound is returne
 func (r *Repository) Blob(h plumbing.Hash) (*object.Blob, error) {
 	return object.GetBlob(r.s, h)
 }
 
-// Blobs decodes the objects into blobs
+// Blobs returns an unsorted BlobIter with all the blobs in the repository
 func (r *Repository) Blobs() (*object.BlobIter, error) {
 	iter, err := r.s.IterEncodedObjects(plumbing.BlobObject)
 	if err != nil {
@@ -556,13 +560,14 @@ func (r *Repository) Blobs() (*object.BlobIter, error) {
 	return object.NewBlobIter(r.s, iter), nil
 }
 
-// Tag returns a tag with the given hash.
+// Tag returns a Tag with the given hash. If not found
+// plumbing.ErrObjectNotFound is returned
 func (r *Repository) Tag(h plumbing.Hash) (*object.Tag, error) {
 	return object.GetTag(r.s, h)
 }
 
-// Tags returns a object.TagIter that can step through all of the annotated tags
-// in the repository.
+// Tags returns a unsorted TagIter that can step through all of the annotated
+// tags in the repository.
 func (r *Repository) Tags() (*object.TagIter, error) {
 	iter, err := r.s.IterEncodedObjects(plumbing.TagObject)
 	if err != nil {
@@ -572,7 +577,8 @@ func (r *Repository) Tags() (*object.TagIter, error) {
 	return object.NewTagIter(r.s, iter), nil
 }
 
-// Object returns an object with the given hash.
+// Object returns an Object with the given hash. If not found
+// plumbing.ErrObjectNotFound is returned
 func (r *Repository) Object(t plumbing.ObjectType, h plumbing.Hash) (object.Object, error) {
 	obj, err := r.s.EncodedObject(t, h)
 	if err != nil {
@@ -586,8 +592,7 @@ func (r *Repository) Object(t plumbing.ObjectType, h plumbing.Hash) (object.Obje
 	return object.DecodeObject(r.s, obj)
 }
 
-// Objects returns an object.ObjectIter that can step through all of the annotated tags
-// in the repository.
+// Objects returns an unsorted BlobIter with all the objects in the repository
 func (r *Repository) Objects() (*object.ObjectIter, error) {
 	iter, err := r.s.IterEncodedObjects(plumbing.AnyObject)
 	if err != nil {
@@ -614,7 +619,7 @@ func (r *Repository) Reference(name plumbing.ReferenceName, resolved bool) (
 	return r.s.Reference(name)
 }
 
-// References returns a ReferenceIter for all references.
+// References returns an unsorted ReferenceIter for all references.
 func (r *Repository) References() (storer.ReferenceIter, error) {
 	return r.s.IterReferences()
 }
@@ -627,4 +632,130 @@ func (r *Repository) Worktree() (*Worktree, error) {
 	}
 
 	return &Worktree{r: r, fs: r.wt}, nil
+}
+
+// ResolveRevision resolves revision to corresponding hash
+func (r *Repository) ResolveRevision(rev plumbing.Revision) (*plumbing.Hash, error) {
+	p := revision.NewParserFromString(string(rev))
+
+	items, err := p.Parse()
+
+	if err != nil {
+		return nil, err
+	}
+
+	var commit *object.Commit
+
+	for _, item := range items {
+		switch item.(type) {
+		case revision.Ref:
+			ref, err := storer.ResolveReference(r.s, plumbing.ReferenceName(item.(revision.Ref)))
+
+			if err != nil {
+				return &plumbing.ZeroHash, err
+			}
+
+			h := ref.Hash()
+
+			commit, err = r.Commit(h)
+
+			if err != nil {
+				return &plumbing.ZeroHash, err
+			}
+		case revision.CaretPath:
+			depth := item.(revision.CaretPath).Depth
+
+			if depth == 0 {
+				break
+			}
+
+			iter := commit.Parents()
+
+			c, err := iter.Next()
+
+			if err != nil {
+				return &plumbing.ZeroHash, err
+			}
+
+			if depth == 1 {
+				commit = c
+
+				break
+			}
+
+			c, err = iter.Next()
+
+			if err != nil {
+				return &plumbing.ZeroHash, err
+			}
+
+			commit = c
+		case revision.TildePath:
+			for i := 0; i < item.(revision.TildePath).Depth; i++ {
+				c, err := commit.Parents().Next()
+
+				if err != nil {
+					return &plumbing.ZeroHash, err
+				}
+
+				commit = c
+			}
+		case revision.CaretReg:
+			history, err := commit.History()
+
+			if err != nil {
+				return &plumbing.ZeroHash, err
+			}
+
+			re := item.(revision.CaretReg).Regexp
+			negate := item.(revision.CaretReg).Negate
+
+			var c *object.Commit
+
+			for i := 0; i < len(history); i++ {
+				if !negate && re.MatchString(history[i].Message) {
+					c = history[i]
+
+					break
+				}
+
+				if negate && !re.MatchString(history[i].Message) {
+					c = history[i]
+
+					break
+				}
+			}
+
+			if c == nil {
+				return &plumbing.ZeroHash, fmt.Errorf(`No commit message match regexp : "%s"`, re.String())
+			}
+
+			commit = c
+		case revision.AtDate:
+			history, err := commit.History()
+
+			if err != nil {
+				return &plumbing.ZeroHash, err
+			}
+
+			date := item.(revision.AtDate).Date
+			var c *object.Commit
+
+			for i := 0; i < len(history); i++ {
+				if date.Equal(history[i].Committer.When.UTC()) || history[i].Committer.When.UTC().Before(date) {
+					c = history[i]
+
+					break
+				}
+			}
+
+			if c == nil {
+				return &plumbing.ZeroHash, fmt.Errorf(`No commit exists prior to date "%s"`, date.String())
+			}
+
+			commit = c
+		}
+	}
+
+	return &commit.Hash, nil
 }

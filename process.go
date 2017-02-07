@@ -6,6 +6,8 @@ import (
 	"os/exec"
 	"os/signal"
 	"syscall"
+
+	"github.com/Sirupsen/logrus"
 )
 
 // Process is a wrapper around external program
@@ -14,17 +16,18 @@ import (
 type Process struct {
 	cmd    *exec.Cmd
 	closer io.Closer
+	logger *logrus.Entry
 }
 
 // NewProcess returns the Process to execute a named program
-func NewProcess(program string, closer io.Closer) *Process {
+func NewProcess(logger *logrus.Logger, program string, closer io.Closer) *Process {
 	cs := []string{"/bin/sh", "-c", program}
 	cmd := exec.Command(cs[0], cs[1:]...)
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = os.Environ()
-	return &Process{cmd: cmd, closer: closer}
+	return &Process{cmd: cmd, closer: closer, logger: logger.WithFields(logrus.Fields{"prefix": "process"})}
 }
 
 // Run starts the specified command and returns
@@ -34,17 +37,17 @@ func NewProcess(program string, closer io.Closer) *Process {
 func (p *Process) Run() (err error) {
 	p.handleOsSignal()
 
-	log.Println("Starting program:", p.cmd.Path)
+	p.logger.Println("Starting program:", p.cmd.Path)
 	if err = p.cmd.Start(); err != nil {
-		log.Println("Failed to start program:", err)
+		p.logger.Println("Failed to start program:", err)
 		if exiterr, ok := err.(*exec.ExitError); ok {
 			if status, ok := exiterr.Sys().(syscall.WaitStatus); ok {
-				log.Printf("Exit Status: %d", status.ExitStatus())
+				p.logger.Printf("Exit Status: %d", status.ExitStatus())
 				os.Exit(status.ExitStatus())
 			}
 		}
 	}
-	go wait(p.cmd)
+	go wait(p.cmd, p.logger)
 	return
 }
 
@@ -62,7 +65,7 @@ func (p *Process) handleOsSignal() {
 			}
 			switch sig {
 			case syscall.SIGINT, syscall.SIGTERM:
-				log.Println("Cleaning up local agent.")
+				p.logger.Println("Cleaning up local agent.")
 				if p.closer != nil {
 					p.closer.Close()
 				}
@@ -89,7 +92,7 @@ func signalProcess(cmd *exec.Cmd, sig os.Signal) (exited bool, exitStatus int, e
 	return
 }
 
-func wait(cmd *exec.Cmd) {
+func wait(cmd *exec.Cmd, log *logrus.Entry) {
 	if err := cmd.Wait(); err != nil {
 		log.Errorln("Program error:", err)
 		if exiterr, ok := err.(*exec.ExitError); ok {
