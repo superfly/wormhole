@@ -1,4 +1,6 @@
 steps:
+  - name: ":golang: tests"
+    command: .buildkite/test.sh
   - name: ":golang: compile binaries"
     command: .buildkite/build.sh
   - wait
