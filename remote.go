@@ -1,7 +1,6 @@
 package wormhole
 
 import (
-	"io/ioutil"
 	"net/url"
 	"os"
 	"os/signal"
@@ -14,9 +13,8 @@ import (
 )
 
 var (
-	redisPool     *redis.Pool
-	sshPrivateKey []byte
-	log           *logrus.Entry
+	redisPool *redis.Pool
+	log       *logrus.Entry
 )
 
 // StartRemote ...
@@ -30,12 +28,13 @@ func StartRemote(cfg *ServerConfig) {
 
 	switch cfg.Protocol {
 	case SSH:
-		h, err = handler.NewSSHHandler(sshPrivateKey, cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
+		h, err = handler.NewSSHHandler(cfg.SSHPrivateKey, cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
 	case TLS:
-		server.Encrypted = true
+		server.TLSCert = &cfg.TLSCert
+		server.TLSPrivateKey = &cfg.TLSPrivateKey
 		fallthrough
 	case TCP:
 		h, err = handler.NewTCPHandler(cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
@@ -52,11 +51,6 @@ func StartRemote(cfg *ServerConfig) {
 
 func ensureRemoteEnvironment(cfg *ServerConfig) {
 	var err error
-	sshPrivateKeyFile := os.Getenv("SSH_PRIVATE_KEY")
-	sshPrivateKey, err = ioutil.ReadFile(sshPrivateKeyFile)
-	if err != nil {
-		log.Fatalf("Failed to load private key (%s)", sshPrivateKeyFile)
-	}
 
 	redisPool = newRedisPool(cfg.RedisURL)
 

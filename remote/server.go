@@ -4,20 +4,20 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
-	"os"
 
 	"github.com/Sirupsen/logrus"
 )
 
 // Server contains configuration options for a TCP Server
 type Server struct {
-	Encrypted bool
+	TLSCert       *[]byte
+	TLSPrivateKey *[]byte
 }
 
 // ListenAndServe accepts incoming wormhole connections and passes them to the handler
 func (s *Server) ListenAndServe(addr string, handler Handler) error {
 	log := logger.WithFields(logrus.Fields{"prefix": "Server"})
-	listener, err := newListener(addr, s.Encrypted)
+	listener, err := s.newListener(addr)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s (%s)", addr, err.Error())
 	}
@@ -35,9 +35,9 @@ func (s *Server) ListenAndServe(addr string, handler Handler) error {
 	return nil
 }
 
-func newListener(addr string, encrypted bool) (net.Listener, error) {
-	if encrypted {
-		cert, err := tls.LoadX509KeyPair(os.Getenv("TLS_CERT_FILE"), os.Getenv("TLS_PRIVATE_KEY_FILE"))
+func (s *Server) newListener(addr string) (net.Listener, error) {
+	if s.encrypted() {
+		cert, err := tls.X509KeyPair(*s.TLSCert, *s.TLSPrivateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -47,4 +47,11 @@ func newListener(addr string, encrypted bool) (net.Listener, error) {
 	} else {
 		return net.Listen("tcp", addr)
 	}
+}
+
+func (s *Server) encrypted() bool {
+	return s.TLSCert != nil &&
+		s.TLSPrivateKey != nil &&
+		len(*s.TLSCert) > 0 &&
+		len(*s.TLSPrivateKey) > 0
 }

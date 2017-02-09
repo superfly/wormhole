@@ -5,9 +5,7 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
-	"os"
 	"sync/atomic"
 	"time"
 
@@ -49,13 +47,9 @@ func NewTCPHandler(token, remote, local, version string, release *messages.Relea
 }
 
 // NewTLSHandler returns a TCPHandler struct with TLS encryption
-func NewTLSHandler(token, remote, local, version string, release *messages.Release) (*TCPHandler, error) {
-	severCert, err := ioutil.ReadFile(os.Getenv("TLS_CERT_FILE"))
-	if err != nil {
-		return nil, fmt.Errorf("Couldn't load SSL Cert: %s", err.Error())
-	}
+func NewTLSHandler(token, remote, local, version string, cert []byte, release *messages.Release) (*TCPHandler, error) {
 	rootCAs := x509.NewCertPool()
-	ok := rootCAs.AppendCertsFromPEM(severCert)
+	ok := rootCAs.AppendCertsFromPEM(cert)
 	if !ok {
 		return nil, fmt.Errorf("couln't append a root CA")
 	}

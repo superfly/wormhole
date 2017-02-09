@@ -1,3 +1,4 @@
 pkg
 cmd/wormhole/wormhole
 app
+scripts/id_rsa*

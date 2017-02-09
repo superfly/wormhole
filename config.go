@@ -2,11 +2,17 @@ package wormhole
 
 import (
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"os"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
+)
+
+const (
+	missingKeyStr = "%s needs to be set"
 )
 
 var (
@@ -56,11 +62,10 @@ type Config struct {
 	// for client this means the hostname or IP address of the local server
 	Localhost string
 
-	// X.509 Key Pair
-	// Server needs both.
+	// TLS cert is used when TLS conn pool is used as transporation layer
+	// Server also needs TLSPrivateKey
 	// Client should only need a cert if the cert is not verifiable using system Root CAs
-	TLSCertFile       string
-	TLSPrivateKeyFile string
+	TLSCert []byte
 
 	// Logging level
 	LogLevel string
@@ -85,9 +90,13 @@ type ServerConfig struct {
 	// used as metadata for session storage
 	NodeID string
 
-	// Private key used by the server when SSH tunneling is used
+	// SSH private key is used by the server when SSH tunneling is used
 	// as transportation layer
 	SSHPrivateKey []byte
+
+	// TLS Private key is used by the server when TLS conn pool is used
+	// as transporation layer
+	TLSPrivateKey []byte
 }
 
 // NewServerConfig parses config values collected from Viper and validates them
@@ -97,27 +106,44 @@ func NewServerConfig() (*ServerConfig, error) {
 	nodeID, _ := os.Hostname()
 	viper.SetDefault("node_id", nodeID)
 	viper.SetDefault("port", "10000")
+	//viper.BindEnv("ssh_private_key_file")
 
 	logger := logrus.New()
 	logger.Formatter = new(prefixed.TextFormatter)
 	logger.Level = parseLogLevel(viper.GetString("log_level"))
 
+	sshKey, err := ioutil.ReadFile(viper.GetString("ssh_private_key_file"))
+	if err != nil {
+		return nil, cfgErr(missingKeyStr, "FLY_SSH_PRIVATE_KEY_FILE")
+	}
+
+	tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
+	if err != nil {
+		return nil, cfgErr(missingKeyStr, "FLY_TLS_PRIVATE_KEY_FILE")
+	}
+
+	tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+	if err != nil {
+		return nil, cfgErr(missingKeyStr, "FLY_TLS_CERT_FILE")
+	}
+
 	shared := Config{
-		Protocol:          ParseTunnelProto(viper.GetString("proto")),
-		Port:              viper.GetString("port"),
-		Version:           viper.GetString("version"),
-		Localhost:         viper.GetString("localhost"),
-		LogLevel:          viper.GetString("log_level"),
-		TLSCertFile:       viper.GetString("tls_cert_file"),
-		TLSPrivateKeyFile: viper.GetString("tls_private_key_file"),
-		Logger:            logger,
+		Protocol:  ParseTunnelProto(viper.GetString("proto")),
+		Port:      viper.GetString("port"),
+		Version:   viper.GetString("version"),
+		Localhost: viper.GetString("localhost"),
+		LogLevel:  viper.GetString("log_level"),
+		TLSCert:   tlsCert,
+		Logger:    logger,
 	}
 
 	cfg := &ServerConfig{
-		ClusterURL: viper.GetString("cluster_url"),
-		RedisURL:   viper.GetString("redis_url"),
-		NodeID:     viper.GetString("node_id"),
-		Config:     shared,
+		ClusterURL:    viper.GetString("cluster_url"),
+		RedisURL:      viper.GetString("redis_url"),
+		NodeID:        viper.GetString("node_id"),
+		SSHPrivateKey: sshKey,
+		TLSPrivateKey: tlsKey,
+		Config:        shared,
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -138,9 +164,9 @@ func (cfg *ServerConfig) validate() error {
 		return ErrInvalidConfig
 	} else if len(cfg.LogLevel) == 0 {
 		return ErrInvalidConfig
-	} else if len(cfg.TLSCertFile) == 0 {
+	} else if len(cfg.TLSCert) == 0 {
 		return ErrInvalidConfig
-	} else if len(cfg.TLSPrivateKeyFile) == 0 {
+	} else if len(cfg.TLSPrivateKey) == 0 {
 		return ErrInvalidConfig
 	} else if len(cfg.ClusterURL) == 0 {
 		return ErrInvalidConfig
@@ -186,15 +212,19 @@ func NewClientConfig() (*ClientConfig, error) {
 	logger.Formatter = new(prefixed.TextFormatter)
 	logger.Level = parseLogLevel(viper.GetString("log_level"))
 
+	tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+	if err != nil {
+		return nil, cfgErr(missingKeyStr, "FLY_TLS_CERT_FILE")
+	}
+
 	shared := Config{
-		Protocol:          ParseTunnelProto(viper.GetString("proto")),
-		Port:              viper.GetString("port"),
-		Version:           viper.GetString("version"),
-		Localhost:         viper.GetString("localhost"),
-		LogLevel:          viper.GetString("log_level"),
-		TLSCertFile:       viper.GetString("tls_cert_file"),
-		TLSPrivateKeyFile: viper.GetString("tls_private_key_file"),
-		Logger:            logger,
+		Protocol:  ParseTunnelProto(viper.GetString("proto")),
+		Port:      viper.GetString("port"),
+		Version:   viper.GetString("version"),
+		Localhost: viper.GetString("localhost"),
+		LogLevel:  viper.GetString("log_level"),
+		TLSCert:   tlsCert,
+		Logger:    logger,
 	}
 
 	cfg := &ClientConfig{
@@ -224,9 +254,7 @@ func (cfg *ClientConfig) validate() error {
 		return ErrInvalidConfig
 	} else if len(cfg.LogLevel) == 0 {
 		return ErrInvalidConfig
-	} else if len(cfg.TLSCertFile) == 0 {
-		return ErrInvalidConfig
-	} else if len(cfg.TLSPrivateKeyFile) == 0 {
+	} else if len(cfg.TLSCert) == 0 {
 		return ErrInvalidConfig
 	} else if len(cfg.LocalEndpoint) == 0 {
 		return ErrInvalidConfig
@@ -244,6 +272,10 @@ func parseLogLevel(lvl string) logrus.Level {
 		return logrus.InfoLevel
 	}
 	return level
+}
+
+func cfgErr(template string, vars ...interface{}) error {
+	return fmt.Errorf(template, vars)
 }
 
 // TunnelProto specifies the type of transport protocol used by wormhole instance

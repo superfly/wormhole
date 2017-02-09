@@ -37,7 +37,7 @@ func StartLocal(cfg *ClientConfig) {
 	case TCP:
 		handler = local.NewTCPHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
 	case TLS:
-		handler, err = local.NewTLSHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
+		handler, err = local.NewTLSHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, cfg.TLSCert, release)
 		if err != nil {
 			log.Fatal(err)
 		}
