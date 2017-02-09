@@ -2,64 +2,28 @@ package wormhole
 
 import (
 	"flag"
+	"fmt"
 	"net"
-	"os"
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/jpillora/backoff"
 
 	"github.com/superfly/wormhole/local"
 )
 
 const (
-	defaultLocalPort      = "5000"
-	defaultLocalHost      = "127.0.0.1"
-	defaultRemoteEndpoint = "wormhole.fly.io:30000"
-	localServerRetry      = 200 * time.Millisecond // how often to retry local server until ready
-	maxWormholeBackoff    = 2 * time.Minute        // max backoff between retries to wormhole server
+	localServerRetry   = 200 * time.Millisecond // how often to retry local server until ready
+	maxWormholeBackoff = 2 * time.Minute        // max backoff between retries to wormhole server
 )
-
-var (
-	localEndpoint  = os.Getenv("LOCAL_ENDPOINT")
-	port           = os.Getenv("PORT")
-	remoteEndpoint = os.Getenv("REMOTE_ENDPOINT")
-	flyToken       = os.Getenv("FLY_TOKEN")
-	releaseIDVar   = os.Getenv("FLY_RELEASE_ID_VAR")
-	releaseDescVar = os.Getenv("FLY_RELEASE_DESC_VAR")
-)
-
-func ensureLocalEnvironment() {
-	ensureEnvironment()
-	if flyToken == "" {
-		log.Fatalln("FLY_TOKEN is required, please set this environment variable.")
-	}
-
-	if releaseIDVar == "" {
-		releaseIDVar = "FLY_RELEASE_ID"
-	}
-
-	if releaseDescVar == "" {
-		releaseDescVar = "FLY_RELEASE_DESC"
-	}
-
-	if remoteEndpoint == "" {
-		remoteEndpoint = defaultRemoteEndpoint
-	}
-
-	if localEndpoint == "" {
-		if port == "" {
-			localEndpoint = defaultLocalHost + ":" + defaultLocalPort
-		} else {
-			localEndpoint = defaultLocalHost + ":" + port
-		}
-	}
-}
 
 // StartLocal ...
-func StartLocal(cfg *Config) {
-	ensureLocalEnvironment()
-	release, err := computeRelease(releaseIDVar, releaseDescVar)
+func StartLocal(cfg *ClientConfig) {
+	log := cfg.Logger.WithFields(logrus.Fields{"prefix": "wormhole"})
+
+	fmt.Printf("config: %v", cfg)
+	release, err := computeRelease(cfg.ReleaseIDVar, cfg.ReleaseDescVar)
 	if err != nil {
 		log.Warn(err)
 	}
@@ -69,11 +33,11 @@ func StartLocal(cfg *Config) {
 
 	switch cfg.Protocol {
 	case SSH:
-		handler = local.NewSSHHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
+		handler = local.NewSSHHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
 	case TCP:
-		handler = local.NewTCPHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
+		handler = local.NewTCPHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
 	case TLS:
-		handler, err = local.NewTLSHandler(flyToken, remoteEndpoint, localEndpoint, cfg.Version, release)
+		handler, err = local.NewTLSHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -84,7 +48,7 @@ func StartLocal(cfg *Config) {
 	args := flag.Args()
 	if len(args) > 0 {
 		cmd := strings.Join(args, " ")
-		process := NewProcess(cmd, handler)
+		process := NewProcess(cfg.Logger, cmd, handler)
 		err := process.Run()
 		if err != nil {
 			log.Fatalf("Error running program: %s", err.Error())
@@ -92,12 +56,12 @@ func StartLocal(cfg *Config) {
 		}
 
 		for {
-			conn, err := net.Dial("tcp", localEndpoint)
+			conn, err := net.Dial("tcp", cfg.LocalEndpoint)
 			if conn != nil {
 				conn.Close()
 			}
 			if err == nil {
-				log.Println("Local server is ready on:", localEndpoint)
+				log.Println("Local server is ready on:", cfg.LocalEndpoint)
 				break
 			}
 			time.Sleep(localServerRetry)
