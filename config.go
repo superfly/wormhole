@@ -12,7 +12,8 @@ import (
 )
 
 const (
-	missingKeyStr = "%s needs to be set"
+	unsetEnvStr = "%s needs to be set"
+	invalidStr  = "%s is invalid"
 )
 
 var (
@@ -27,6 +28,7 @@ func init() {
 	//set common defaults for server and client config
 
 	viper.SetDefault("proto", "ssh")
+	viper.SetDefault("log_level", "info")
 
 	// only set it when version is provided by the build system
 	if len(version) > 0 {
@@ -106,44 +108,48 @@ func NewServerConfig() (*ServerConfig, error) {
 	nodeID, _ := os.Hostname()
 	viper.SetDefault("node_id", nodeID)
 	viper.SetDefault("port", "10000")
-	//viper.BindEnv("ssh_private_key_file")
 
 	logger := logrus.New()
 	logger.Formatter = new(prefixed.TextFormatter)
 	logger.Level = parseLogLevel(viper.GetString("log_level"))
 
-	sshKey, err := ioutil.ReadFile(viper.GetString("ssh_private_key_file"))
-	if err != nil {
-		return nil, cfgErr(missingKeyStr, "FLY_SSH_PRIVATE_KEY_FILE")
-	}
-
-	tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
-	if err != nil {
-		return nil, cfgErr(missingKeyStr, "FLY_TLS_PRIVATE_KEY_FILE")
-	}
-
-	tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
-	if err != nil {
-		return nil, cfgErr(missingKeyStr, "FLY_TLS_CERT_FILE")
-	}
+	protocol := ParseTunnelProto(viper.GetString("proto"))
 
 	shared := Config{
-		Protocol:  ParseTunnelProto(viper.GetString("proto")),
+		Protocol:  protocol,
 		Port:      viper.GetString("port"),
 		Version:   viper.GetString("version"),
 		Localhost: viper.GetString("localhost"),
 		LogLevel:  viper.GetString("log_level"),
-		TLSCert:   tlsCert,
 		Logger:    logger,
 	}
 
 	cfg := &ServerConfig{
-		ClusterURL:    viper.GetString("cluster_url"),
-		RedisURL:      viper.GetString("redis_url"),
-		NodeID:        viper.GetString("node_id"),
-		SSHPrivateKey: sshKey,
-		TLSPrivateKey: tlsKey,
-		Config:        shared,
+		ClusterURL: viper.GetString("cluster_url"),
+		RedisURL:   viper.GetString("redis_url"),
+		NodeID:     viper.GetString("node_id"),
+		Config:     shared,
+	}
+
+	switch protocol {
+	case SSH:
+		sshKey, err := ioutil.ReadFile(viper.GetString("ssh_private_key_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_SSH_PRIVATE_KEY_FILE")
+		}
+		cfg.SSHPrivateKey = sshKey
+	case TLS:
+		tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_PRIVATE_KEY_FILE")
+		}
+		cfg.TLSPrivateKey = tlsKey
+
+		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+		}
+		cfg.TLSCert = tlsCert
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -154,26 +160,33 @@ func NewServerConfig() (*ServerConfig, error) {
 }
 
 func (cfg *ServerConfig) validate() error {
-	if cfg.Protocol == UNSUPPORTED {
-		return ErrInvalidConfig
-	} else if len(cfg.Port) == 0 {
-		return ErrInvalidConfig
-	} else if len(cfg.Version) == 0 {
-		return ErrInvalidConfig
+	switch cfg.Protocol {
+	case UNSUPPORTED:
+		return cfgErr(unsetEnvStr, "FLY_PROTO")
+	case TLS:
+		if len(cfg.TLSCert) == 0 {
+			return cfgErr(invalidStr, "FLY_TLS_CERT_FILE")
+		} else if len(cfg.TLSPrivateKey) == 0 {
+			return cfgErr(invalidStr, "FLY_TLS_PRIVATE_KEY_FILE")
+		}
+	case SSH:
+		if len(cfg.SSHPrivateKey) == 0 {
+			return cfgErr(invalidStr, "FLY_SSH_PRIVATE_KEY_FILE")
+		}
+	}
+
+	if len(cfg.Port) == 0 {
+		return cfgErr(unsetEnvStr, "FLY_PORT")
 	} else if len(cfg.Localhost) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_LOCALHOST or IPADDRESS")
 	} else if len(cfg.LogLevel) == 0 {
-		return ErrInvalidConfig
-	} else if len(cfg.TLSCert) == 0 {
-		return ErrInvalidConfig
-	} else if len(cfg.TLSPrivateKey) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_LOG_LEVEL")
 	} else if len(cfg.ClusterURL) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_CLUSTER_URL")
 	} else if len(cfg.RedisURL) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_REDIS_URL")
 	} else if len(cfg.NodeID) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_NODE_ID")
 	}
 	return nil
 }
@@ -212,19 +225,23 @@ func NewClientConfig() (*ClientConfig, error) {
 	logger.Formatter = new(prefixed.TextFormatter)
 	logger.Level = parseLogLevel(viper.GetString("log_level"))
 
-	tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
-	if err != nil {
-		return nil, cfgErr(missingKeyStr, "FLY_TLS_CERT_FILE")
-	}
+	protocol := ParseTunnelProto(viper.GetString("proto"))
 
 	shared := Config{
-		Protocol:  ParseTunnelProto(viper.GetString("proto")),
+		Protocol:  protocol,
 		Port:      viper.GetString("port"),
 		Version:   viper.GetString("version"),
 		Localhost: viper.GetString("localhost"),
 		LogLevel:  viper.GetString("log_level"),
-		TLSCert:   tlsCert,
 		Logger:    logger,
+	}
+
+	if protocol == TLS {
+		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+		}
+		shared.TLSCert = tlsCert
 	}
 
 	cfg := &ClientConfig{
@@ -244,24 +261,27 @@ func NewClientConfig() (*ClientConfig, error) {
 }
 
 func (cfg *ClientConfig) validate() error {
-	if cfg.Protocol == UNSUPPORTED {
-		return ErrInvalidConfig
-	} else if len(cfg.Port) == 0 {
-		return ErrInvalidConfig
-	} else if len(cfg.Version) == 0 {
-		return ErrInvalidConfig
+	switch cfg.Protocol {
+	case UNSUPPORTED:
+		return cfgErr(unsetEnvStr, "FLY_PROTO")
+	case TLS:
+		if len(cfg.TLSCert) == 0 {
+			return cfgErr(invalidStr, "FLY_TLS_CERT_KEY_FILE")
+		}
+	}
+
+	if len(cfg.Port) == 0 {
+		return cfgErr(unsetEnvStr, "FLY_PORT")
 	} else if len(cfg.Localhost) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_LOCALHOST")
 	} else if len(cfg.LogLevel) == 0 {
-		return ErrInvalidConfig
-	} else if len(cfg.TLSCert) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_LOG_LEVEL")
 	} else if len(cfg.LocalEndpoint) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_LOCAL_ENDPOINT")
 	} else if len(cfg.RemoteEndpoint) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_REMOTE_ENDPOINT")
 	} else if len(cfg.Token) == 0 {
-		return ErrInvalidConfig
+		return cfgErr(unsetEnvStr, "FLY_TOKEN")
 	}
 	return nil
 }
