@@ -6,7 +6,9 @@ import (
 	"io/ioutil"
 	"os"
 
+	bugsnag_hook "github.com/Shopify/logrus-bugsnag"
 	"github.com/Sirupsen/logrus"
+	bugsnag "github.com/bugsnag/bugsnag-go"
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
@@ -99,6 +101,9 @@ type ServerConfig struct {
 	// TLS Private key is used by the server when TLS conn pool is used
 	// as transporation layer
 	TLSPrivateKey []byte
+
+	// API token for error reporting to Bugsnag
+	BugsnagAPIKey string
 }
 
 // NewServerConfig parses config values collected from Viper and validates them
@@ -108,17 +113,32 @@ func NewServerConfig() (*ServerConfig, error) {
 	nodeID, _ := os.Hostname()
 	viper.SetDefault("node_id", nodeID)
 	viper.SetDefault("port", "10000")
+	viper.BindEnv("bugsnag_api_key", "BUGSNAG_API_KEY")
 
 	logger := logrus.New()
 	logger.Formatter = new(prefixed.TextFormatter)
 	logger.Level = parseLogLevel(viper.GetString("log_level"))
+
+	version := viper.GetString("version")
+	bugsnagKey := viper.GetString("bugsnag_api_key")
+	if len(bugsnagKey) > 0 {
+		bugsnag.Configure(bugsnag.Configuration{
+			APIKey:     bugsnagKey,
+			AppVersion: version,
+		})
+		hook, err := bugsnag_hook.NewBugsnagHook()
+		if err != nil {
+			return nil, cfgErr(invalidStr, "BUGSNAG_API_KEY")
+		}
+		logger.Hooks.Add(hook)
+	}
 
 	protocol := ParseTunnelProto(viper.GetString("proto"))
 
 	shared := Config{
 		Protocol:  protocol,
 		Port:      viper.GetString("port"),
-		Version:   viper.GetString("version"),
+		Version:   version,
 		Localhost: viper.GetString("localhost"),
 		LogLevel:  viper.GetString("log_level"),
 		Logger:    logger,
