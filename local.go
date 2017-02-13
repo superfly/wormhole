@@ -2,7 +2,6 @@ package wormhole
 
 import (
 	"flag"
-	"fmt"
 	"net"
 	"strings"
 	"time"
@@ -10,6 +9,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/jpillora/backoff"
 
+	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/local"
 )
 
@@ -19,10 +19,9 @@ const (
 )
 
 // StartLocal ...
-func StartLocal(cfg *ClientConfig) {
+func StartLocal(cfg *config.ClientConfig) {
 	log := cfg.Logger.WithFields(logrus.Fields{"prefix": "wormhole"})
 
-	fmt.Printf("config: %v", cfg)
 	release, err := computeRelease(cfg.ReleaseIDVar, cfg.ReleaseDescVar)
 	if err != nil {
 		log.Warn(err)
@@ -32,11 +31,11 @@ func StartLocal(cfg *ClientConfig) {
 	var handler local.ConnectionHandler
 
 	switch cfg.Protocol {
-	case SSH:
+	case config.SSH:
 		handler = local.NewSSHHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
-	case TCP:
+	case config.TCP:
 		handler = local.NewTCPHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
-	case TLS:
+	case config.TLS:
 		handler, err = local.NewTLSHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, cfg.TLSCert, release)
 		if err != nil {
 			log.Fatal(err)

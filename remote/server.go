@@ -12,11 +12,12 @@ import (
 type Server struct {
 	TLSCert       *[]byte
 	TLSPrivateKey *[]byte
+	Logger        *logrus.Logger
 }
 
 // ListenAndServe accepts incoming wormhole connections and passes them to the handler
 func (s *Server) ListenAndServe(addr string, handler Handler) error {
-	log := logger.WithFields(logrus.Fields{"prefix": "Server"})
+	log := s.Logger.WithFields(logrus.Fields{"prefix": "Server"})
 	listener, err := s.newListener(addr)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s (%s)", addr, err.Error())

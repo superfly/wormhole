@@ -26,7 +26,6 @@ type TCPSession struct {
 	control    net.Conn
 	conns      chan net.Conn
 	lastPingAt int64
-	logger     *logrus.Entry
 }
 
 // NewTCPSession creates new TCPSession struct
@@ -35,13 +34,13 @@ func NewTCPSession(logger *logrus.Logger, nodeID string, redisPool *redis.Pool, 
 		id:     xid.New().String(),
 		nodeID: nodeID,
 		store:  NewRedisStore(redisPool),
+		logger: logger.WithFields(logrus.Fields{"prefix": "TCPSession"}),
 	}
 	s := &TCPSession{
 		control:     conn,
 		baseSession: base,
 		conns:       make(chan net.Conn, 10),
 		lastPingAt:  time.Now().UnixNano(),
-		logger:      logger.WithFields(logrus.Fields{"prefix": "TCPSession"}),
 	}
 	return s
 }

@@ -9,6 +9,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/wormhole/config"
 	handler "github.com/superfly/wormhole/remote"
 )
 
@@ -18,26 +19,26 @@ var (
 )
 
 // StartRemote ...
-func StartRemote(cfg *ServerConfig) {
+func StartRemote(cfg *config.ServerConfig) {
 	log = cfg.Logger.WithFields(logrus.Fields{"prefix": "wormhole"})
 	ensureRemoteEnvironment(cfg)
 
 	var h handler.Handler
 	var err error
-	server := &handler.Server{}
+	server := &handler.Server{Logger: cfg.Logger}
 
 	switch cfg.Protocol {
-	case SSH:
-		h, err = handler.NewSSHHandler(cfg.SSHPrivateKey, cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
+	case config.SSH:
+		h, err = handler.NewSSHHandler(cfg, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
-	case TLS:
+	case config.TLS:
 		server.TLSCert = &cfg.TLSCert
 		server.TLSPrivateKey = &cfg.TLSPrivateKey
 		fallthrough
-	case TCP:
-		h, err = handler.NewTCPHandler(cfg.Localhost, cfg.ClusterURL, cfg.NodeID, redisPool)
+	case config.TCP:
+		h, err = handler.NewTCPHandler(cfg, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -49,7 +50,7 @@ func StartRemote(cfg *ServerConfig) {
 	server.ListenAndServe(":"+cfg.Port, h)
 }
 
-func ensureRemoteEnvironment(cfg *ServerConfig) {
+func ensureRemoteEnvironment(cfg *config.ServerConfig) {
 	var err error
 
 	redisPool = newRedisPool(cfg.RedisURL)

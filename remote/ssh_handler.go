@@ -8,6 +8,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/session"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/crypto/ssh"
@@ -40,20 +41,20 @@ type SSHHandler struct {
 }
 
 // NewSSHHandler ...
-func NewSSHHandler(key []byte, localhost, clusterURL, nodeID string, pool *redis.Pool) (*SSHHandler, error) {
-	config, err := makeConfig(key)
+func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, error) {
+	config, err := makeConfig(cfg.SSHPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create SSH Server Config: %s", err.Error())
 	}
 
 	s := SSHHandler{
-		nodeID:     nodeID,
+		nodeID:     cfg.NodeID,
 		sessions:   make(map[string]session.Session),
-		localhost:  localhost,
-		clusterURL: clusterURL,
+		localhost:  cfg.Localhost,
+		clusterURL: cfg.ClusterURL,
 		pool:       pool,
 		config:     config,
-		logger:     logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
+		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
 	}
 	return &s, nil
 }
@@ -77,7 +78,7 @@ func makeConfig(key []byte) (*ssh.ServerConfig, error) {
 
 func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewSSHSession(s.nodeID, s.pool, conn, s.config)
+	sess := session.NewSSHSession(s.logger.Logger, s.nodeID, s.pool, conn, s.config)
 	s.sessions[sess.ID()] = sess
 	err := sess.RequireStream()
 	if err != nil {
@@ -120,6 +121,7 @@ func (s *SSHHandler) closeSession(sess session.Session) {
 	delete(s.sessions, sess.ID())
 }
 
+// Close closes all sessions handled by SSHandler
 func (s *SSHHandler) Close() {
 	for _, sess := range s.sessions {
 		sess.Close()

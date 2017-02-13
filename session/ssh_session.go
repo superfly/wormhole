@@ -11,7 +11,7 @@ import (
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	log "github.com/Sirupsen/logrus"
+	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/rs/xid"
 	"github.com/superfly/wormhole/messages"
@@ -47,11 +47,12 @@ type directForward struct {
 }
 
 // NewSSHSession creates new SshSession struct
-func NewSSHSession(nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
+func NewSSHSession(logger *logrus.Logger, nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
 	base := baseSession{
 		id:     xid.New().String(),
 		nodeID: nodeID,
 		store:  NewRedisStore(redisPool),
+		logger: logger.WithFields(logrus.Fields{"prefix": "SSHSession"}),
 	}
 	s := &SSHSession{
 		tcpConn:     tcpConn,
@@ -66,7 +67,7 @@ func (s *SSHSession) RequireStream() error {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sshConn, chans, reqs, err := ssh.NewServerConn(s.tcpConn, s.config)
 	if err != nil {
-		log.Printf("Failed to handshake %s (%s): %s", s.nodeID, s.tcpConn.RemoteAddr(), err)
+		s.logger.Printf("Failed to handshake %s (%s): %s", s.nodeID, s.tcpConn.RemoteAddr(), err)
 		return err
 	}
 	s.conn = sshConn
@@ -99,7 +100,7 @@ func (s *SSHSession) RequireAuthentication() error {
 
 func (s *SSHSession) Close() {
 	s.RegisterDisconnection()
-	log.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
+	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
 	s.conn.Close()
 }
 
@@ -143,10 +144,10 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 	defer func() {
 		err := ln.Close()
 		if err != nil {
-			log.Debugf("Couldn't close ingress conn: %s", err)
+			s.logger.Debugf("Couldn't close ingress conn: %s", err)
 			return
 		}
-		log.Debugf("Closed ingress conn: %s", ln.Addr().String())
+		s.logger.Debugf("Closed ingress conn: %s", ln.Addr().String())
 	}()
 
 	t := s.setSshPort(req, ln)
@@ -169,10 +170,10 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 					if ok && netErr.Timeout() && netErr.Temporary() {
 						continue
 					}
-					log.Errorln("Could not accept Ingress TCP conn:", err)
+					s.logger.Errorln("Could not accept Ingress TCP conn:", err)
 					return
 				}
-				log.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
+				s.logger.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
 
 				host, port, err := net.SplitHostPort(tcpConn.RemoteAddr().String())
 				if err != nil {
@@ -190,16 +191,14 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 
 				ch, reqs, err := s.conn.OpenChannel(sshForwardedTCPReturnRequest, ssh.Marshal(p))
 				if err != nil {
-					log.WithFields(log.Fields{
-						"err": err.Error(),
-					}).Error("Open forwarded Channel error:")
+					s.logger.Errorf("Open forwarded Channel error: %s", err.Error())
 					return
 				}
 				go ssh.DiscardRequests(reqs)
 				go func() {
 					err := utils.CopyCloseIO(ch, tcpConn)
 					if err != nil && err != io.EOF {
-						log.Error(err)
+						s.logger.Error(err)
 					}
 				}()
 			}
@@ -222,7 +221,7 @@ func (s *SSHSession) handleKeepalive(req *ssh.Request) {
 	}
 	go func() {
 		if err := s.RegisterHeartbeat(); err != nil {
-			log.Warnf("Failed to register session heartbeat: %s", err.Error())
+			s.logger.Warnf("Failed to register session heartbeat: %s", err.Error())
 		}
 	}()
 }
@@ -236,7 +235,7 @@ func (s *SSHSession) registerRelease(req *ssh.Request) {
 		s.release = &release
 		s.store.RegisterRelease(s)
 	} else {
-		log.Warnf("Couldn't process release info: %s", err.Error())
+		s.logger.Warnf("Couldn't process release info: %s", err.Error())
 	}
 }
 

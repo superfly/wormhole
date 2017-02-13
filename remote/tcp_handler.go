@@ -5,6 +5,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/session"
 )
@@ -21,14 +22,14 @@ type TCPHandler struct {
 }
 
 // NewTCPHandler ...
-func NewTCPHandler(localhost, clusterURL, nodeID string, pool *redis.Pool) (*TCPHandler, error) {
+func NewTCPHandler(cfg *config.ServerConfig, pool *redis.Pool) (*TCPHandler, error) {
 	h := TCPHandler{
-		nodeID:     nodeID,
+		nodeID:     cfg.NodeID,
 		sessions:   make(map[string]session.Session),
-		localhost:  localhost,
-		clusterURL: clusterURL,
+		localhost:  cfg.Localhost,
+		clusterURL: cfg.ClusterURL,
 		pool:       pool,
-		logger:     logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
+		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
 	return &h, nil
 }
@@ -66,6 +67,7 @@ func (h *TCPHandler) Serve(conn net.Conn) {
 	}
 }
 
+// Close closes all sessions handled by TCPHandler
 func (h *TCPHandler) Close() {
 	for _, sess := range h.sessions {
 		sess.Close()
@@ -75,7 +77,7 @@ func (h *TCPHandler) Close() {
 
 func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewTCPSession(logger, h.nodeID, h.pool, conn)
+	sess := session.NewTCPSession(h.logger.Logger, h.nodeID, h.pool, conn)
 	h.sessions[sess.ID()] = sess
 
 	err := sess.RequireStream()

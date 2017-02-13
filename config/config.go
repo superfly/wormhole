@@ -1,4 +1,4 @@
-package wormhole
+package config
 
 import (
 	"errors"

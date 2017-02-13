@@ -1,6 +1,9 @@
 package session
 
-import "github.com/superfly/wormhole/messages"
+import (
+	"github.com/Sirupsen/logrus"
+	"github.com/superfly/wormhole/messages"
+)
 
 // Session hold information about connected client
 type Session interface {
@@ -29,6 +32,7 @@ type baseSession struct {
 
 	release *messages.Release
 	store   *RedisStore
+	logger  *logrus.Entry
 }
 
 func (s *baseSession) ID() string {
