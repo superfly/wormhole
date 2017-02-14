@@ -7,6 +7,9 @@ if [ ! -x "$(command -v glide)" ]; then
   go get -v github.com/Masterminds/glide
 fi
 
+tags=${GOTEST_TAGS:-}
 # we don't want to run tests on all vendorized dependencies,
 # so need to ignore /vendor dir
-go test -v -race $(glide novendor)
+echo $tags
+
+go test -v -race $tags $(glide novendor)

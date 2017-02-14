@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
@@ -38,6 +39,8 @@ type SSHHandler struct {
 	sessions   map[string]session.Session
 	pool       *redis.Pool
 	logger     *logrus.Entry
+
+	mu sync.Mutex
 }
 
 // NewSSHHandler ...
@@ -76,10 +79,16 @@ func makeConfig(key []byte) (*ssh.ServerConfig, error) {
 	return config, nil
 }
 
+func (s *SSHHandler) setSession(sess session.Session) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.sessions[sess.ID()] = sess
+}
+
 func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewSSHSession(s.logger.Logger, s.nodeID, s.pool, conn, s.config)
-	s.sessions[sess.ID()] = sess
+	sess := session.NewSSHSession(s.logger.Logger, s.clusterURL, s.nodeID, s.pool, conn, s.config)
+	s.setSession(sess)
 	err := sess.RequireStream()
 	if err != nil {
 		s.logger.Errorln("error getting a stream:", err)
@@ -104,7 +113,6 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 	_, port, _ := net.SplitHostPort(ln.Addr().String())
 	sess.EndpointAddr = s.localhost + ":" + port
-	sess.ClusterURL = s.clusterURL
 
 	if err = sess.RegisterEndpoint(); err != nil {
 		s.logger.Errorln("Error registering endpoint:", err)
@@ -118,11 +126,16 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 func (s *SSHHandler) closeSession(sess session.Session) {
 	sess.Close()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 	delete(s.sessions, sess.ID())
 }
 
 // Close closes all sessions handled by SSHandler
 func (s *SSHHandler) Close() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	for _, sess := range s.sessions {
 		sess.Close()
 		delete(s.sessions, sess.ID())

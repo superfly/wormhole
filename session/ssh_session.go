@@ -47,12 +47,13 @@ type directForward struct {
 }
 
 // NewSSHSession creates new SshSession struct
-func NewSSHSession(logger *logrus.Logger, nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
+func NewSSHSession(logger *logrus.Logger, clusterURL, nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
 	base := baseSession{
-		id:     xid.New().String(),
-		nodeID: nodeID,
-		store:  NewRedisStore(redisPool),
-		logger: logger.WithFields(logrus.Fields{"prefix": "SSHSession"}),
+		id:         xid.New().String(),
+		nodeID:     nodeID,
+		store:      NewRedisStore(redisPool),
+		ClusterURL: clusterURL,
+		logger:     logger.WithFields(logrus.Fields{"prefix": "SSHSession"}),
 	}
 	s := &SSHSession{
 		tcpConn:     tcpConn,

@@ -1,5 +1,5 @@
-hash: e967646b705e38e30663dc9680b2b704769caff655e4957f9d8528c2dc22f917
-updated: 2017-02-10T12:35:02.273145961-08:00
+hash: 0f62179bac5e464e52ad1f92f37c85c1a0f7a56ba8845bd81d0cf8d88e31befc
+updated: 2017-02-13T14:53:03.669671021-08:00
 imports:
 - name: github.com/bugsnag/bugsnag-go
   version: 0e0aea7fe7d3fa47be41fc8a0e3a92d9668a9020
@@ -50,7 +50,7 @@ imports:
 - name: github.com/pelletier/go-toml
   version: c9506ee96398e7571356462217b9e24d6a628d71
 - name: github.com/rs/xid
-  version: e39c3571542a72a9d44559fc96e2a80ed896682b
+  version: e959e92539c364578e455189c9250311a5160095
 - name: github.com/sergi/go-diff
   version: 24e2351369ec4949b2ed0dc5c477afdd4c4034e8
   subpackages:
@@ -59,6 +59,8 @@ imports:
   version: 797fa877e4ab814c9a0e3fc1c77bf6e3beb76465
 - name: github.com/Sirupsen/logrus
   version: c078b1e43f58d563c74cebe63c85789e76ddb627
+  subpackages:
+  - hooks/test
 - name: github.com/spf13/afero
   version: 72b31426848c6ef12a7a8e216708cb0d1530f074
   subpackages:
@@ -88,11 +90,11 @@ imports:
   - ssh
   - ssh/agent
 - name: golang.org/x/net
-  version: a689eb3bc4b53af70390acc3cf68c9f549b6b8d6
+  version: 61557ac0112b576429a0df080e1c2cef5dfbb642
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: aaabbdc969c3935a2a7f61efac801e7163c73a2a
+  version: 0ed46b70d91ba0ab7273e1aea3c89ccc9a9cc489
   subpackages:
   - unix
 - name: golang.org/x/text
@@ -124,7 +126,7 @@ imports:
   subpackages:
   - osfs
 - name: srcd.works/go-git.v4
-  version: 87a84b1cb90149cf81e76be46811341a30e4a367
+  version: a69e1cf378db9eb86fe384ced9a295b5eba7943e
   repo: git@github.com:src-d/go-git.git
   vcs: git
   subpackages:
@@ -158,4 +160,10 @@ imports:
   - utils/binary
   - utils/diff
   - utils/ioutil
-testImports: []
+testImports:
+- name: github.com/alicebob/miniredis
+  version: 10ddf01f45bee3c40d1af5dbaad9aa71e6f20835
+- name: github.com/bsm/redeo
+  version: 1ce09fc76693fb3c1ca9b529c66f38920beb6fb8
+  subpackages:
+  - info
