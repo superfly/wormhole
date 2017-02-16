@@ -12,7 +12,7 @@ VERSION=${VERSION:-"latest"}
 
 echo "Compiling version: ${VERSION}"
 
-LDFLAGS="-X 'wormhole.version=$VERSION' -s -w"
+LDFLAGS="-X 'github.com/superfly/wormhole/config.version=$VERSION' -s -w"
 GCFLAGS=""
 
 # Cleanup

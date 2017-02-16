@@ -48,6 +48,11 @@ func init() {
 	viper.AutomaticEnv()
 }
 
+// Version returns version of wormhole
+func Version() string {
+	return viper.GetString("version")
+}
+
 // Config stores wormole shared parameters
 type Config struct {
 	// Protocol specifies transportation layer used by wormhole
