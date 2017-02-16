@@ -36,6 +36,10 @@ echo "+++ Pushing binaries to S3"
 
 buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/$BUILDKITE_TAG
 
+# also set the version as the latest
+# TODO: there must be a better way to copy/symlink objects in S3 instead of uploading again
+buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/latest
+
 echo "+++ Building and pushing to Docker Hub"
 
 base_image_name="flyio/wormhole"
