@@ -53,18 +53,18 @@ func StartLocal(cfg *config.ClientConfig) {
 			log.Fatalf("Error running program: %s", err.Error())
 			return
 		}
+	}
 
-		for {
-			conn, err := net.Dial("tcp", cfg.LocalEndpoint)
-			if conn != nil {
-				conn.Close()
-			}
-			if err == nil {
-				log.Println("Local server is ready on:", cfg.LocalEndpoint)
-				break
-			}
-			time.Sleep(localServerRetry)
+	for {
+		conn, err := net.Dial("tcp", cfg.LocalEndpoint)
+		if conn != nil {
+			conn.Close()
 		}
+		if err == nil {
+			log.Println("Local server is ready on:", cfg.LocalEndpoint)
+			break
+		}
+		time.Sleep(localServerRetry)
 	}
 
 	b := &backoff.Backoff{
