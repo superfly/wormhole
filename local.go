@@ -22,7 +22,7 @@ const (
 func StartLocal(cfg *config.ClientConfig) {
 	log := cfg.Logger.WithFields(logrus.Fields{"prefix": "wormhole"})
 
-	release, err := computeRelease(cfg.ReleaseIDVar, cfg.ReleaseDescVar)
+	release, err := computeRelease(cfg.ReleaseID, cfg.ReleaseDesc, cfg.ReleaseBranch)
 	if err != nil {
 		log.Warn(err)
 	}

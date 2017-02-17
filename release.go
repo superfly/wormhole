@@ -11,17 +11,20 @@ import (
 	"srcd.works/go-git.v4/plumbing"
 )
 
-func computeRelease(releaseIDVar, releaseDescVar string) (*messages.Release, error) {
+func computeRelease(id, desc, branch string) (*messages.Release, error) {
 	release := &messages.Release{}
-	if releaseID := os.Getenv(releaseIDVar); releaseID != "" {
-		release.ID = releaseID
+	if len(id) > 0 {
+		release.ID = id
 	}
 
-	if releaseDesc := os.Getenv(releaseDescVar); releaseDesc != "" {
-		release.Description = releaseDesc
+	if len(desc) > 0 {
+		release.Description = desc
 	}
 
-	var branches []string
+	if len(branch) > 0 {
+		release.Branch = branch
+	}
+
 	if _, err := os.Stat(".git"); !os.IsNotExist(err) {
 		release.VCSType = "git"
 		repo, err := git.PlainOpen(".")
@@ -44,6 +47,8 @@ func computeRelease(releaseIDVar, releaseDescVar string) (*messages.Release, err
 		if err != nil {
 			return nil, fmt.Errorf("Could not get current refs: %s", err.Error())
 		}
+
+		var branches []string
 		refs.ForEach(func(ref *plumbing.Reference) error {
 			if ref.IsBranch() && head.Hash().String() == ref.Hash().String() {
 				branch := strings.TrimPrefix(ref.Name().String(), "refs/heads/")
@@ -57,16 +62,18 @@ func computeRelease(releaseIDVar, releaseDescVar string) (*messages.Release, err
 		release.VCSRevisionAuthorName = author.Name
 		release.VCSRevisionTime = author.When
 		release.VCSRevisionMessage = tip.Message
+
+		// TODO: be smarter about branches, and maybe let users override this
+		if release.Branch == "" && len(branches) > 0 {
+			release.Branch = branches[0]
+		}
 	}
+
 	if release.ID == "" && release.VCSRevision != "" {
 		release.ID = release.VCSRevision
 	}
 	if release.Description == "" && release.VCSRevisionMessage != "" {
 		release.Description = release.VCSRevisionMessage
-	}
-	// TODO: be smarter about branches, and maybe let users override this
-	if len(branches) > 0 {
-		release.Branch = branches[0]
 	}
 	return release, nil
 }

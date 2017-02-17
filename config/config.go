@@ -229,13 +229,17 @@ type ClientConfig struct {
 	// Authentication token when connecting to wormhole server
 	Token string
 
-	// ENV name that stores Release ID
 	// when set this will override the default VCS ID (i.e. git commit SHA1)
-	ReleaseIDVar string
+	// defaults to FLY_RELASE_ID (but can be overriden with FLY_RELEASE_ID_VAR to point ot a different ENV)
+	ReleaseID string
 
-	// ENV name that stores Release Description
 	// when set this will override the default VCS message (i.e. git commit message)
-	ReleaseDescVar string
+	// defaults to FLY_RELASE_DESC (but can be overriden with FLY_RELEASE_DESC_VAR to point ot a different ENV)
+	ReleaseDesc string
+
+	// when set this will override the default VCS branch
+	// defaults to FLY_RELASE_BRANCH (but can be overriden with FLY_RELEASE_BRANCH_VAR to point ot a different ENV)
+	ReleaseBranch string
 }
 
 // NewClientConfig parses config values collected from Viper and validates them
@@ -245,6 +249,9 @@ func NewClientConfig() (*ClientConfig, error) {
 	viper.SetDefault("localhost", "127.0.0.1")
 	viper.SetDefault("remote_endpoint", "wormhole.fly.io:30000")
 	viper.SetDefault("local_endpoint", viper.GetString("localhost")+":"+viper.GetString("port"))
+	viper.SetDefault("release_id_var", "FLY_RELEASE_ID")
+	viper.SetDefault("release_desc_var", "FLY_RELEASE_DESC")
+	viper.SetDefault("release_branch_var", "FLY_RELEASE_BRANCH")
 
 	logger := logrus.New()
 	logger.Formatter = new(prefixed.TextFormatter)
@@ -273,8 +280,9 @@ func NewClientConfig() (*ClientConfig, error) {
 		LocalEndpoint:  viper.GetString("local_endpoint"),
 		RemoteEndpoint: viper.GetString("remote_endpoint"),
 		Token:          viper.GetString("token"),
-		ReleaseIDVar:   viper.GetString("release_id_var"),
-		ReleaseDescVar: viper.GetString("release_desc_var"),
+		ReleaseID:      os.Getenv(viper.GetString("release_id_var")),
+		ReleaseBranch:  os.Getenv(viper.GetString("release_branch_var")),
+		ReleaseDesc:    os.Getenv(viper.GetString("release_desc_var")),
 		Config:         shared,
 	}
 
