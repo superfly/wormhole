@@ -1,6 +1,10 @@
-hash: 0f62179bac5e464e52ad1f92f37c85c1a0f7a56ba8845bd81d0cf8d88e31befc
-updated: 2017-02-13T14:53:03.669671021-08:00
+hash: 2138359e1ca237667deb4ea909974f12e754ff7e269788fc80b4089a3daa294d
+updated: 2017-02-20T10:25:21.716596957-08:00
 imports:
+- name: github.com/beorn7/perks
+  version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
+  subpackages:
+  - quantile
 - name: github.com/bugsnag/bugsnag-go
   version: 0e0aea7fe7d3fa47be41fc8a0e3a92d9668a9020
   subpackages:
@@ -15,11 +19,11 @@ imports:
   - internal
   - redis
 - name: github.com/golang/protobuf
-  version: 8ee79997227bf9b34611aee7946ae64735e6fd93
+  version: 69b215d01a5606c843240eab4937eab3acee6530
   subpackages:
   - proto
 - name: github.com/hashicorp/hcl
-  version: 372e8ddaa16fd67e371e9323807d056b799360af
+  version: 630949a3c5fa3c613328e1b8256052cbc2327c9b
   subpackages:
   - hcl/ast
   - hcl/parser
@@ -40,7 +44,11 @@ imports:
 - name: github.com/mattn/go-colorable
   version: 5411d3eea5978e6cdc258b30de592b60df6aba96
 - name: github.com/mattn/go-isatty
-  version: 281032e84ae07510239465db46bf442aa44b953a
+  version: dda3de49cbfcec471bd7a70e6cc01fcc3ff90109
+- name: github.com/matttproud/golang_protobuf_extensions
+  version: c12348ce28de40eed0136aa2b644d0ee0650e56c
+  subpackages:
+  - pbutil
 - name: github.com/mgutz/ansi
   version: 9520e82c474b0a04dd04f8a40959027271bab992
 - name: github.com/mitchellh/mapstructure
@@ -48,7 +56,26 @@ imports:
 - name: github.com/pelletier/go-buffruneio
   version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
 - name: github.com/pelletier/go-toml
-  version: c9506ee96398e7571356462217b9e24d6a628d71
+  version: 22139eb5469018e7374b3e7ef653de37ffb44f72
+- name: github.com/prometheus/client_golang
+  version: c5b7fccd204277076155f10851dad72b76a49317
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
+- name: github.com/prometheus/client_model
+  version: 6f3806018612930941127f2a7c6c453ba2c527d2
+  subpackages:
+  - go
+- name: github.com/prometheus/common
+  version: 49fee292b27bfff7f354ee0f64e1bc4850462edf
+  subpackages:
+  - expfmt
+  - internal/bitbucket.org/ww/goautoneg
+  - model
+- name: github.com/prometheus/procfs
+  version: a1dba9ce8baed984a2495b658c82687f8157b98f
+  subpackages:
+  - xfs
 - name: github.com/rs/xid
   version: e959e92539c364578e455189c9250311a5160095
 - name: github.com/sergi/go-diff
@@ -59,10 +86,8 @@ imports:
   version: 797fa877e4ab814c9a0e3fc1c77bf6e3beb76465
 - name: github.com/Sirupsen/logrus
   version: c078b1e43f58d563c74cebe63c85789e76ddb627
-  subpackages:
-  - hooks/test
 - name: github.com/spf13/afero
-  version: 72b31426848c6ef12a7a8e216708cb0d1530f074
+  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
   - mem
 - name: github.com/spf13/cast
@@ -72,7 +97,7 @@ imports:
 - name: github.com/spf13/pflag
   version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
 - name: github.com/spf13/viper
-  version: 5ed0fc31f7f453625df314d8e66b9791e8d13003
+  version: 7538d73b4eb9511d85a9f1dfef202eeb8ac260f4
 - name: github.com/src-d/gcfg
   version: f187355171c936ac84a82793659ebb4936bc1c23
   subpackages:
@@ -90,15 +115,15 @@ imports:
   - ssh
   - ssh/agent
 - name: golang.org/x/net
-  version: 61557ac0112b576429a0df080e1c2cef5dfbb642
+  version: 6b27048ae5e6ad1ef927e72e437531493de612fe
   subpackages:
   - context
 - name: golang.org/x/sys
-  version: 0ed46b70d91ba0ab7273e1aea3c89ccc9a9cc489
+  version: 075e574b89e4c2d22f2286a7e2b919519c6f3547
   subpackages:
   - unix
 - name: golang.org/x/text
-  version: 06d6eba81293389cafdff7fca90d75592194b2d9
+  version: 85c29909967d7f171f821e7a42e7b7af76fb9598
   subpackages:
   - transform
   - unicode/norm
@@ -126,7 +151,7 @@ imports:
   subpackages:
   - osfs
 - name: srcd.works/go-git.v4
-  version: a69e1cf378db9eb86fe384ced9a295b5eba7943e
+  version: f5a9c7ed5ab58afa255c2f405b30f06f88a6aecf
   repo: git@github.com:src-d/go-git.git
   vcs: git
   subpackages:

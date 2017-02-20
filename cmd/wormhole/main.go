@@ -3,10 +3,16 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/superfly/wormhole"
 	"github.com/superfly/wormhole/config"
+)
+
+const (
+	prometheusAPIAddr = ":9191" // host:port on which Prometheus scraping endpoint will be exposed on
 )
 
 func main() {
@@ -24,6 +30,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("config error: %s", err.Error())
 		}
+
+		// Expose the registered metrics via HTTP.
+		go func() {
+			http.Handle("/metrics", promhttp.Handler())
+			log.Fatal(http.ListenAndServe(prometheusAPIAddr, nil))
+		}()
+
 		wormhole.StartRemote(config)
 	} else {
 		config, err := config.NewClientConfig()

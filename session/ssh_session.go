@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/xid"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
@@ -23,6 +24,25 @@ const (
 	sshRemoteForwardRequest      = "tcpip-forward"
 	sshForwardedTCPReturnRequest = "forwarded-tcpip"
 )
+
+var (
+	openSessionsMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "wormhole",
+			Subsystem: "session",
+			Name:      "open_sessions_total",
+			Help:      "Number of active sessions, partitioned by backend.",
+		},
+		[]string{
+			// Which backend this session belongs to?
+			"backend",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(openSessionsMetric)
+}
 
 type SSHSession struct {
 	baseSession
@@ -75,6 +95,7 @@ func (s *SSHSession) RequireStream() error {
 	s.chans = chans
 	s.reqs = reqs
 	go handleChannels(chans)
+	go openSessionsMetric.With(prometheus.Labels{"backend": s.BackendID()}).Add(1)
 	return nil
 }
 
@@ -102,6 +123,7 @@ func (s *SSHSession) RequireAuthentication() error {
 func (s *SSHSession) Close() {
 	s.RegisterDisconnection()
 	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
+	go openSessionsMetric.With(prometheus.Labels{"backend": s.BackendID()}).Sub(1)
 	s.conn.Close()
 }
 
