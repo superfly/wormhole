@@ -3,8 +3,10 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net/http"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/superfly/wormhole"
 	"github.com/superfly/wormhole/config"
 )
@@ -24,6 +26,13 @@ func main() {
 		if err != nil {
 			log.Fatalf("config error: %s", err.Error())
 		}
+
+		// Expose the registered metrics via HTTP.
+		go func() {
+			http.Handle("/metrics", promhttp.Handler())
+			config.Logger.Fatal(http.ListenAndServe(":"+config.MetricsAPIPort, nil))
+		}()
+
 		wormhole.StartRemote(config)
 	} else {
 		config, err := config.NewClientConfig()

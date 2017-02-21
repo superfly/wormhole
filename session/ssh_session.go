@@ -13,6 +13,7 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/xid"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
@@ -24,6 +25,49 @@ const (
 	sshForwardedTCPReturnRequest = "forwarded-tcpip"
 )
 
+var (
+	openSessionsMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "wormhole",
+			Subsystem: "ssh_session",
+			Name:      "open_sessions_total",
+			Help:      "Number of active sessions, partitioned by backend, node and cluster.",
+		},
+		[]string{
+			// Which backend this session belongs to?
+			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
+		},
+	)
+
+	openChannelsMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "wormhole",
+			Subsystem: "ssh_session",
+			Name:      "open_channels_total",
+			Help:      "Number of active channels, partitioned by backend, node and cluster.",
+		},
+		[]string{
+			// Which backend this channel belongs to?
+			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
+		},
+	)
+)
+
+func init() {
+	prometheus.MustRegister(openSessionsMetric)
+	prometheus.MustRegister(openChannelsMetric)
+}
+
+// SSHSession extends information about connected client stored in Session.
+// It also includes SSH-specific information like the SSH conn, SSH server config, etc.
 type SSHSession struct {
 	baseSession
 
@@ -46,6 +90,24 @@ type directForward struct {
 	Port2 uint32
 }
 
+type instrumentedIO struct {
+	rwc        io.ReadWriteCloser
+	metricFunc func()
+}
+
+func (io instrumentedIO) Close() error {
+	go io.metricFunc()
+	return io.rwc.Close()
+}
+
+func (io instrumentedIO) Read(p []byte) (int, error) {
+	return io.rwc.Read(p)
+}
+
+func (io instrumentedIO) Write(p []byte) (int, error) {
+	return io.rwc.Write(p)
+}
+
 // NewSSHSession creates new SshSession struct
 func NewSSHSession(logger *logrus.Logger, clusterURL, nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
 	base := baseSession{
@@ -64,6 +126,8 @@ func NewSSHSession(logger *logrus.Logger, clusterURL, nodeID string, redisPool *
 	return s
 }
 
+// RequireStream performs SSH handshake and ensures SSHSession is ready to receive
+// and send data
 func (s *SSHSession) RequireStream() error {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sshConn, chans, reqs, err := ssh.NewServerConn(s.tcpConn, s.config)
@@ -75,9 +139,14 @@ func (s *SSHSession) RequireStream() error {
 	s.chans = chans
 	s.reqs = reqs
 	go handleChannels(chans)
+	go openSessionsMetric.With(labels(s)).Add(1)
 	return nil
 }
 
+// HandleRequests handles all requests coming over the SSH connection from the client.
+// The main function is to accept ingress traffic (from the listener) once the remote port
+// forwarding is set up.
+// It also handles out-of-band SSH request types, like the keepalive or register-release.
 func (s *SSHSession) HandleRequests(ln *net.TCPListener) {
 	for req := range s.reqs {
 		switch req.Type {
@@ -93,15 +162,21 @@ func (s *SSHSession) HandleRequests(ln *net.TCPListener) {
 	}
 }
 
+// RequireAuthentication registers the connection, since authentication is part of the SSH handshake
+// TODO: figure out a better interface for Session
 func (s *SSHSession) RequireAuthentication() error {
 	// done as a hook to ssh handshake
 	go s.RegisterConnection(time.Now())
 	return nil
 }
 
+// Close closes SSHSession and registers disconnection
 func (s *SSHSession) Close() {
 	s.RegisterDisconnection()
 	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
+	go func() {
+		openSessionsMetric.With(labels(s)).Sub(1)
+	}()
 	s.conn.Close()
 }
 
@@ -121,7 +196,7 @@ func (s *SSHSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permis
 	return nil, nil
 }
 
-func (s *SSHSession) setSshPort(req *ssh.Request, ln net.Listener) tcpipForward {
+func (s *SSHSession) setSSHPort(req *ssh.Request, ln net.Listener) tcpipForward {
 	t := tcpipForward{}
 	ssh.Unmarshal(req.Payload, &t)
 
@@ -151,7 +226,7 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 		s.logger.Debugf("Closed ingress conn: %s", ln.Addr().String())
 	}()
 
-	t := s.setSshPort(req, ln)
+	t := s.setSSHPort(req, ln)
 	p := directForward{}
 	quit := make(chan bool)
 	go func(ln *net.TCPListener) { // Handle incoming connections on this new listener
@@ -196,8 +271,13 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 					return
 				}
 				go ssh.DiscardRequests(reqs)
+				go openChannelsMetric.With(labels(s)).Add(1)
 				go func() {
-					err := utils.CopyCloseIO(ch, tcpConn)
+					metricFunc := func() {
+						openChannelsMetric.With(labels(s)).Sub(1)
+					}
+					conn := instrumentedIO{rwc: ch, metricFunc: metricFunc}
+					err := utils.CopyCloseIO(conn, tcpConn)
 					if err != nil && err != io.EOF {
 						s.logger.Error(err)
 					}
@@ -263,4 +343,11 @@ func (s *SSHSession) UpdateAttribute(name string, value interface{}) error {
 // RegisterHeartbeat ...
 func (s *SSHSession) RegisterHeartbeat() error {
 	return s.store.RegisterHeartbeat(s)
+}
+
+func labels(s Session) prometheus.Labels {
+	return prometheus.Labels{"backend": s.BackendID(),
+		"node":    s.NodeID(),
+		"cluster": s.Cluster(),
+	}
 }

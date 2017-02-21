@@ -20,6 +20,11 @@ const (
 	tunnelTimeoutInterval = 10 * time.Second
 )
 
+// TCPSession extends information about connected client stored in Session.
+// It also includes:
+// - control connection for exchanging communication with the client
+// - channel with available tunnel connections
+// - timestamp with the last known ping from the client
 type TCPSession struct {
 	baseSession
 
@@ -45,6 +50,7 @@ func NewTCPSession(logger *logrus.Logger, nodeID string, redisPool *redis.Pool, 
 	return s
 }
 
+// AddTunnel adds a connection to the pool of tunnel connections
 func (s *TCPSession) AddTunnel(conn net.Conn) {
 	select {
 	case s.conns <- conn:
@@ -55,6 +61,9 @@ func (s *TCPSession) AddTunnel(conn net.Conn) {
 	}
 }
 
+// GetTunnel gets a new tunnel connection from the pool of available connections.
+// If no connections are available it will request a new tunnel connection from
+// the client and it will block until tunnelTimeoutInterval.
 func (s *TCPSession) GetTunnel() (conn net.Conn, err error) {
 	var ok bool
 
@@ -89,22 +98,31 @@ func (s *TCPSession) GetTunnel() (conn net.Conn, err error) {
 	return
 }
 
+// RequireStream sends a request to the client to open a new tunnel Connection
+// for this Session.
 func (s *TCPSession) RequireStream() error {
 	return s.openTunnel()
 }
 
+// HandleRequests handles all requests coming over the control connection from the client.
+// The main function is to accept ingress traffic (from the listener) once the remote port
+// forwarding is set up.
+// It also handles out-of-band communication, like the maintaining the Session heartbeat or
+// request the client to open new tunnel connections.
 func (s *TCPSession) HandleRequests(ln *net.TCPListener) {
 	go s.controlLoop()
 	go s.heartbeat()
 	s.handleRemoteForward(ln)
 }
 
+// RequireAuthentication registers the connection
+// TODO: add authentication here
 func (s *TCPSession) RequireAuthentication() error {
-	// we can skip this right now, eventually needs conn to be authed
 	go s.RegisterConnection(time.Now())
 	return nil
 }
 
+// Close closes SSHSession and registers disconnection
 func (s *TCPSession) Close() {
 	s.RegisterDisconnection()
 	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())

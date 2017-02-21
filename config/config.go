@@ -109,6 +109,10 @@ type ServerConfig struct {
 
 	// API token for error reporting to Bugsnag
 	BugsnagAPIKey string
+
+	// Port used by HTTP server to serve metrics
+	// Used by Prometheus to scrape wormhole server endpoint
+	MetricsAPIPort string
 }
 
 // NewServerConfig parses config values collected from Viper and validates them
@@ -118,6 +122,7 @@ func NewServerConfig() (*ServerConfig, error) {
 	nodeID, _ := os.Hostname()
 	viper.SetDefault("node_id", nodeID)
 	viper.SetDefault("port", "10000")
+	viper.SetDefault("metrics_api_port", "9191")
 	viper.BindEnv("bugsnag_api_key", "BUGSNAG_API_KEY")
 
 	logger := logrus.New()
@@ -150,10 +155,11 @@ func NewServerConfig() (*ServerConfig, error) {
 	}
 
 	cfg := &ServerConfig{
-		ClusterURL: viper.GetString("cluster_url"),
-		RedisURL:   viper.GetString("redis_url"),
-		NodeID:     viper.GetString("node_id"),
-		Config:     shared,
+		ClusterURL:     viper.GetString("cluster_url"),
+		RedisURL:       viper.GetString("redis_url"),
+		NodeID:         viper.GetString("node_id"),
+		MetricsAPIPort: viper.GetString("metrics_api_port"),
+		Config:         shared,
 	}
 
 	switch protocol {
@@ -212,6 +218,8 @@ func (cfg *ServerConfig) validate() error {
 		return cfgErr(unsetEnvStr, "FLY_REDIS_URL")
 	} else if len(cfg.NodeID) == 0 {
 		return cfgErr(unsetEnvStr, "FLY_NODE_ID")
+	} else if len(cfg.MetricsAPIPort) == 0 {
+		return cfgErr(unsetEnvStr, "FLY_METRICS_API_PORT")
 	}
 	return nil
 }
