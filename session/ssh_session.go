@@ -29,19 +29,41 @@ var (
 	openSessionsMetric = prometheus.NewGaugeVec(
 		prometheus.GaugeOpts{
 			Namespace: "wormhole",
-			Subsystem: "session",
+			Subsystem: "ssh_session",
 			Name:      "open_sessions_total",
-			Help:      "Number of active sessions, partitioned by backend.",
+			Help:      "Number of active sessions, partitioned by backend, node and cluster.",
 		},
 		[]string{
 			// Which backend this session belongs to?
 			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
+		},
+	)
+
+	openChannelsMetric = prometheus.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Namespace: "wormhole",
+			Subsystem: "ssh_session",
+			Name:      "open_channels_total",
+			Help:      "Number of active channels, partitioned by backend, node and cluster.",
+		},
+		[]string{
+			// Which backend this channel belongs to?
+			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
 		},
 	)
 )
 
 func init() {
 	prometheus.MustRegister(openSessionsMetric)
+	prometheus.MustRegister(openChannelsMetric)
 }
 
 type SSHSession struct {
@@ -64,6 +86,24 @@ type directForward struct {
 	Port1 uint32
 	Host2 string
 	Port2 uint32
+}
+
+type instrumentedIO struct {
+	rwc        io.ReadWriteCloser
+	metricFunc func()
+}
+
+func (io instrumentedIO) Close() error {
+	go io.metricFunc()
+	return io.rwc.Close()
+}
+
+func (io instrumentedIO) Read(p []byte) (int, error) {
+	return io.rwc.Read(p)
+}
+
+func (io instrumentedIO) Write(p []byte) (int, error) {
+	return io.rwc.Write(p)
 }
 
 // NewSSHSession creates new SshSession struct
@@ -95,7 +135,7 @@ func (s *SSHSession) RequireStream() error {
 	s.chans = chans
 	s.reqs = reqs
 	go handleChannels(chans)
-	go openSessionsMetric.With(prometheus.Labels{"backend": s.BackendID()}).Add(1)
+	go openSessionsMetric.With(labels(s)).Add(1)
 	return nil
 }
 
@@ -123,7 +163,9 @@ func (s *SSHSession) RequireAuthentication() error {
 func (s *SSHSession) Close() {
 	s.RegisterDisconnection()
 	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
-	go openSessionsMetric.With(prometheus.Labels{"backend": s.BackendID()}).Sub(1)
+	go func() {
+		openSessionsMetric.With(labels(s)).Sub(1)
+	}()
 	s.conn.Close()
 }
 
@@ -218,8 +260,13 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 					return
 				}
 				go ssh.DiscardRequests(reqs)
+				go openChannelsMetric.With(labels(s)).Add(1)
 				go func() {
-					err := utils.CopyCloseIO(ch, tcpConn)
+					metricFunc := func() {
+						openChannelsMetric.With(labels(s)).Sub(1)
+					}
+					conn := instrumentedIO{rwc: ch, metricFunc: metricFunc}
+					err := utils.CopyCloseIO(conn, tcpConn)
 					if err != nil && err != io.EOF {
 						s.logger.Error(err)
 					}
@@ -285,4 +332,11 @@ func (s *SSHSession) UpdateAttribute(name string, value interface{}) error {
 // RegisterHeartbeat ...
 func (s *SSHSession) RegisterHeartbeat() error {
 	return s.store.RegisterHeartbeat(s)
+}
+
+func labels(s Session) prometheus.Labels {
+	return prometheus.Labels{"backend": s.BackendID(),
+		"node":    s.NodeID(),
+		"cluster": s.Cluster(),
+	}
 }
