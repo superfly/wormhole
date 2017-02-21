@@ -11,10 +11,6 @@ import (
 	"github.com/superfly/wormhole/config"
 )
 
-const (
-	prometheusAPIAddr = ":9191" // host:port on which Prometheus scraping endpoint will be exposed on
-)
-
 func main() {
 	serverMode := flag.Bool("server", false, "Run the wormhole in server mode.")
 	versionFlag := flag.Bool("version", false, "Display wormhole version.")
@@ -34,7 +30,7 @@ func main() {
 		// Expose the registered metrics via HTTP.
 		go func() {
 			http.Handle("/metrics", promhttp.Handler())
-			log.Fatal(http.ListenAndServe(prometheusAPIAddr, nil))
+			config.Logger.Fatal(http.ListenAndServe(":"+config.MetricsAPIPort, nil))
 		}()
 
 		wormhole.StartRemote(config)
