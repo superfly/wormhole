@@ -248,22 +248,23 @@ func (s *TCPSession) controlLoop() {
 	}
 }
 
-// RegisterConnection ...
+// RegisterConnection creates and stores a new session record
 func (s *TCPSession) RegisterConnection(t time.Time) error {
 	return s.store.RegisterConnection(s)
 }
 
-// RegisterDisconnection ...
+// RegisterDisconnection destroys the session record
 func (s *TCPSession) RegisterDisconnection() error {
 	return s.store.RegisterDisconnection(s)
 }
 
-// RegisterEndpoint ...
+// RegisterEndpoint registers the endpoint and adds it to the current session record
+// The endpoint is a particular instance of a running wormhole client
 func (s *TCPSession) RegisterEndpoint() error {
 	return s.store.RegisterEndpoint(s)
 }
 
-// UpdateAttribute ...
+// UpdateAttribute updates a particular attribute of the current session record
 func (s *TCPSession) UpdateAttribute(name string, value interface{}) error {
 	return s.store.UpdateAttribute(s, name, value)
 }

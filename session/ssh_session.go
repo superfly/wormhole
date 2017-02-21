@@ -320,27 +320,29 @@ func (s *SSHSession) registerRelease(req *ssh.Request) {
 	}
 }
 
-// RegisterConnection ...
+// RegisterConnection creates and stores a new session record
 func (s *SSHSession) RegisterConnection(t time.Time) error {
 	return s.store.RegisterConnection(s)
 }
 
-// RegisterDisconnection ...
+// RegisterDisconnection destroys the session record
 func (s *SSHSession) RegisterDisconnection() error {
 	return s.store.RegisterDisconnection(s)
 }
 
-// RegisterEndpoint ...
+// RegisterEndpoint registers the endpoint and adds it to the current session record
+// The endpoint is a particular instance of a running wormhole client
 func (s *SSHSession) RegisterEndpoint() error {
 	return s.store.RegisterEndpoint(s)
 }
 
-// UpdateAttribute ...
+// UpdateAttribute updates a particular attribute of the current session record
 func (s *SSHSession) UpdateAttribute(name string, value interface{}) error {
 	return s.store.UpdateAttribute(s, name, value)
 }
 
-// RegisterHeartbeat ...
+// RegisterHeartbeat updates appropriate session records to indicate the session
+// is still alive
 func (s *SSHSession) RegisterHeartbeat() error {
 	return s.store.RegisterHeartbeat(s)
 }

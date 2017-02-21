@@ -43,7 +43,7 @@ type SSHHandler struct {
 	mu sync.Mutex
 }
 
-// NewSSHHandler ...
+// NewSSHHandler returns a new SSHHandler
 func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, error) {
 	config, err := makeConfig(cfg.SSHPrivateKey)
 	if err != nil {

@@ -2,7 +2,8 @@ package messages
 
 import "time"
 
-// Release ...
+// Release contains basic VCS (e.g. git) information about the running version
+// of client server
 type Release struct {
 	ID                     string    `redis:"id,omitempty"`
 	Branch                 string    `redis:"branch,omitempty"`
