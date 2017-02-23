@@ -11,7 +11,6 @@ fi
 
 export FLY_PROTO=ssh
 export FLY_LOG_LEVEL=debug
-export FLY_TOKEN=fla
 export FLY_REDIS_URL=redis://localhost:6379
 export FLY_CLUSTER_URL=localhost
 export FLY_LOCALHOST=localhost
@@ -20,11 +19,5 @@ export FLY_TLS_PRIVATE_KEY_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts
 
 
 WORMHOLE_BIN=$GOPATH/src/github.com/superfly/wormhole/cmd/wormhole/wormhole
-SITE_ID=13
-BACKEND_ID=7
-
-# Set data in Redis
-redis-cli HSET backend_tokens $FLY_TOKEN $BACKEND_ID
-redis-cli HGET backend_tokens $FLY_TOKEN
 
 $WORMHOLE_BIN -server
