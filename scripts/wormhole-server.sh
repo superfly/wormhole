@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Wormhole server wrapper script, that sets all the defaults to make it really easy
+# to start a wormhole server locally.
+
+# ## Usage:
+#
+#     $ wormhole-server.sh
+
 echo `pwd`
 echo $0
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"

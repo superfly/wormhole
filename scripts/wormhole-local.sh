@@ -1,5 +1,15 @@
 #!/usr/bin/env bash
 
+# Wormhole client wrapper script, that sets all the defaults to make it really easy
+# to connect wormhole client to a local wormhole server.
+#
+# This script by default launches 1 wormhole client, but it has an option to launch
+# multiple clients at once.
+
+# ## Usage:
+#
+#     $ wormhole-local.sh <NUM_CLIENTS>
+
 NUM_CLIENTS=${1:-1}
 PORT=8080
 
@@ -39,10 +49,6 @@ _term() {
     echo "Killing PID: $chpid"
     kill $chpid
   done
-  # this is a hack bc I cannot figure a better way to kill all the decendants
-  # (actual wormhole process is a child of $chpid)
-  # let's kill all the wormole clients
-  #`ps aux | grep wormhole | grep -v '-server' | awk '{ print $2}' | xargs kill`
 }
 
 trap _term SIGINT SIGTERM
@@ -51,7 +57,6 @@ for i in `seq 1 $NUM_CLIENTS`; do
   echo -n "Starting wormhole client ID $i... "
   token="token-for-$i"
   register_client $i $token > /dev/null
-  #($dir/wormhole-local.sh $token) &
   spawn_wormhole $token
 done
 
