@@ -59,11 +59,68 @@ var (
 			"cluster",
 		},
 	)
+
+	ingressConnDurationMetric = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  "wormhole",
+			Subsystem:  "ssh_session",
+			Name:       "ingress_conn_duration_seconds",
+			Help:       "Duration in seconds of ingress connections, paritioned by backend, node and cluster.",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{
+			// Which backend this channel belongs to?
+			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
+		},
+	)
+
+	ingressConnRcvdBytesMetric = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  "wormhole",
+			Subsystem:  "ssh_session",
+			Name:       "ingress_conn_rcvd_bytes",
+			Help:       "Number of bytes received from ingress connections, paritioned by backend, node and cluster.",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{
+			// Which backend this channel belongs to?
+			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
+		},
+	)
+
+	ingressConnSentBytesMetric = prometheus.NewSummaryVec(
+		prometheus.SummaryOpts{
+			Namespace:  "wormhole",
+			Subsystem:  "ssh_session",
+			Name:       "ingress_conn_sent_bytes",
+			Help:       "Number of bytes sent to ingress connections, paritioned by backend, node and cluster.",
+			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		},
+		[]string{
+			// Which backend this channel belongs to?
+			"backend",
+			// What wormhole instance this session is running on?
+			"node",
+			// What region this session belongs to?
+			"cluster",
+		},
+	)
 )
 
 func init() {
 	prometheus.MustRegister(openSessionsMetric)
 	prometheus.MustRegister(openChannelsMetric)
+	prometheus.MustRegister(ingressConnDurationMetric)
+	prometheus.MustRegister(ingressConnRcvdBytesMetric)
+	prometheus.MustRegister(ingressConnSentBytesMetric)
 }
 
 // SSHSession extends information about connected client stored in Session.
@@ -237,6 +294,16 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 			default:
 				ln.SetDeadline(time.Now().Add(time.Second))
 				tcpConn, err := ln.AcceptTCP()
+				connStart := time.Now()
+
+				// wrap a conn with instrumentation, so we can record when the conn is being closed
+				metricFunc := func(sentBytes, rcvdBytes int64) {
+					ingressConnDurationMetric.With(labels(s)).Observe(time.Since(connStart).Seconds())
+					ingressConnRcvdBytesMetric.With(labels(s)).Observe(float64(rcvdBytes))
+					ingressConnSentBytesMetric.With(labels(s)).Observe(float64(sentBytes))
+				}
+
+				ingressConn := &utils.InstrumentedTCPConn{TCPConn: tcpConn, MetricFunc: metricFunc}
 
 				if err != nil {
 					netErr, ok := err.(net.Error)
@@ -249,9 +316,9 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 					s.logger.Errorln("Could not accept Ingress TCP conn:", err)
 					return
 				}
-				s.logger.Debugln("Accepted Ingress TCP conn from:", tcpConn.RemoteAddr())
+				s.logger.Debugln("Accepted Ingress TCP conn from:", ingressConn.RemoteAddr())
 
-				host, port, err := net.SplitHostPort(tcpConn.RemoteAddr().String())
+				host, port, err := net.SplitHostPort(ingressConn.RemoteAddr().String())
 				if err != nil {
 					return
 				}
@@ -277,7 +344,7 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 						openChannelsMetric.With(labels(s)).Sub(1)
 					}
 					conn := instrumentedIO{rwc: ch, metricFunc: metricFunc}
-					err := utils.CopyCloseIO(conn, tcpConn)
+					err := utils.CopyCloseIO(conn, ingressConn)
 					if err != nil && err != io.EOF {
 						s.logger.Error(err)
 					}
