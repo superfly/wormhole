@@ -11,20 +11,30 @@
 #     $ wormhole-local.sh <NUM_CLIENTS>
 
 NUM_CLIENTS=${1:-1}
+
+# HTTP port of local server
 PORT=8080
+# HTTPS port of local server
+TLS_PORT=8888
 
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # wormhole client defaults
 export FLY_PROTO=ssh
-export FLY_LOG_LEVEL=debug
+export FLY_LOG_LEVEL=error
 export FLY_REMOTE_ENDPOINT=localhost:10000
 export FLY_TLS_CERT_FILE=$dir/cert.pem
 
 
-$dir/register-clients.sh $NUM_CLIENTS
+LOCAL_SERVER_CMD=\
+"go run $GOPATH/src/github.com/valyala/fasthttp/examples/fileserver/fileserver.go"\
+" -addrTLS localhost:$TLS_PORT"\
+" -certFile=$dir/cert.pem"\
+" -keyFile=$dir/key.pem"\
+" -addr localhost:$PORT"\
+" -dir $dir"
 
-LOCAL_SERVER_CMD="go run $GOPATH/src/github.com/valyala/fasthttp/examples/fileserver/fileserver.go -addr localhost:$PORT -dir ."
+echo "LOCAL CMD: $LOCAL_SERVER_CMD"
 
 CHILD_PIDS=()
 

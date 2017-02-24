@@ -1,5 +1,16 @@
 #!/usr/bin/env bash
 
+# Wormhole benchmark that uses wrk (https://github.com/wg/wrk) to load test
+# wormhole server.
+# It detects ports for each connected wormhole client (by querying Redis), and
+# launches 1 wrk process to load test each client.
+# It assumes that all clients have been launched using wormhole-local.sh script,
+# which takes care of setting up necessary Redis keys (like FLY_TOKEN etc.)
+
+# ## Usage:
+#
+#     $ benchmark.sh <NUM_CLIENTS>
+
 NUM_CLIENTS=${1:-1}
 
 PORTS=()
@@ -17,7 +28,7 @@ trap _term SIGINT SIGTERM
 
 launch_wrk() {
   port=$1
-  cmd="wrk -t 4 -c 10 -d 5s --latency http://localhost:$port"
+  cmd="wrk -t 2 -c 10 -d 10s --latency http://localhost:$port"
   echo "Launching: \"$cmd\"..."
   output=`$cmd`
   CHILD_PIDS=("$!")
