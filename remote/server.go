@@ -45,9 +45,8 @@ func (s *Server) newListener(addr string) (net.Listener, error) {
 		return tls.Listen("tcp", addr, &tls.Config{
 			Certificates: []tls.Certificate{cert},
 		})
-	} else {
-		return net.Listen("tcp", addr)
 	}
+	return net.Listen("tcp", addr)
 }
 
 func (s *Server) encrypted() bool {

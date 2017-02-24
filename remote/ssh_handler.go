@@ -4,14 +4,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"os"
 	"sync"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/session"
-	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -19,16 +17,6 @@ const (
 	sshRemoteForwardRequest      = "tcpip-forward"
 	sshForwardedTCPReturnRequest = "forwarded-tcpip"
 )
-
-var logger = logrus.New()
-var log *logrus.Entry
-
-func init() {
-	logger.Formatter = new(prefixed.TextFormatter)
-	if os.Getenv("LOG_LEVEL") == "debug" {
-		logger.Level = logrus.DebugLevel
-	}
-}
 
 // SSHHandler type represents the handler that accepts incoming wormhole connections
 type SSHHandler struct {

@@ -9,6 +9,8 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
 )
@@ -32,36 +34,39 @@ type TCPHandler struct {
 	encrypted      bool
 	tlsConfig      *tls.Config
 	lastPongAt     int64
+	logger         *logrus.Entry
 }
 
 // NewTCPHandler returns a TCPHandler struct
 // WARNING: TCPHandler is insecure and shouldn't be used in production
-func NewTCPHandler(token, remote, local, version string, release *messages.Release) *TCPHandler {
+func NewTCPHandler(cfg *config.ClientConfig, release *messages.Release) *TCPHandler {
 	return &TCPHandler{
-		FlyToken:       token,
-		RemoteEndpoint: remote,
-		LocalEndpoint:  local,
+		FlyToken:       cfg.Token,
+		RemoteEndpoint: cfg.RemoteEndpoint,
+		LocalEndpoint:  cfg.LocalEndpoint,
 		Release:        release,
-		Version:        version,
+		Version:        cfg.Version,
+		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
 }
 
 // NewTLSHandler returns a TCPHandler struct with TLS encryption
-func NewTLSHandler(token, remote, local, version string, cert []byte, release *messages.Release) (*TCPHandler, error) {
+func NewTLSHandler(cfg *config.ClientConfig, release *messages.Release) (*TCPHandler, error) {
 	rootCAs := x509.NewCertPool()
-	ok := rootCAs.AppendCertsFromPEM(cert)
+	ok := rootCAs.AppendCertsFromPEM(cfg.TLSCert)
 	if !ok {
 		return nil, fmt.Errorf("couln't append a root CA")
 	}
 
 	h := &TCPHandler{
-		FlyToken:       token,
-		RemoteEndpoint: remote,
-		LocalEndpoint:  local,
+		FlyToken:       cfg.Token,
+		RemoteEndpoint: cfg.RemoteEndpoint,
+		LocalEndpoint:  cfg.LocalEndpoint,
 		Release:        release,
-		Version:        version,
+		Version:        cfg.Version,
 		encrypted:      true,
 		tlsConfig:      &tls.Config{RootCAs: rootCAs},
+		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "TLSHandler"}),
 	}
 
 	return h, nil
@@ -108,7 +113,7 @@ func (s *TCPHandler) ListenAndServe() error {
 		}
 		switch m := msg.(type) {
 		case *messages.OpenTunnel:
-			log.Debug("Received Open Tunnel message.")
+			s.logger.Debug("Received Open Tunnel message.")
 			conn, err := s.dial()
 			if err != nil {
 				return err
@@ -120,16 +125,16 @@ func (s *TCPHandler) ListenAndServe() error {
 				return fmt.Errorf("Failed to auth tunnel: %s", err.Error())
 			}
 
-			log.Infof("Established TCP Tunnel connection for Session: %s", m.ClientID)
+			s.logger.Infof("Established TCP Tunnel connection for Session: %s", m.ClientID)
 			s.conns = append(s.conns, conn)
 			go s.forwardConnection(conn, s.LocalEndpoint)
 		case *messages.Shutdown:
-			log.Debugf("Received Shutdown message: %s", m.Error)
+			s.logger.Debugf("Received Shutdown message: %s", m.Error)
 			return s.Close()
 		case *messages.Pong:
 			atomic.StoreInt64(&s.lastPongAt, time.Now().UnixNano())
 		default:
-			log.Warn("Unrecognized command. Ignoring.")
+			s.logger.Warn("Unrecognized command. Ignoring.")
 		}
 	}
 }
@@ -138,12 +143,12 @@ func (s *TCPHandler) ListenAndServe() error {
 func (s *TCPHandler) Close() error {
 	err := s.control.Close()
 	if err != nil {
-		log.Errorf("Control TCP conn close: %s", err)
+		s.logger.Errorf("Control TCP conn close: %s", err)
 	}
 	for _, c := range s.conns {
 		err = c.Close()
 		if err != nil {
-			log.Errorf("Proxy TCP conn close: %s", err)
+			s.logger.Errorf("Proxy TCP conn close: %s", err)
 		}
 	}
 	return err
@@ -161,7 +166,7 @@ func (s *TCPHandler) dial() (conn net.Conn, err error) {
 	if err != nil {
 		return nil, fmt.Errorf("Failed to establish TCP connection: %s", err.Error())
 	}
-	log.Info("Established TCP connection.")
+	s.logger.Info("Established TCP connection.")
 
 	return conn, nil
 }
@@ -186,36 +191,40 @@ func (s *TCPHandler) heartbeat() {
 			pongLatency := time.Since(lastPing)
 
 			if needPong && pongLatency > maxPongLatency {
-				log.Infof("Last ping: %v, Last pong: %v", lastPing, lastPong)
-				log.Infof("Connection stale, haven't gotten PongMsg in %d seconds", int(pongLatency.Seconds()))
+				s.logger.Infof("Last ping: %v, Last pong: %v", lastPing, lastPong)
+				s.logger.Infof("Connection stale, haven't gotten PongMsg in %d seconds", int(pongLatency.Seconds()))
 				return
 			}
 
 		case <-ping.C:
 			b, err := messages.Pack(&messages.Ping{})
-			_, err = s.control.Write(b)
 			if err != nil {
-				log.Errorf("Got error %v when writing PingMsg", err)
+				s.logger.Errorf("Got error %v when creating PingMsg", err)
 				return
 			}
-			log.Debug("Sent Ping message")
+			_, err = s.control.Write(b)
+			if err != nil {
+				s.logger.Errorf("Got error %v when writing PingMsg", err)
+				return
+			}
+			s.logger.Debug("Sent Ping message")
 			lastPing = time.Now()
 		}
 	}
 }
 
 func (s *TCPHandler) forwardConnection(tunnel net.Conn, local string) {
-	log.Debugf("Accepted TCP session on %s", tunnel.RemoteAddr())
+	s.logger.Debugf("Accepted TCP session on %s", tunnel.RemoteAddr())
 
 	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
 	if err != nil {
-		log.Errorf("Failed to reach local server: %s", err.Error())
+		s.logger.Errorf("Failed to reach local server: %s", err.Error())
 	}
 
-	log.Debugf("Dialed local server on %s", local)
+	s.logger.Debugf("Dialed local server on %s", local)
 
 	err = utils.CopyCloseIO(localConn, tunnel)
 	if err != nil && err != io.EOF {
-		log.Error(err)
+		s.logger.Error(err)
 	}
 }

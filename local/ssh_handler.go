@@ -9,6 +9,8 @@ import (
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
+	"github.com/Sirupsen/logrus"
+	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/utils"
 	"golang.org/x/crypto/ssh"
@@ -31,17 +33,19 @@ type SSHHandler struct {
 	ssh            *ssh.Client
 	ln             net.Listener
 	shutdown       *utils.Shutdown
+	logger         *logrus.Entry
 }
 
 // NewSSHHandler initializes SSHHandler
-func NewSSHHandler(token, remoteEndpoint, localEndpoint, version string, release *messages.Release) ConnectionHandler {
+func NewSSHHandler(cfg *config.ClientConfig, release *messages.Release) ConnectionHandler {
 	return &SSHHandler{
-		FlyToken:       token,
-		RemoteEndpoint: remoteEndpoint,
-		LocalEndpoint:  localEndpoint,
+		FlyToken:       cfg.Token,
+		RemoteEndpoint: cfg.RemoteEndpoint,
+		LocalEndpoint:  cfg.LocalEndpoint,
 		Release:        release,
-		Version:        version,
+		Version:        cfg.Version,
 		shutdown:       utils.NewShutdown(),
+		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
 	}
 }
 
@@ -74,7 +78,7 @@ func (s *SSHHandler) ListenAndServe() error {
 				return nil
 			}
 
-			go forwardConnection(conn, s.LocalEndpoint)
+			go s.forwardConnection(conn, s.LocalEndpoint)
 		}
 	}
 }
@@ -109,36 +113,36 @@ func (s *SSHHandler) dial() (*ssh.Client, net.Listener, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to establish SSH connection: %s", err.Error())
 	}
-	log.Info("Established SSH connection.")
+	s.logger.Info("Established SSH connection.")
 
 	// open a port on wormhole server that we can listen on
 	ln, err := conn.Listen("tcp", "0.0.0.0:0")
 	if err != nil {
 		return nil, nil, fmt.Errorf("Failed to open SSH tunnel: %s", err.Error())
 	}
-	log.Infof("Opened SSH tunnel on %s", ln.Addr().String())
+	s.logger.Infof("Opened SSH tunnel on %s", ln.Addr().String())
 	return conn, ln, nil
 }
 
-func forwardConnection(conn net.Conn, local string) {
-	log.Debugf("Accepted SSH session on %s", conn.RemoteAddr())
+func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
+	s.logger.Debugf("Accepted SSH session on %s", conn.RemoteAddr())
 
 	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
 	if err != nil {
-		log.Errorf("Failed to reach local server: %s", err.Error())
+		s.logger.Errorf("Failed to reach local server: %s", err.Error())
 	}
 
-	log.Debugf("Dialed local server on %s", local)
+	s.logger.Debugf("Dialed local server on %s", local)
 
 	err = utils.CopyCloseIO(localConn, conn)
 	if err != nil && err != io.EOF {
-		log.Error(err)
+		s.logger.Error(err)
 	}
 }
 
 func (s *SSHHandler) stayAlive() {
 	ticker := time.NewTicker(sshKeepaliveInterval)
-	log.Debugf("Sending keepalive every %.1f seconds", sshKeepaliveInterval.Seconds())
+	s.logger.Debugf("Sending keepalive every %.1f seconds", sshKeepaliveInterval.Seconds())
 	defer ticker.Stop()
 	for {
 		select {
@@ -146,7 +150,7 @@ func (s *SSHHandler) stayAlive() {
 			go func() {
 				_, _, err := s.ssh.SendRequest("keepalive", false, nil)
 				if err != nil {
-					log.Errorf("Keepalive failed: %s", err.Error())
+					s.logger.Errorf("Keepalive failed: %s", err.Error())
 					s.shutdown.Begin()
 					return
 				}
@@ -158,12 +162,12 @@ func (s *SSHHandler) stayAlive() {
 }
 
 func (s *SSHHandler) registerRelease() {
-	log.Info("Sending release info...")
+	s.logger.Info("Sending release info...")
 	releaseBytes, err := msgpack.Marshal(s.Release)
 	_, _, err = s.ssh.SendRequest("register-release", false, releaseBytes)
 	if err != nil {
-		log.Errorf("Failed to send release info: %s", err.Error())
+		s.logger.Errorf("Failed to send release info: %s", err.Error())
 		return
 	}
-	log.Debug("Release info sent.")
+	s.logger.Debug("Release info sent.")
 }

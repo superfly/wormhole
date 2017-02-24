@@ -32,11 +32,11 @@ func StartLocal(cfg *config.ClientConfig) {
 
 	switch cfg.Protocol {
 	case config.SSH:
-		handler = local.NewSSHHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
+		handler = local.NewSSHHandler(cfg, release)
 	case config.TCP:
-		handler = local.NewTCPHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, release)
+		handler = local.NewTCPHandler(cfg, release)
 	case config.TLS:
-		handler, err = local.NewTLSHandler(cfg.Token, cfg.RemoteEndpoint, cfg.LocalEndpoint, cfg.Version, cfg.TLSCert, release)
+		handler, err = local.NewTLSHandler(cfg, release)
 		if err != nil {
 			log.Fatal(err)
 		}
