@@ -20,7 +20,7 @@ if [ -n "$BUILDKITE_TAG" ]; then
     PATCH=0-beta.$BUILDKITE_TAG
     CHANNEL=beta
   fi
-else if [ -z "$BUILDKITE_TAG" ] && [ "$BUILDKITE_BRANCH" = "master" ]; then
+elif [ -z "$BUILDKITE_TAG" ] && [ "$BUILDKITE_BRANCH" = "master" ]; then
   MAJOR=0
   MINOR=0
   PATCH=0-beta.${BUILDKITE_COMMIT:0:7}
@@ -88,7 +88,7 @@ rm -f ./app
 
 if [ "$CHANNEL" = "stable" ]; then
   declare -a tag_versions=("${major}" "${major}.${minor}" "${major}.${minor}.${patch}" "$CHANNEL")
-else if [ "$CHANNEL" = "beta" ]; then
+elif [ "$CHANNEL" = "beta" ]; then
   declare -a tag_versions=("$CHANNEL")
 fi
 
