@@ -4,9 +4,8 @@ steps:
   - name: ":golang: compile binaries"
     command: .buildkite/build.sh
   - wait
-  - name: ":github: create release (tag pushed)"
+  - name: ":github: :docker: :aws: release! :allthethings:"
     command: .buildkite/release.sh
-    branches: v*.* # tags
   - wait
   - name: ":ec2: kubernetes deploy"
     command: .buildkite/deploy.sh
