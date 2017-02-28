@@ -13,7 +13,8 @@ buildkite-agent artifact download "pkg/wormhole*" pkg/
 num_binaries=`ls pkg/wormhole* | wc -l`
 
 # right now we support 32- and 64-bit builds for Windows, macOS, Linux and FreeBSD
-if [ "$num_builds" -lt "8" ]; then
+# plus ARM on Linux ;)
+if [ "$num_builds" -lt "9" ]; then
   echo "Missing some wormhole binaries. Cannot make a release."
   exit 1
 fi
