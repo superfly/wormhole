@@ -87,7 +87,7 @@ docker build -t $base_image_name .
 rm -f ./app
 
 if [ "$CHANNEL" = "stable" ]; then
-  tag_versions=("${major}" "${major}.${minor}" "${major}.${minor}.${patch}" "$CHANNEL")
+  tag_versions=("${MAJOR}" "${MAJOR}.${MINOR}" "${MAJOR}.${MINOR}.${PATCH}" "$CHANNEL")
 elif [ "$CHANNEL" = "beta" ]; then
   tag_versions=("$CHANNEL")
 fi
