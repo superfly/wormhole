@@ -87,9 +87,15 @@ docker build -t $base_image_name .
 rm -f ./app
 
 if [ "$CHANNEL" = "stable" ]; then
-  declare -a tag_versions=("${major}" "${major}.${minor}" "${major}.${minor}.${patch}" "$CHANNEL")
+  tag_versions=("${major}" "${major}.${minor}" "${major}.${minor}.${patch}" "$CHANNEL")
 elif [ "$CHANNEL" = "beta" ]; then
-  declare -a tag_versions=("$CHANNEL")
+  tag_versions=("$CHANNEL")
+fi
+
+# this shouldn't happen, at this point we're either in "stable" or "beta" release
+if [ "${#tag_versions[@]}" -lt "1" ]; then
+  echo "expected to have some tags for the Docker image, got: '${tag_versions[@]}' instead"
+  exit 1
 fi
 
 for i in "${tag_versions[@]}"; do
