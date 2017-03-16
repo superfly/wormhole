@@ -55,13 +55,14 @@ func StartLocal(cfg *config.ClientConfig) {
 		}
 	}
 
+	log.Infoln("Attempting to connect to local server on:", cfg.LocalEndpoint)
 	for {
 		conn, err := net.Dial("tcp", cfg.LocalEndpoint)
 		if conn != nil {
 			conn.Close()
 		}
 		if err == nil {
-			log.Println("Local server is ready on:", cfg.LocalEndpoint)
+			log.Infoln("Local server is ready on:", cfg.LocalEndpoint)
 			break
 		}
 		time.Sleep(localServerRetry)
