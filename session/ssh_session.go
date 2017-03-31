@@ -230,7 +230,7 @@ func (s *SSHSession) RequireAuthentication() error {
 // Close closes SSHSession and registers disconnection
 func (s *SSHSession) Close() {
 	s.RegisterDisconnection()
-	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
+	s.logger.Infof("Closed session %s for %s %s (%s).", s.ID(), s.NodeID(), s.Agent(), s.Client())
 	go func() {
 		openSessionsMetric.With(labels(s)).Sub(1)
 	}()

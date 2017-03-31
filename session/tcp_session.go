@@ -125,7 +125,7 @@ func (s *TCPSession) RequireAuthentication() error {
 // Close closes SSHSession and registers disconnection
 func (s *TCPSession) Close() {
 	s.RegisterDisconnection()
-	s.logger.Infof("Closed session %s for %s (%s).", s.ID(), s.NodeID(), s.Client())
+	s.logger.Infof("Closed session %s for %s %s (%s).", s.ID(), s.NodeID(), s.Agent(), s.Client())
 	s.control.Close()
 }
 

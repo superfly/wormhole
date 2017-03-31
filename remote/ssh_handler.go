@@ -107,7 +107,7 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 		return
 	}
 
-	s.logger.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
+	s.logger.Infof("Started session %s for %s %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Agent(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }
