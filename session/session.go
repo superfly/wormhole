@@ -1,6 +1,8 @@
 package session
 
 import (
+	"net"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/messages"
 )
@@ -12,6 +14,7 @@ type Session interface {
 	BackendID() string
 	NodeID() string
 	Client() string
+	ClientIP() string
 	Cluster() string
 	Endpoint() string
 	Key() string
@@ -53,6 +56,11 @@ func (s *baseSession) NodeID() string {
 
 func (s *baseSession) Client() string {
 	return s.clientAddr
+}
+
+func (s *baseSession) ClientIP() string {
+	host, _, _ := net.SplitHostPort(s.clientAddr)
+	return host
 }
 
 func (s *baseSession) Cluster() string {

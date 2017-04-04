@@ -66,6 +66,7 @@ func (r *RedisStore) RegisterDisconnection(s Session) error {
 
 	redisConn.Send("MULTI")
 	redisConn.Send("ZADD", disconnectedSessionsKey, timeToScore(t), s.ID())
+	redisConn.Send("ZADD", dailyClientIpsKey(s, timeToDate(t)), timeToScore(t), s.ClientIP())
 	redisConn.Send("ZREM", connectedSessionsKey, s.ID())
 	redisConn.Send("SREM", "node:"+s.NodeID()+":sessions", s.ID())
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":sessions", s.ID())
@@ -146,6 +147,14 @@ func (r *RedisStore) UpdateAttribute(s Session, name string, value interface{}) 
 
 func timeToScore(t time.Time) int64 {
 	return t.UnixNano() / (int64(time.Millisecond) / int64(time.Nanosecond))
+}
+
+func timeToDate(t time.Time) string {
+	return t.Format("2006-01-02")
+}
+
+func dailyClientIpsKey(s Session, date string) string {
+	return "node:" + s.NodeID() + ":clients:" + date
 }
 
 func endpointKey(s Session) string {
