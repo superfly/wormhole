@@ -130,6 +130,8 @@ func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
 	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
 	if err != nil {
 		s.logger.Errorf("Failed to reach local server: %s", err.Error())
+		s.shutdown.Begin()
+		return
 	}
 
 	s.logger.Debugf("Dialed local server on %s", local)
