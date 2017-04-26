@@ -12,7 +12,7 @@ import:
 - package: github.com/klauspost/cpuid
   version: ~1.0.0
 - package: srcd.works/go-git.v4
-  version: master
+  version: v4
   repo: git@github.com:src-d/go-git.git
   vcs: git
 - package: github.com/spf13/viper

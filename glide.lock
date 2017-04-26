@@ -1,5 +1,5 @@
-hash: 2138359e1ca237667deb4ea909974f12e754ff7e269788fc80b4089a3daa294d
-updated: 2017-02-20T10:25:21.716596957-08:00
+hash: 7686bf337794474089becffa952352dc57b4f9857aff88f391441b791a76dedd
+updated: 2017-04-26T12:55:16.45021268-07:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -85,7 +85,7 @@ imports:
 - name: github.com/Shopify/logrus-bugsnag
   version: 797fa877e4ab814c9a0e3fc1c77bf6e3beb76465
 - name: github.com/Sirupsen/logrus
-  version: c078b1e43f58d563c74cebe63c85789e76ddb627
+  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
 - name: github.com/spf13/afero
   version: 9be650865eab0c12963d8753212f4f9c66cdcf12
   subpackages:
@@ -138,27 +138,18 @@ imports:
   - internal/log
   - internal/modules
   - internal/remote_api
-- name: gopkg.in/vmihailenco/msgpack.v2
-  version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
-  subpackages:
-  - codes
-- name: gopkg.in/warnings.v0
-  version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
-- name: gopkg.in/yaml.v2
-  version: a3f3340b5840cee44f372bddb5880fcbc419b46a
-- name: srcd.works/go-billy.v1
-  version: 1dfacf9a4b2ac372f16acd6b1aab9a50df955a2a
+- name: gopkg.in/src-d/go-billy.v2
+  version: 99d839800b93542496ec19319f37abacf17f589f
   subpackages:
   - osfs
-- name: srcd.works/go-git.v4
-  version: f5a9c7ed5ab58afa255c2f405b30f06f88a6aecf
-  repo: git@github.com:src-d/go-git.git
-  vcs: git
+- name: gopkg.in/src-d/go-git.v4
+  version: 36c78b9d1b1eea682703fb1cbb0f4f3144354389
   subpackages:
-  - cache
   - config
   - internal/revision
   - plumbing
+  - plumbing/cache
+  - plumbing/filemode
   - plumbing/format/config
   - plumbing/format/idxfile
   - plumbing/format/index
@@ -179,12 +170,30 @@ imports:
   - plumbing/transport/internal/common
   - plumbing/transport/server
   - plumbing/transport/ssh
+  - storage
   - storage/filesystem
   - storage/filesystem/internal/dotgit
   - storage/memory
   - utils/binary
   - utils/diff
   - utils/ioutil
+  - utils/merkletrie
+  - utils/merkletrie/internal/frame
+  - utils/merkletrie/noder
+- name: gopkg.in/vmihailenco/msgpack.v2
+  version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
+  subpackages:
+  - codes
+- name: gopkg.in/warnings.v0
+  version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
+- name: gopkg.in/yaml.v2
+  version: a3f3340b5840cee44f372bddb5880fcbc419b46a
+- name: srcd.works/go-git.v4
+  version: 36c78b9d1b1eea682703fb1cbb0f4f3144354389
+  repo: git@github.com:src-d/go-git.git
+  vcs: git
+  subpackages:
+  - plumbing
 testImports:
 - name: github.com/alicebob/miniredis
   version: 10ddf01f45bee3c40d1af5dbaad9aa71e6f20835
