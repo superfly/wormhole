@@ -17,7 +17,7 @@ if [ ! -f $FLY_SSH_PRIVATE_KEY_FILE ]; then
 fi
 
 export FLY_PROTO=ssh
-export FLY_LOG_LEVEL=error
+export FLY_LOG_LEVEL=debug
 export FLY_REDIS_URL=redis://localhost:6379
 export FLY_CLUSTER_URL=localhost
 export FLY_LOCALHOST=localhost

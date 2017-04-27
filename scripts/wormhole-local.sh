@@ -21,7 +21,7 @@ dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # wormhole client defaults
 export FLY_PROTO=ssh
-export FLY_LOG_LEVEL=error
+export FLY_LOG_LEVEL=debug
 export FLY_REMOTE_ENDPOINT=localhost:10000
 export FLY_TLS_CERT_FILE=$dir/cert.pem
 

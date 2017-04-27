@@ -15,6 +15,7 @@ import (
 
 const (
 	localServerRetry   = 200 * time.Millisecond // how often to retry local server until ready
+	minWormholeBackoff = 200 * time.Millisecond // min backoff between retries to wormhole server
 	maxWormholeBackoff = 2 * time.Minute        // max backoff between retries to wormhole server
 )
 
@@ -69,7 +70,9 @@ func StartLocal(cfg *config.ClientConfig) {
 	}
 
 	b := &backoff.Backoff{
-		Max: 2 * time.Minute,
+		Min:    minWormholeBackoff,
+		Max:    maxWormholeBackoff,
+		Jitter: true,
 	}
 
 	for {
