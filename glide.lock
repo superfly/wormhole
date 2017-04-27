@@ -144,8 +144,6 @@ imports:
   - osfs
 - name: gopkg.in/src-d/go-git.v4
   version: 36c78b9d1b1eea682703fb1cbb0f4f3144354389
-  repo: git@github.com:src-d/go-git.git
-  vcs: git
   subpackages:
   - config
   - internal/revision

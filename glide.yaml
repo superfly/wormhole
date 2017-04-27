@@ -13,8 +13,6 @@ import:
   version: ~1.0.0
 - package: gopkg.in/src-d/go-git.v4
   version: v4
-  repo: git@github.com:src-d/go-git.git
-  vcs: git
 - package: github.com/spf13/viper
 - package: github.com/Shopify/logrus-bugsnag
 - package: github.com/bugsnag/bugsnag-go
