@@ -7,7 +7,7 @@ if [ ! -x "$(command -v glide)" ]; then
   go get github.com/Masterminds/glide
 fi
 
-glide install
+glide --debug install
 
 MD5='md5sum'
 unamestr=`uname`
