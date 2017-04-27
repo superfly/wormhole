@@ -7,8 +7,8 @@ import (
 
 	"github.com/superfly/wormhole/messages"
 
-	git "srcd.works/go-git.v4"
-	"srcd.works/go-git.v4/plumbing"
+	git "gopkg.in/src-d/go-git.v4"
+	"gopkg.in/src-d/go-git.v4/plumbing"
 )
 
 func computeRelease(id, desc, branch string) (*messages.Release, error) {
@@ -38,7 +38,7 @@ func computeRelease(id, desc, branch string) (*messages.Release, error) {
 
 		oid := head.Hash()
 		release.VCSRevision = oid.String()
-		tip, err := repo.Commit(oid)
+		tip, err := repo.CommitObject(oid)
 		if err != nil {
 			return nil, fmt.Errorf("Could not get current commit: %s", err.Error())
 		}

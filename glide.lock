@@ -1,5 +1,5 @@
-hash: 7686bf337794474089becffa952352dc57b4f9857aff88f391441b791a76dedd
-updated: 2017-04-26T12:55:16.45021268-07:00
+hash: 77fd11b68da562f7c2e394623a92c289bf755d0ff77fa67f85a1fc66aaea6aab
+updated: 2017-04-26T15:51:14.337050999-07:00
 imports:
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
@@ -144,6 +144,8 @@ imports:
   - osfs
 - name: gopkg.in/src-d/go-git.v4
   version: 36c78b9d1b1eea682703fb1cbb0f4f3144354389
+  repo: git@github.com:src-d/go-git.git
+  vcs: git
   subpackages:
   - config
   - internal/revision
@@ -188,12 +190,6 @@ imports:
   version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
 - name: gopkg.in/yaml.v2
   version: a3f3340b5840cee44f372bddb5880fcbc419b46a
-- name: srcd.works/go-git.v4
-  version: 36c78b9d1b1eea682703fb1cbb0f4f3144354389
-  repo: git@github.com:src-d/go-git.git
-  vcs: git
-  subpackages:
-  - plumbing
 testImports:
 - name: github.com/alicebob/miniredis
   version: 10ddf01f45bee3c40d1af5dbaad9aa71e6f20835
