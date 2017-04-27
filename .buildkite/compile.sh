@@ -2,6 +2,13 @@
 
 set -e
 
+# download glide if it's not available
+if [ ! -x "$(command -v glide)" ]; then
+  go get github.com/Masterminds/glide
+fi
+
+glide install
+
 MD5='md5sum'
 unamestr=`uname`
 if [[ "$unamestr" == 'Darwin' ]]; then
