@@ -133,8 +133,10 @@ func NewServerConfig() (*ServerConfig, error) {
 	bugsnagKey := viper.GetString("bugsnag_api_key")
 	if len(bugsnagKey) > 0 {
 		bugsnag.Configure(bugsnag.Configuration{
-			APIKey:     bugsnagKey,
-			AppVersion: version,
+			APIKey:          bugsnagKey,
+			AppVersion:      version,
+			ProjectPackages: []string{"main", "wormhole", "config", "utils", "local", "remote", "messages", "session"},
+			Hostname:        viper.GetString("node_id"),
 		})
 		hook, err := bugsnag_hook.NewBugsnagHook()
 		if err != nil {
