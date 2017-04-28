@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	sessionTTL              = 60 * 60 * 24 // 24h
+	sessionTTL              = 60 * 60 * 1 // 1h
 	connectedSessionsKey    = "sessions:connected"
 	disconnectedSessionsKey = "sessions:disconnected"
 )
