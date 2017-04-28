@@ -54,7 +54,7 @@ Modes
 
   Supervisor (preferred)
   ----------
-    
+
     Wormhole will start your application (the specified executable) and supervise the process.
 
     Examples:
@@ -78,11 +78,11 @@ Modes
     Examples:
 
       export FLY_TOKEN=x # Always set this.
-  
+
       # Setting a port
       export FLY_PORT=3000 # Defaults to: 5000
       wormhole
-  
+
       # Setting a full endpoint
       export FLY_ENDPOINT=127.0.0.1:3000 # Defaults to: 127.0.0.1:5000
       wormhole

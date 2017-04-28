@@ -21,5 +21,6 @@ import:
   version: ^0.8.0
   subpackages:
   - prometheus
+- package: github.com/ulule/limiter
 testImport:
 - package: github.com/alicebob/miniredis

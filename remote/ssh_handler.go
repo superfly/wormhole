@@ -10,6 +10,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/session"
+	"github.com/ulule/limiter"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -27,12 +28,22 @@ type SSHHandler struct {
 	sessions   map[string]session.Session
 	pool       *redis.Pool
 	logger     *logrus.Entry
+	limiter    *limiter.Limiter
 
 	mu sync.Mutex
 }
 
 // NewSSHHandler returns a new SSHHandler
 func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, error) {
+	rate, err := limiter.NewRateFromFormatted("240-H")
+	if err != nil {
+		return nil, fmt.Errorf("Couldn't create a rate limit for SSHHandler: %s", err.Error())
+	}
+	// use a in-memory store with a goroutine which clears expired keys every 30 seconds
+	store := limiter.NewMemoryStore()
+
+	limiterInstance := limiter.NewLimiter(store, rate)
+
 	config, err := makeConfig(cfg.SSHPrivateKey)
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create SSH Server Config: %s", err.Error())
@@ -46,13 +57,25 @@ func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, err
 		pool:       pool,
 		config:     config,
 		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
+		limiter:    limiterInstance,
 	}
 	return &s, nil
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
 func (s *SSHHandler) Serve(conn net.Conn) {
-	s.sshSessionHandler(conn)
+	conn.RemoteAddr()
+	ctx, err := s.limiter.Get(ipForConn(conn))
+	if err != nil {
+		s.logger.Errorln("error getting limiter info for conn:", err)
+	}
+	if ctx.Reached {
+		s.logger.Errorf("Rate Limit (%d) reached for %s. Closing connection", ctx.Limit, conn.RemoteAddr().String())
+		conn.Close()
+		return
+	} else {
+		s.sshSessionHandler(conn)
+	}
 }
 
 func makeConfig(key []byte) (*ssh.ServerConfig, error) {
@@ -140,4 +163,10 @@ func listenTCP() (*net.TCPListener, error) {
 		return nil, errors.New("could not listen on: " + err.Error())
 	}
 	return ln, nil
+}
+
+func ipForConn(conn net.Conn) string {
+	addr := conn.RemoteAddr()
+	host, _, _ := net.SplitHostPort(addr.String())
+	return host
 }

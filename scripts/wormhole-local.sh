@@ -13,9 +13,9 @@
 NUM_CLIENTS=${1:-1}
 
 # HTTP port of local server
-PORT=8080
+PORT=9080
 # HTTPS port of local server
-TLS_PORT=8888
+TLS_PORT=9888
 
 dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 

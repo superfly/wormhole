@@ -1,6 +1,11 @@
-hash: 77fd11b68da562f7c2e394623a92c289bf755d0ff77fa67f85a1fc66aaea6aab
-updated: 2017-04-26T15:51:14.337050999-07:00
+hash: 27d87619fc240ef63a996195f99ae03430cf74bfea1546bcf4ea12c0f61f5f42
+updated: 2017-04-27T17:46:19.870683507-07:00
 imports:
+- name: github.com/ant0ine/go-json-rest
+  version: 4602b00d2caab423578a3094c68137dcc1eb2051
+  subpackages:
+  - rest
+  - rest/trie
 - name: github.com/beorn7/perks
   version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
   subpackages:
@@ -53,6 +58,8 @@ imports:
   version: 9520e82c474b0a04dd04f8a40959027271bab992
 - name: github.com/mitchellh/mapstructure
   version: db1efb556f84b25a0a13a04aad883943538ad2e0
+- name: github.com/patrickmn/go-cache
+  version: 7ac151875ffb48b9f3ccce9ea20f020b0c1596c8
 - name: github.com/pelletier/go-buffruneio
   version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
 - name: github.com/pelletier/go-toml
@@ -104,6 +111,8 @@ imports:
   - scanner
   - token
   - types
+- name: github.com/ulule/limiter
+  version: c242da0b4c9524723c5a2dc8e7d49c228d1bb33c
 - name: github.com/x-cray/logrus-prefixed-formatter
   version: 9cd0cf058806896bf8ca66f9a957d36bd9e4ce0f
 - name: golang.org/x/crypto
