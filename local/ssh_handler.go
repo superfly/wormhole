@@ -13,6 +13,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
+	wnet "github.com/superfly/wormhole/net"
 	"github.com/superfly/wormhole/utils"
 	"golang.org/x/crypto/ssh"
 )
@@ -146,8 +147,7 @@ func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
 	}
 
 	s.logger.Debugf("Dialed local server on %s", local)
-
-	err = utils.CopyCloseIO(localConn, conn)
+	_, _, err = wnet.CopyCloseIO(localConn, conn)
 	if err != nil && err != io.EOF {
 		s.logger.Error(err)
 	}

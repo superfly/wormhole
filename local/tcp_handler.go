@@ -12,7 +12,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
-	"github.com/superfly/wormhole/utils"
+	wnet "github.com/superfly/wormhole/net"
 )
 
 const (
@@ -223,7 +223,7 @@ func (s *TCPHandler) forwardConnection(tunnel net.Conn, local string) {
 
 	s.logger.Debugf("Dialed local server on %s", local)
 
-	err = utils.CopyCloseIO(localConn, tunnel)
+	_, _, err = wnet.CopyCloseIO(localConn, tunnel)
 	if err != nil && err != io.EOF {
 		s.logger.Error(err)
 	}

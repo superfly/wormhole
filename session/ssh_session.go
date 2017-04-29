@@ -16,8 +16,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/xid"
 	"github.com/superfly/wormhole/messages"
-	"github.com/superfly/wormhole/utils"
 	"golang.org/x/crypto/ssh"
+
+	wnet "github.com/superfly/wormhole/net"
 )
 
 const (
@@ -204,7 +205,7 @@ func (s *SSHSession) RequireStream() error {
 // The main function is to accept ingress traffic (from the listener) once the remote port
 // forwarding is set up.
 // It also handles out-of-band SSH request types, like the keepalive or register-release.
-func (s *SSHSession) HandleRequests(ln *net.TCPListener) {
+func (s *SSHSession) HandleRequests(ln net.Listener) {
 	for req := range s.reqs {
 		switch req.Type {
 		case sshRemoteForwardRequest:
@@ -273,7 +274,7 @@ func (s *SSHSession) setSSHPort(req *ssh.Request, ln net.Listener) tcpipForward 
 	return t
 }
 
-func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) {
+func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln net.Listener) {
 	defer func() {
 		err := ln.Close()
 		if err != nil {
@@ -286,24 +287,13 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 	t := s.setSSHPort(req, ln)
 	p := directForward{}
 	quit := make(chan bool)
-	go func(ln *net.TCPListener) { // Handle incoming connections on this new listener
+	go func(ln net.Listener) { // Handle incoming connections on this new listener
 		for {
 			select {
 			case <-quit:
 				return
 			default:
-				ln.SetDeadline(time.Now().Add(time.Second))
-				tcpConn, err := ln.AcceptTCP()
-				connStart := time.Now()
-
-				// wrap a conn with instrumentation, so we can record when the conn is being closed
-				metricFunc := func(sentBytes, rcvdBytes int64) {
-					ingressConnDurationMetric.With(labels(s)).Observe(time.Since(connStart).Seconds())
-					ingressConnRcvdBytesMetric.With(labels(s)).Observe(float64(rcvdBytes))
-					ingressConnSentBytesMetric.With(labels(s)).Observe(float64(sentBytes))
-				}
-
-				ingressConn := &utils.InstrumentedTCPConn{TCPConn: tcpConn, MetricFunc: metricFunc}
+				ingressConn, err := ln.Accept()
 
 				if err != nil {
 					netErr, ok := err.(net.Error)
@@ -340,11 +330,12 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln *net.TCPListener) 
 				go ssh.DiscardRequests(reqs)
 				go openChannelsMetric.With(labels(s)).Add(1)
 				go func() {
-					metricFunc := func() {
-						openChannelsMetric.With(labels(s)).Sub(1)
+					chWritten, ingressConnWritten, err := wnet.CopyCloseIO(ch, ingressConn)
+					s.logger.Debugf("lconn written: %d, rconn written %d, err: %v", chWritten, ingressConnWritten, err)
+					openChannelsMetric.With(labels(s)).Sub(1)
+					if connWithMetrics, ok := ingressConn.(*wnet.ServerConnTracker); ok {
+						connWithMetrics.ReportDataMetrics(ingressConnWritten, chWritten)
 					}
-					conn := instrumentedIO{rwc: ch, metricFunc: metricFunc}
-					err := utils.CopyCloseIO(conn, ingressConn)
 					if err != nil && err != io.EOF {
 						s.logger.Error(err)
 					}

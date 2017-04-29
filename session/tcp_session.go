@@ -11,7 +11,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/rs/xid"
 	"github.com/superfly/wormhole/messages"
-	"github.com/superfly/wormhole/utils"
+	wnet "github.com/superfly/wormhole/net"
 )
 
 const (
@@ -109,7 +109,7 @@ func (s *TCPSession) RequireStream() error {
 // forwarding is set up.
 // It also handles out-of-band communication, like the maintaining the Session heartbeat or
 // request the client to open new tunnel connections.
-func (s *TCPSession) HandleRequests(ln *net.TCPListener) {
+func (s *TCPSession) HandleRequests(ln net.Listener) {
 	go s.controlLoop()
 	go s.heartbeat()
 	s.handleRemoteForward(ln)
@@ -129,7 +129,7 @@ func (s *TCPSession) Close() {
 	s.control.Close()
 }
 
-func (s *TCPSession) handleRemoteForward(ln *net.TCPListener) {
+func (s *TCPSession) handleRemoteForward(ln net.Listener) {
 	defer func() {
 		err := ln.Close()
 		if err != nil {
@@ -140,8 +140,7 @@ func (s *TCPSession) handleRemoteForward(ln *net.TCPListener) {
 	}()
 
 	for {
-		ln.SetDeadline(time.Now().Add(time.Second))
-		tcpConn, err := ln.AcceptTCP()
+		tcpConn, err := ln.Accept()
 
 		if err != nil {
 			netErr, ok := err.(net.Error)
@@ -169,7 +168,7 @@ func (s *TCPSession) handleRemoteForward(ln *net.TCPListener) {
 			}
 		}()
 
-		err = utils.CopyCloseIO(tunnel, tcpConn)
+		_, _, err = wnet.CopyCloseIO(tunnel, tcpConn)
 		if err != nil && err != io.EOF {
 			s.logger.Error(err)
 		}

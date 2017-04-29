@@ -5,10 +5,12 @@ import (
 	"fmt"
 	"net"
 	"sync"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/superfly/wormhole/config"
+	wnet "github.com/superfly/wormhole/net"
 	"github.com/superfly/wormhole/session"
 	"github.com/ulule/limiter"
 	"golang.org/x/crypto/ssh"
@@ -116,7 +118,7 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 	defer s.closeSession(sess)
 
-	ln, err := listenTCP()
+	ln, err := listenTCP("ssh_ingress", sess)
 	if err != nil {
 		s.logger.Errorln(err)
 		return
@@ -153,7 +155,7 @@ func (s *SSHHandler) Close() {
 	}
 }
 
-func listenTCP() (*net.TCPListener, error) {
+func listenTCP(name string, sess session.Session) (net.Listener, error) {
 	addr, err := net.ResolveTCPAddr("tcp4", ":0")
 	if err != nil {
 		return nil, errors.New("could not parse TCP addr: " + err.Error())
@@ -162,7 +164,10 @@ func listenTCP() (*net.TCPListener, error) {
 	if err != nil {
 		return nil, errors.New("could not listen on: " + err.Error())
 	}
-	return ln, nil
+	listener := wnet.NewTCPListener(ln, wnet.TrackWithName(name),
+		wnet.TrackWithDeadline(1*time.Second),
+		wnet.TrackWithLabels(map[string]string{"cluster": sess.Cluster(), "backend": sess.BackendID(), "node": sess.NodeID()}))
+	return listener, nil
 }
 
 func ipForConn(conn net.Conn) string {

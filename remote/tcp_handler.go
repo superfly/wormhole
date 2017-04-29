@@ -96,7 +96,7 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 	defer h.closeSession(sess)
 
-	ln, err := listenTCP()
+	ln, err := listenTCP("tcp_ingress", sess)
 	if err != nil {
 		h.logger.Errorln(err)
 		return
