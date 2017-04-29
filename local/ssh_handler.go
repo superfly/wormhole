@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"sync/atomic"
 	"time"
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
@@ -19,21 +20,23 @@ import (
 const (
 	sshConnTimeout       = 10 * time.Second
 	localConnTimeout     = 5 * time.Second
-	sshKeepaliveInterval = 30 * time.Second
+	sshKeepaliveInterval = 10 * time.Second
+	maxKeepaliveLatency  = 20 * time.Second
 )
 
 // SSHHandler type represents the handler that SSHs to wormhole server and serves
 // incoming requests
 type SSHHandler struct {
-	RemoteEndpoint string
-	LocalEndpoint  string
-	FlyToken       string
-	Release        *messages.Release
-	Version        string
-	ssh            *ssh.Client
-	ln             net.Listener
-	shutdown       *utils.Shutdown
-	logger         *logrus.Entry
+	RemoteEndpoint       string
+	LocalEndpoint        string
+	FlyToken             string
+	Release              *messages.Release
+	Version              string
+	ssh                  *ssh.Client
+	ln                   net.Listener
+	shutdown             *utils.Shutdown
+	logger               *logrus.Entry
+	lastKeepaliveReplyAt int64
 }
 
 // NewSSHHandler initializes SSHHandler
@@ -52,6 +55,7 @@ func NewSSHHandler(cfg *config.ClientConfig, release *messages.Release) Connecti
 // ListenAndServe accepts requests coming from wormhole server
 // and forwards them to the local server
 func (s *SSHHandler) ListenAndServe() error {
+	s.shutdown = utils.NewShutdown()
 	ssh, ln, err := s.dial()
 	if err != nil {
 		return err
@@ -60,32 +64,40 @@ func (s *SSHHandler) ListenAndServe() error {
 	defer ssh.Close()
 	s.ssh = ssh
 	s.ln = ln
+	s.lastKeepaliveReplyAt = time.Now().UnixNano()
 
 	go s.stayAlive()
 	go s.registerRelease()
+	go s.handleSSH()
 
+	select {
+	case <-s.shutdown.WaitBeginCh():
+		s.logger.Debug("Shutdown triggered")
+		s.shutdown.Complete()
+		return s.shutdown.Error()
+	}
+}
+
+func (s *SSHHandler) handleSSH() {
 	for {
-		select {
-		case <-s.shutdown.WaitBeginCh():
-			s.shutdown.Complete()
-			return nil
-		default:
-			conn, err := s.ln.Accept()
-			if err != nil {
-				if err != io.EOF {
-					return fmt.Errorf("Failed to accept SSH Session: %s", err.Error())
-				}
-				return nil
+		conn, err := s.ln.Accept()
+		if err != nil {
+			if err != io.EOF {
+				s.shutdown.Begin(fmt.Errorf("Failed to accept SSH Session: %s", err.Error()))
+				return
 			}
-
-			go s.forwardConnection(conn, s.LocalEndpoint)
+			s.logger.Debugln("SSH Tunnel is closed:", err)
+			s.shutdown.Begin(nil)
+			return
 		}
+
+		go s.forwardConnection(conn, s.LocalEndpoint)
 	}
 }
 
 // Close closes the listener and SSH connection
 func (s *SSHHandler) Close() error {
-	s.shutdown.Begin()
+	s.shutdown.Begin(nil)
 	s.shutdown.WaitComplete()
 	return nil
 }
@@ -129,8 +141,7 @@ func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
 
 	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
 	if err != nil {
-		s.logger.Errorf("Failed to reach local server: %s", err.Error())
-		s.shutdown.Begin()
+		s.shutdown.Begin(fmt.Errorf("Failed to reach local server: %s", err.Error()))
 		return
 	}
 
@@ -143,18 +154,37 @@ func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
 }
 
 func (s *SSHHandler) stayAlive() {
+	// set lastPing to something sane
+	lastKeepalive := time.Unix(atomic.LoadInt64(&s.lastKeepaliveReplyAt)-1, 0)
+	keepaliveCheck := time.NewTicker(time.Second)
 	ticker := time.NewTicker(sshKeepaliveInterval)
 	s.logger.Debugf("Sending keepalive every %.1f seconds", sshKeepaliveInterval.Seconds())
+
 	defer ticker.Stop()
+	defer keepaliveCheck.Stop()
+
 	for {
 		select {
+		case <-keepaliveCheck.C:
+			lastKeepaliveReply := time.Unix(0, atomic.LoadInt64(&s.lastKeepaliveReplyAt))
+			needReply := lastKeepaliveReply.Sub(lastKeepalive) < 0
+			replyLatency := time.Since(lastKeepaliveReply)
+
+			if needReply && replyLatency > maxKeepaliveLatency {
+				s.logger.Infof("Last Keepalive: %v, Last Keepalive reply: %v", lastKeepalive, lastKeepaliveReply)
+				err := fmt.Errorf("Connection stale, haven't gotten Keepalive reply in %d seconds. Closing connection.", int(replyLatency.Seconds()))
+				s.shutdown.Begin(err)
+				return
+			}
+
 		case <-ticker.C:
+			lastKeepalive = time.Now()
 			go func() {
 				_, _, err := s.ssh.SendRequest("keepalive", false, nil)
 				if err != nil {
 					s.logger.Errorf("Keepalive failed: %s", err.Error())
-					s.shutdown.Begin()
-					return
+				} else {
+					atomic.StoreInt64(&s.lastKeepaliveReplyAt, time.Now().UnixNano())
 				}
 			}()
 		case <-s.shutdown.WaitBeginCh():

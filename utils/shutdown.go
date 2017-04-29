@@ -6,8 +6,9 @@ import (
 
 // Shutdown is a struct that coordinates shutdowns
 type Shutdown struct {
+	err          error     // stores error that initialized the shutdown (if any)
 	beginOnce    sync.Once // synchronizes closing begin channel
-	completeOnce sync.Once //synchronizes closing complete channel
+	completeOnce sync.Once // synchronizes closing complete channel
 	begin        chan int  // closed when the shutdown begins
 	complete     chan int  // closed when the shutdown completes
 }
@@ -21,8 +22,9 @@ func NewShutdown() *Shutdown {
 }
 
 // Begin marks shutdown as started
-func (s *Shutdown) Begin() {
+func (s *Shutdown) Begin(err error) {
 	s.beginOnce.Do(func() {
+		s.err = err
 		close(s.begin)
 	})
 }
@@ -48,4 +50,9 @@ func (s *Shutdown) Complete() {
 // WaitComplete blocks until shutdown is finished
 func (s *Shutdown) WaitComplete() {
 	<-s.complete
+}
+
+// Error returns error that initialized the shutdown if any
+func (s *Shutdown) Error() error {
+	return s.err
 }

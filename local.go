@@ -75,14 +75,16 @@ func StartLocal(cfg *config.ClientConfig) {
 		Jitter: true,
 	}
 
+	log.Infoln("Attempting to connect to wormhole server on:", cfg.RemoteEndpoint)
 	for {
 		err := handler.ListenAndServe()
 		if err != nil {
-			log.Error(err)
 			d := b.Duration()
+			log.Errorf("Failed to connect to wormhole server: %s. Will try again in %s", err.Error(), d.String())
 			time.Sleep(d)
 			continue
 		}
+		log.Debug("Handler exited with no errors. Starting again")
 		b.Reset()
 	}
 }
