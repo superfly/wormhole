@@ -42,24 +42,22 @@ var (
 			Name:       "conn_duration_seconds",
 			Help:       "Duration in seconds of connections.",
 			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+		}, []string{listenerLabel, "cluster"})
+
+	connRcvdBytes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "wormhole",
+			Subsystem: "net",
+			Name:      "conn_rcvd_bytes",
+			Help:      "Number of bytes received from connections.",
 		}, defaultPromLabels)
 
-	connRcvdBytes = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  "wormhole",
-			Subsystem:  "net",
-			Name:       "conn_rcvd_bytes",
-			Help:       "Number of bytes received from connections.",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
-		}, defaultPromLabels)
-
-	connSentBytes = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  "wormhole",
-			Subsystem:  "net",
-			Name:       "conn_sent_bytes",
-			Help:       "Number of bytes sent to ingress connections.",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+	connSentBytes = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "wormhole",
+			Subsystem: "net",
+			Name:      "conn_sent_bytes",
+			Help:      "Number of bytes sent to ingress connections.",
 		}, defaultPromLabels)
 )
 
@@ -80,7 +78,7 @@ func preRegisterListenerMetrics(listenerName string, labels map[string]string) e
 	if _, err = listenerClosedTotal.GetMetricWith(getLabels(listenerName, labels)); err != nil {
 		return err
 	}
-	if _, err = connDuration.GetMetricWith(getLabels(listenerName, labels)); err != nil {
+	if _, err = connDuration.GetMetricWith(getSummaryLabels(listenerName, labels)); err != nil {
 		return err
 	}
 	if _, err = connRcvdBytes.GetMetricWith(getLabels(listenerName, labels)); err != nil {
@@ -101,15 +99,15 @@ func reportListenerConnClosed(listenerName string, labels map[string]string) {
 }
 
 func reportConnDuration(listenerName string, labels map[string]string, duration float64) {
-	connDuration.With(getLabels(listenerName, labels)).Observe(duration)
+	connDuration.With(getSummaryLabels(listenerName, labels)).Observe(duration)
 }
 
 func reportConnRcvdBytes(listenerName string, labels map[string]string, bytes float64) {
-	connRcvdBytes.With(getLabels(listenerName, labels)).Observe(bytes)
+	connRcvdBytes.With(getLabels(listenerName, labels)).Add(bytes)
 }
 
 func reportConnSentBytes(listenerName string, labels map[string]string, bytes float64) {
-	connSentBytes.With(getLabels(listenerName, labels)).Observe(bytes)
+	connSentBytes.With(getLabels(listenerName, labels)).Add(bytes)
 }
 
 func getLabels(name string, labels map[string]string) prometheus.Labels {
@@ -120,6 +118,13 @@ func getLabels(name string, labels map[string]string) prometheus.Labels {
 			promLabels[k] = v
 		}
 	}
+	return promLabels
+}
+
+func getSummaryLabels(name string, labels map[string]string) prometheus.Labels {
+	promLabels := prometheus.Labels{}
+	promLabels[listenerLabel] = name
+	promLabels["cluster"] = labels["cluster"]
 	return promLabels
 }
 

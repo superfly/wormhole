@@ -79,13 +79,12 @@ var (
 		},
 	)
 
-	ingressConnRcvdBytesMetric = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  "wormhole",
-			Subsystem:  "ssh_session",
-			Name:       "ingress_conn_rcvd_bytes",
-			Help:       "Number of bytes received from ingress connections, paritioned by backend, node and cluster.",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+	ingressConnRcvdBytesMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "wormhole",
+			Subsystem: "ssh_session",
+			Name:      "ingress_conn_rcvd_bytes",
+			Help:      "Number of bytes received from ingress connections, paritioned by backend, node and cluster.",
 		},
 		[]string{
 			// Which backend this channel belongs to?
@@ -97,13 +96,12 @@ var (
 		},
 	)
 
-	ingressConnSentBytesMetric = prometheus.NewSummaryVec(
-		prometheus.SummaryOpts{
-			Namespace:  "wormhole",
-			Subsystem:  "ssh_session",
-			Name:       "ingress_conn_sent_bytes",
-			Help:       "Number of bytes sent to ingress connections, paritioned by backend, node and cluster.",
-			Objectives: map[float64]float64{0.5: 0.05, 0.9: 0.01, 0.99: 0.001},
+	ingressConnSentBytesMetric = prometheus.NewCounterVec(
+		prometheus.CounterOpts{
+			Namespace: "wormhole",
+			Subsystem: "ssh_session",
+			Name:      "ingress_conn_sent_bytes",
+			Help:      "Number of bytes sent to ingress connections, paritioned by backend, node and cluster.",
 		},
 		[]string{
 			// Which backend this channel belongs to?
@@ -331,7 +329,6 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln net.Listener) {
 				go openChannelsMetric.With(labels(s)).Add(1)
 				go func() {
 					chWritten, ingressConnWritten, err := wnet.CopyCloseIO(ch, ingressConn)
-					s.logger.Debugf("lconn written: %d, rconn written %d, err: %v", chWritten, ingressConnWritten, err)
 					openChannelsMetric.With(labels(s)).Sub(1)
 					if connWithMetrics, ok := ingressConn.(*wnet.ServerConnTracker); ok {
 						connWithMetrics.ReportDataMetrics(ingressConnWritten, chWritten)
