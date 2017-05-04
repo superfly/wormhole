@@ -82,7 +82,7 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 	err := sess.RequireStream()
 	if err != nil {
-		h.logger.Errorln("error getting a stream:", err)
+		h.logger.WithField("client_addr", conn.RemoteAddr().String()).Errorln("error getting a stream:", err)
 		return
 	}
 

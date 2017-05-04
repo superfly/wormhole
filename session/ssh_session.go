@@ -188,7 +188,6 @@ func (s *SSHSession) RequireStream() error {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sshConn, chans, reqs, err := ssh.NewServerConn(s.tcpConn, s.config)
 	if err != nil {
-		s.logger.Printf("Failed to handshake %s (%s): %s", s.nodeID, s.tcpConn.RemoteAddr(), err)
 		return err
 	}
 	s.conn = sshConn

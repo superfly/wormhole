@@ -104,7 +104,7 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	s.setSession(sess)
 	err := sess.RequireStream()
 	if err != nil {
-		s.logger.Errorln("error getting a stream:", err)
+		s.logger.WithField("client_addr", conn.RemoteAddr().String()).Errorln("error getting a stream:", err)
 		return
 	}
 
