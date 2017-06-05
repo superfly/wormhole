@@ -1,0 +1,206 @@
+hash: 27d87619fc240ef63a996195f99ae03430cf74bfea1546bcf4ea12c0f61f5f42
+updated: 2017-04-27T17:46:19.870683507-07:00
+imports:
+- name: github.com/ant0ine/go-json-rest
+  version: 4602b00d2caab423578a3094c68137dcc1eb2051
+  subpackages:
+  - rest
+  - rest/trie
+- name: github.com/beorn7/perks
+  version: 4c0e84591b9aa9e6dcfdf3e020114cd81f89d5f9
+  subpackages:
+  - quantile
+- name: github.com/bugsnag/bugsnag-go
+  version: 0e0aea7fe7d3fa47be41fc8a0e3a92d9668a9020
+  subpackages:
+  - errors
+- name: github.com/bugsnag/panicwrap
+  version: aa7703c9414b36d4e9b2e42e6c704d0bfae7db64
+- name: github.com/fsnotify/fsnotify
+  version: a904159b9206978bb6d53fcc7a769e5cd726c737
+- name: github.com/garyburd/redigo
+  version: 8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13
+  subpackages:
+  - internal
+  - redis
+- name: github.com/golang/protobuf
+  version: 69b215d01a5606c843240eab4937eab3acee6530
+  subpackages:
+  - proto
+- name: github.com/hashicorp/hcl
+  version: 630949a3c5fa3c613328e1b8256052cbc2327c9b
+  subpackages:
+  - hcl/ast
+  - hcl/parser
+  - hcl/scanner
+  - hcl/strconv
+  - hcl/token
+  - json/parser
+  - json/scanner
+  - json/token
+- name: github.com/jpillora/backoff
+  version: f24585d1c70490c0920ab34924f54f726e1416c7
+- name: github.com/kardianos/osext
+  version: 9b883c5eb462dd5cb1b0a7a104fe86bc6b9bd391
+- name: github.com/klauspost/cpuid
+  version: 09cded8978dc9e80714c4d85b0322337b0a1e5e0
+- name: github.com/magiconair/properties
+  version: b3b15ef068fd0b17ddf408a23669f20811d194d2
+- name: github.com/mattn/go-colorable
+  version: 5411d3eea5978e6cdc258b30de592b60df6aba96
+- name: github.com/mattn/go-isatty
+  version: dda3de49cbfcec471bd7a70e6cc01fcc3ff90109
+- name: github.com/matttproud/golang_protobuf_extensions
+  version: c12348ce28de40eed0136aa2b644d0ee0650e56c
+  subpackages:
+  - pbutil
+- name: github.com/mgutz/ansi
+  version: 9520e82c474b0a04dd04f8a40959027271bab992
+- name: github.com/mitchellh/mapstructure
+  version: db1efb556f84b25a0a13a04aad883943538ad2e0
+- name: github.com/patrickmn/go-cache
+  version: 7ac151875ffb48b9f3ccce9ea20f020b0c1596c8
+- name: github.com/pelletier/go-buffruneio
+  version: df1e16fde7fc330a0ca68167c23bf7ed6ac31d6d
+- name: github.com/pelletier/go-toml
+  version: 22139eb5469018e7374b3e7ef653de37ffb44f72
+- name: github.com/prometheus/client_golang
+  version: c5b7fccd204277076155f10851dad72b76a49317
+  subpackages:
+  - prometheus
+  - prometheus/promhttp
+- name: github.com/prometheus/client_model
+  version: 6f3806018612930941127f2a7c6c453ba2c527d2
+  subpackages:
+  - go
+- name: github.com/prometheus/common
+  version: 49fee292b27bfff7f354ee0f64e1bc4850462edf
+  subpackages:
+  - expfmt
+  - internal/bitbucket.org/ww/goautoneg
+  - model
+- name: github.com/prometheus/procfs
+  version: a1dba9ce8baed984a2495b658c82687f8157b98f
+  subpackages:
+  - xfs
+- name: github.com/rs/xid
+  version: e959e92539c364578e455189c9250311a5160095
+- name: github.com/sergi/go-diff
+  version: 24e2351369ec4949b2ed0dc5c477afdd4c4034e8
+  subpackages:
+  - diffmatchpatch
+- name: github.com/Shopify/logrus-bugsnag
+  version: 797fa877e4ab814c9a0e3fc1c77bf6e3beb76465
+- name: github.com/Sirupsen/logrus
+  version: ba1b36c82c5e05c4f912a88eab0dcd91a171688f
+- name: github.com/spf13/afero
+  version: 9be650865eab0c12963d8753212f4f9c66cdcf12
+  subpackages:
+  - mem
+- name: github.com/spf13/cast
+  version: d1139bab1c07d5ad390a65e7305876b3c1a8370b
+- name: github.com/spf13/jwalterweatherman
+  version: fa7ca7e836cf3a8bb4ebf799f472c12d7e903d66
+- name: github.com/spf13/pflag
+  version: 9ff6c6923cfffbcd502984b8e0c80539a94968b7
+- name: github.com/spf13/viper
+  version: 7538d73b4eb9511d85a9f1dfef202eeb8ac260f4
+- name: github.com/src-d/gcfg
+  version: f187355171c936ac84a82793659ebb4936bc1c23
+  subpackages:
+  - scanner
+  - token
+  - types
+- name: github.com/ulule/limiter
+  version: c242da0b4c9524723c5a2dc8e7d49c228d1bb33c
+- name: github.com/x-cray/logrus-prefixed-formatter
+  version: 9cd0cf058806896bf8ca66f9a957d36bd9e4ce0f
+- name: golang.org/x/crypto
+  version: 453249f01cfeb54c3d549ddb75ff152ca243f9d8
+  subpackages:
+  - curve25519
+  - ed25519
+  - ed25519/internal/edwards25519
+  - ssh
+  - ssh/agent
+- name: golang.org/x/net
+  version: 6b27048ae5e6ad1ef927e72e437531493de612fe
+  subpackages:
+  - context
+- name: golang.org/x/sys
+  version: 075e574b89e4c2d22f2286a7e2b919519c6f3547
+  subpackages:
+  - unix
+- name: golang.org/x/text
+  version: 85c29909967d7f171f821e7a42e7b7af76fb9598
+  subpackages:
+  - transform
+  - unicode/norm
+- name: google.golang.org/appengine
+  version: 2e4a801b39fc199db615bfca7d0b9f8cd9580599
+  subpackages:
+  - datastore
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
+- name: gopkg.in/src-d/go-billy.v2
+  version: 99d839800b93542496ec19319f37abacf17f589f
+  subpackages:
+  - osfs
+- name: gopkg.in/src-d/go-git.v4
+  version: 36c78b9d1b1eea682703fb1cbb0f4f3144354389
+  subpackages:
+  - config
+  - internal/revision
+  - plumbing
+  - plumbing/cache
+  - plumbing/filemode
+  - plumbing/format/config
+  - plumbing/format/idxfile
+  - plumbing/format/index
+  - plumbing/format/objfile
+  - plumbing/format/packfile
+  - plumbing/format/pktline
+  - plumbing/object
+  - plumbing/protocol/packp
+  - plumbing/protocol/packp/capability
+  - plumbing/protocol/packp/sideband
+  - plumbing/revlist
+  - plumbing/storer
+  - plumbing/transport
+  - plumbing/transport/client
+  - plumbing/transport/file
+  - plumbing/transport/git
+  - plumbing/transport/http
+  - plumbing/transport/internal/common
+  - plumbing/transport/server
+  - plumbing/transport/ssh
+  - storage
+  - storage/filesystem
+  - storage/filesystem/internal/dotgit
+  - storage/memory
+  - utils/binary
+  - utils/diff
+  - utils/ioutil
+  - utils/merkletrie
+  - utils/merkletrie/internal/frame
+  - utils/merkletrie/noder
+- name: gopkg.in/vmihailenco/msgpack.v2
+  version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
+  subpackages:
+  - codes
+- name: gopkg.in/warnings.v0
+  version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
+- name: gopkg.in/yaml.v2
+  version: a3f3340b5840cee44f372bddb5880fcbc419b46a
+testImports:
+- name: github.com/alicebob/miniredis
+  version: 10ddf01f45bee3c40d1af5dbaad9aa71e6f20835
+- name: github.com/bsm/redeo
+  version: 1ce09fc76693fb3c1ca9b529c66f38920beb6fb8
+  subpackages:
+  - info

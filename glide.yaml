@@ -1,0 +1,26 @@
+package: github.com/superfly/wormhole
+import:
+- package: github.com/jpillora/backoff
+- package: github.com/Sirupsen/logrus
+  version: ~0.11.2
+- package: github.com/x-cray/logrus-prefixed-formatter
+- package: github.com/garyburd/redigo
+  version: ~1.0.0
+- package: gopkg.in/vmihailenco/msgpack.v2
+  version: ~2.7.4
+- package: github.com/rs/xid
+- package: github.com/klauspost/cpuid
+  version: ~1.0.0
+- package: gopkg.in/src-d/go-git.v4
+  version: v4
+- package: github.com/spf13/viper
+- package: github.com/Shopify/logrus-bugsnag
+- package: github.com/bugsnag/bugsnag-go
+  version: ^1.1.1
+- package: github.com/prometheus/client_golang
+  version: ^0.8.0
+  subpackages:
+  - prometheus
+- package: github.com/ulule/limiter
+testImport:
+- package: github.com/alicebob/miniredis
