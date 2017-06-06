@@ -75,9 +75,8 @@ func (s *SSHHandler) Serve(conn net.Conn) {
 		s.logger.Errorf("Rate Limit (%d) reached for %s. Closing connection", ctx.Limit, conn.RemoteAddr().String())
 		conn.Close()
 		return
-	} else {
-		s.sshSessionHandler(conn)
 	}
+	s.sshSessionHandler(conn)
 }
 
 func makeConfig(key []byte) (*ssh.ServerConfig, error) {

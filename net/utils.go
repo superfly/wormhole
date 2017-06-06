@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// CopyDirection decribes the direction of data copying in full-duplex link
+// CopyDirection describes the direction of data copying in full-duplex link
 type CopyDirection int
 
 const (

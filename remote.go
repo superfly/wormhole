@@ -102,7 +102,7 @@ func handleDeath(h handler.Handler) {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func(c <-chan os.Signal) {
-		for _ = range c {
+		for range c {
 			log.Print("Cleaning up before exit...")
 			h.Close()
 			log.Print("Cleaned up connections.")
