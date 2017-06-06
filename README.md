@@ -1,3 +1,5 @@
+<a href="https://fly.io/slack/"><img src="https://fly.io/slack/badge.svg"></a>
+
 # wormhole - Fly.io reverse Proxy
 
 ## What is wormhole?
