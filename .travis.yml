@@ -10,5 +10,5 @@ env:
   - GIMME_OS=darwin GIMME_ARCH=amd64
   - GIMME_OS=windows GIMME_ARCH=amd64
 
-intall: make setup
+install: make setup
 script: make ci
