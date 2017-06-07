@@ -71,7 +71,7 @@ type Config struct {
 	// for client this means the hostname or IP address of the local server
 	Localhost string
 
-	// TLS cert is used when TLS conn pool is used as transporation layer
+	// TLS cert is used when TLS conn pool is used as transportation layer
 	// Server also needs TLSPrivateKey
 	// Client should only need a cert if the cert is not verifiable using system Root CAs
 	TLSCert []byte
@@ -104,7 +104,7 @@ type ServerConfig struct {
 	SSHPrivateKey []byte
 
 	// TLS Private key is used by the server when TLS conn pool is used
-	// as transporation layer
+	// as transportation layer
 	TLSPrivateKey []byte
 
 	// API token for error reporting to Bugsnag
@@ -240,15 +240,15 @@ type ClientConfig struct {
 	Token string
 
 	// when set this will override the default VCS ID (i.e. git commit SHA1)
-	// defaults to FLY_RELASE_ID (but can be overriden with FLY_RELEASE_ID_VAR to point ot a different ENV)
+	// defaults to FLY_RELASE_ID (but can be overridden with FLY_RELEASE_ID_VAR to point ot a different ENV)
 	ReleaseID string
 
 	// when set this will override the default VCS message (i.e. git commit message)
-	// defaults to FLY_RELASE_DESC (but can be overriden with FLY_RELEASE_DESC_VAR to point ot a different ENV)
+	// defaults to FLY_RELASE_DESC (but can be overridden with FLY_RELEASE_DESC_VAR to point ot a different ENV)
 	ReleaseDesc string
 
 	// when set this will override the default VCS branch
-	// defaults to FLY_RELASE_BRANCH (but can be overriden with FLY_RELEASE_BRANCH_VAR to point ot a different ENV)
+	// defaults to FLY_RELASE_BRANCH (but can be overridden with FLY_RELEASE_BRANCH_VAR to point ot a different ENV)
 	ReleaseBranch string
 }
 

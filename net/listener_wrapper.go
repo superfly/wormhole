@@ -20,24 +20,26 @@ type listenerOpts struct {
 	deadline     time.Duration
 }
 
-type listenerOpt func(*listenerOpts)
+// ListenerOpt wraps listenerOpts in a func as convenience method to provide friendly API
+// to configure connTrackListener
+type ListenerOpt func(*listenerOpts)
 
 // TrackWithName sets the name of the Listener for use in tracking and monitoring.
-func TrackWithName(name string) listenerOpt {
+func TrackWithName(name string) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.name = name
 	}
 }
 
 // TrackWithLabels sets additional labels of the Listener for use in tracking in monitoring.
-func TrackWithLabels(labels map[string]string) listenerOpt {
+func TrackWithLabels(labels map[string]string) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.labels = labels
 	}
 }
 
 // TrackWithoutMonitoring turns *off* Prometheus monitoring for this listener.
-func TrackWithoutMonitoring() listenerOpt {
+func TrackWithoutMonitoring() ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.monitoring = false
 	}
@@ -47,14 +49,14 @@ func TrackWithoutMonitoring() listenerOpt {
 // This is useful for HTTP servers in order for, for example laptops, to not use up resources on the
 // server while they don't utilise their connection.
 // A value of 0 disables it.
-func TrackWithTCPKeepAlive(keepalive time.Duration) listenerOpt {
+func TrackWithTCPKeepAlive(keepalive time.Duration) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.tcpKeepAlive = keepalive
 	}
 }
 
 // TrackWithDeadline makes sure that SetDeadline is being called for `net.TCPListener` before each `Accept` call
-func TrackWithDeadline(deadline time.Duration) listenerOpt {
+func TrackWithDeadline(deadline time.Duration) ListenerOpt {
 	return func(opts *listenerOpts) {
 		opts.deadline = deadline
 	}
@@ -71,7 +73,7 @@ type connTrackTCPListener struct {
 }
 
 // NewListener returns the given listener wrapped in connection tracking listener.
-func NewListener(inner net.Listener, optFuncs ...listenerOpt) (net.Listener, error) {
+func NewListener(inner net.Listener, optFuncs ...ListenerOpt) (net.Listener, error) {
 	opts := &listenerOpts{
 		name:       defaultName,
 		monitoring: true,
@@ -92,7 +94,7 @@ func NewListener(inner net.Listener, optFuncs ...listenerOpt) (net.Listener, err
 }
 
 // NewTCPListener returns the given listener wrapped in connection tracking listener.
-func NewTCPListener(inner *net.TCPListener, optFuncs ...listenerOpt) net.Listener {
+func NewTCPListener(inner *net.TCPListener, optFuncs ...ListenerOpt) net.Listener {
 	opts := &listenerOpts{
 		name:       defaultName,
 		monitoring: true,
@@ -109,6 +111,8 @@ func NewTCPListener(inner *net.TCPListener, optFuncs ...listenerOpt) net.Listene
 	}
 }
 
+// Accept implements the Accept method in the Listener interface;
+// it waits for the next call and returns a ServerConnTracker.
 func (ct *connTrackListener) Accept() (net.Conn, error) {
 	// TODO(mwitkow): Add monitoring of failed accept.
 	conn, err := ct.Listener.Accept()
@@ -122,6 +126,8 @@ func (ct *connTrackListener) Accept() (net.Conn, error) {
 	return newServerConnTracker(conn, ct.opts), nil
 }
 
+// Accept implements the Accept method in the Listener interface;
+// it waits for the next call and returns a ServerConnTracker.
 func (ct *connTrackTCPListener) Accept() (net.Conn, error) {
 	// TODO(mwitkow): Add monitoring of failed accept.
 	if ct.opts.deadline > 0 {
@@ -146,6 +152,8 @@ func (ct *connTrackTCPListener) Close() error {
 	return ct.Listener.Close()
 }
 
+// ServerConnTracker is a wrapper around Net.Conn that tracks when connection is opened,
+// closed and the duration of the connection
 type ServerConnTracker struct {
 	net.Conn
 	opts      *listenerOpts
@@ -165,11 +173,7 @@ func newServerConnTracker(inner net.Conn, opts *listenerOpts) net.Conn {
 	return tracker
 }
 
-// ReadFrom calls TCPConn's ReadFrom and records number of bytes read from io.Reader r
-// and written to TCPConn
-// FIXME: since we don't have timeouts ReadFrom is blocking until the connection is severed
-// by a call to Close, so sentBytes are not avaiable to MetricFunc. It's probably best to make
-// utils.CopyCloseIO return sentBytes and rcvdBytes and hook in a metric collection func there.
+// ReadFrom delegates to TCPConn's ReadFrom
 func (ct *ServerConnTracker) ReadFrom(r io.Reader) (n int64, err error) {
 	if tcpConn, ok := ct.Conn.(*net.TCPConn); ok {
 		n, err = tcpConn.ReadFrom(r)
@@ -177,16 +181,17 @@ func (ct *ServerConnTracker) ReadFrom(r io.Reader) (n int64, err error) {
 	return
 }
 
-// Read calls TCPConn's Read and records number of bytes read.
+// Read delegates to TCPConn's Read
 func (ct *ServerConnTracker) Read(b []byte) (n int, err error) {
 	return ct.Conn.Read(b)
 }
 
-// Write calls TCPConn's Write and records number of bytes written.
+// Write delegates to TCPConn's Write
 func (ct *ServerConnTracker) Write(b []byte) (n int, err error) {
 	return ct.Conn.Write(b)
 }
 
+// Close closes the connection and records metrics
 func (ct *ServerConnTracker) Close() error {
 	err := ct.Conn.Close()
 	if ct.opts.monitoring {
@@ -196,7 +201,8 @@ func (ct *ServerConnTracker) Close() error {
 	return err
 }
 
+// ReportDataMetrics reports bytes sent and received over the course of the duration of net.Conn
 func (ct *ServerConnTracker) ReportDataMetrics(sentBytes, rcvdBytes int64) {
-	reportConnSentBytes(ct.opts.name, ct.opts.labels, float64(sentBytes))
 	reportConnRcvdBytes(ct.opts.name, ct.opts.labels, float64(rcvdBytes))
+	reportConnSentBytes(ct.opts.name, ct.opts.labels, float64(sentBytes))
 }

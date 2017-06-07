@@ -1,5 +1,7 @@
 pkg
+bin
 cmd/wormhole/wormhole
 app
 scripts/id_rsa*
 vendor
+*coverage.txt

@@ -345,7 +345,7 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln net.Listener) {
 }
 
 func handleChannels(chans <-chan ssh.NewChannel) {
-	for _ = range chans {
+	for range chans {
 		// nothing for now.
 	}
 }
