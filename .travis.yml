@@ -7,10 +7,10 @@ go:
 install: make setup
 script:
   # check compilation on supported targets
-  - GOARCH=linux   GOOS=amd64 make binaries
-  - GOARCH=windows GOOS=amd64 make binaries
-  - GOARCH=darwin  GOOS=amd64 make binaries
-  - GOARCH=linux   GOOS=arm make binaries
-  - GOARCH=linux   GOOS=386 make binaries
+  - GOOS=linux   GOARCH=amd64 make binaries
+  - GOOS=windows GOARCH=amd64 make binaries
+  - GOOS=darwin  GOARCH=amd64 make binaries
+  - GOOS=linux   GOARCH=arm   make binaries
+  - GOOS=linux   GOARCH=386   make binaries
   # run tests
   - make ci
