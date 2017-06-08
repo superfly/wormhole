@@ -1,4 +1,5 @@
-<a href="https://fly.io/slack/"><img src="https://fly.io/slack/badge.svg"></a>
+[![Fly.io Community Slack](https://fly.io/slack/badge.svg)](https://fly.io/slack/)
+[![Build Status](https://travis-ci.org/superfly/wormhole.svg?branch=master)](https://travis-ci.org/superfly/wormhole)
 
 # wormhole - Fly.io reverse Proxy
 
