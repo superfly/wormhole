@@ -12,3 +12,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 
 ### Fixed
+
+## [0.5.35] - 2017-06-15
+### Added
+- Makefile
+- Travis CI integration
+
+### Changed
+- First open-source release of Wormhole
+
+### Fixed
+- go {fmt,vet,lint} the code base
