@@ -9,14 +9,10 @@ Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 ## Compiling
 **Wormhole requires Go1.7+**
 
-    go get github.com/Masterminds/glide
-    mkdir -p $GOPATH/github.com/superfly
-    cd $GOPATH/src/github.com/superfly
-    git clone git@github.com:superfly/wormhole.git
-    cd wormhole
-    glide install
-    go build github.com/superfly/wormhole/cmd/wormhole
-
+    go get github.com/superfly/wormhole
+    cd $GOPATH/src/github.com/superfly/wormhole
+    make setup
+    make binaries
 
 ## Running locally
 

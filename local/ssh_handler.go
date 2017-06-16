@@ -172,7 +172,7 @@ func (s *SSHHandler) stayAlive() {
 
 			if needReply && replyLatency > maxKeepaliveLatency {
 				s.logger.Infof("Last Keepalive: %v, Last Keepalive reply: %v", lastKeepalive, lastKeepaliveReply)
-				err := fmt.Errorf("Connection stale, haven't gotten Keepalive reply in %d seconds. Closing connection.", int(replyLatency.Seconds()))
+				err := fmt.Errorf("ssh_handler: connection stale, haven't gotten keepalive reply in %d seconds", int(replyLatency.Seconds()))
 				s.shutdown.Begin(err)
 				return
 			}

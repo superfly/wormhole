@@ -33,6 +33,9 @@ ci: check binaries checkprotos coverage coverage-integration ## to be used by th
 
 setup: ## install dependencies
 	@echo "🎈 $@"
+	@go get -u github.com/golang/lint/golint
+	@go get -u github.com/gordonklaus/ineffassign
+	@go get -u github.com/client9/misspell/cmd/misspell
 	@go get -u github.com/Masterminds/glide
 	@glide install
 
