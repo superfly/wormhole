@@ -1,9 +1,11 @@
 [![Fly.io Community Slack](https://fly.io/slack/badge.svg)](https://fly.io/slack/)
 [![Build Status](https://travis-ci.org/superfly/wormhole.svg?branch=master)](https://travis-ci.org/superfly/wormhole)
 
-<div style="text-align:center"><img src ="wormhole.png" /></div>
-
 # wormhole - Fly.io reverse Proxy
+
+<p align="center">
+  <img src="wormhole.png">
+</p>
 
 ## What is wormhole?
 Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
