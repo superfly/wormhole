@@ -6,8 +6,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
+* Experimental HTTP2 support
+* Experimental connection pool
 
 ### Changed
+* The top-level listener at the wh-server level now only listens on TCP - allowing each handler control over TLS/SSH
 
 ### Removed
 
