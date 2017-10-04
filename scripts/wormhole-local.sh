@@ -48,7 +48,7 @@ register_client() {
 spawn_wormhole() {
   token=$1
 
-  FLY_TOKEN=$token FLY_PORT=$PORT $GOPATH/src/github.com/superfly/wormhole/cmd/wormhole/wormhole &
+  FLY_TOKEN=$token FLY_PORT=$PORT $GOPATH/src/github.com/superfly/wormhole/bin/wormhole &
   CHILD_PIDS+=("$!")
   echo "DONE (PID: $!)"
 }

@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/jpillora/backoff"
+	"github.com/sirupsen/logrus"
 
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/local"
@@ -41,6 +41,12 @@ func StartLocal(cfg *config.ClientConfig) {
 		if err != nil {
 			log.Fatal(err)
 		}
+	case config.HTTP2:
+		handler, err = local.NewHTTP2Handler(cfg, release)
+		if err != nil {
+			log.Fatal(err)
+		}
+
 	default:
 		log.Fatal("Unknown wormhole transport layer protocol selected.")
 	}

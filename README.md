@@ -11,7 +11,7 @@
 Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 
 ## Compiling
-**Wormhole requires Go1.7+**
+**Wormhole requires Go1.8+**
 
     go get github.com/superfly/wormhole
     cd $GOPATH/src/github.com/superfly/wormhole

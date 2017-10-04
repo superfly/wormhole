@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/alicebob/miniredis"
+	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole"
 	"github.com/superfly/wormhole/config"
 

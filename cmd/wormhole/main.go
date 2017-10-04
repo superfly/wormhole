@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	log "github.com/Sirupsen/logrus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	log "github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole"
 	"github.com/superfly/wormhole/config"
 )

@@ -7,8 +7,8 @@ import (
 	"os"
 
 	bugsnag_hook "github.com/Shopify/logrus-bugsnag"
-	"github.com/Sirupsen/logrus"
 	bugsnag "github.com/bugsnag/bugsnag-go"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
 	prefixed "github.com/x-cray/logrus-prefixed-formatter"
 )
@@ -183,6 +183,18 @@ func NewServerConfig() (*ServerConfig, error) {
 			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
 		}
 		cfg.TLSCert = tlsCert
+	case HTTP2:
+		tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_PRIVATE_KEY_FILE")
+		}
+		cfg.TLSPrivateKey = tlsKey
+
+		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+		}
+		cfg.TLSCert = tlsCert
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -278,7 +290,14 @@ func NewClientConfig() (*ClientConfig, error) {
 		Logger:    logger,
 	}
 
-	if protocol == TLS {
+	switch protocol {
+	case TLS:
+		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+		}
+		shared.TLSCert = tlsCert
+	case HTTP2:
 		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
 		if err != nil {
 			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
@@ -351,6 +370,8 @@ const (
 	TCP
 	// TLS connection pool
 	TLS
+	// HTTP2 connection pool
+	HTTP2
 	_
 	_
 	_
@@ -367,6 +388,8 @@ func ParseTunnelProto(proto string) TunnelProto {
 		return TCP
 	case "tls":
 		return TLS
+	case "http2":
+		return HTTP2
 	default:
 		return UNSUPPORTED
 	}

@@ -1,8 +1,6 @@
 package: github.com/superfly/wormhole
 import:
 - package: github.com/jpillora/backoff
-- package: github.com/Sirupsen/logrus
-  version: ~0.11.2
 - package: github.com/x-cray/logrus-prefixed-formatter
 - package: github.com/garyburd/redigo
   version: ~1.0.0
@@ -22,5 +20,7 @@ import:
   subpackages:
   - prometheus
 - package: github.com/ulule/limiter
+- package: github.com/sirupsen/logrus
+  version: ^1.0.3
 testImport:
 - package: github.com/alicebob/miniredis

@@ -72,11 +72,11 @@ build: ## build the go packages
 
 test: ## run tests, except integration tests
 	@echo "🎈 $@"
-	@go test -parallel 8 ${RACE} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
+	@go test ${RACE} $(filter-out ${INTEGRATION_PACKAGE},${PACKAGES})
 
 integration: ## run integration tests
 	@echo "🎈 $@"
-	@go test -parallel 8 ${RACE} ${INTEGRATION_PACKAGE}
+	@go test ${RACE} ${INTEGRATION_PACKAGE}
 
 FORCE:
 

@@ -50,7 +50,7 @@ func computeRelease(id, desc, branch string) (*messages.Release, error) {
 
 		var branches []string
 		refs.ForEach(func(ref *plumbing.Reference) error {
-			if ref.IsBranch() && head.Hash().String() == ref.Hash().String() {
+			if ref.Name().IsBranch() && head.Hash().String() == ref.Hash().String() {
 				branch := strings.TrimPrefix(ref.Name().String(), "refs/heads/")
 				branches = append(branches, branch)
 			}

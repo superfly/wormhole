@@ -1,9 +1,14 @@
 package net
 
 import (
+	"crypto/tls"
+	"fmt"
+	"golang.org/x/net/http2"
 	"io"
 	"net"
+	"reflect"
 	"strings"
+	"time"
 )
 
 // CopyDirection describes the direction of data copying in full-duplex link
@@ -39,6 +44,100 @@ func (me multiError) Error() string {
 		}
 	}
 	return errStr
+}
+
+// TLSWrapperFunc represents a TLS Wrapper. This is intended to be either
+// tls.Client or tls.Server see https://golang.org/pkg/crypto/tls/ for info
+type TLSWrapperFunc func(conn net.Conn, cfg *tls.Config) *tls.Conn
+
+// GenericTLSWrap takes a TCP connection, a tls config, and an upgrade function
+// and returns the new connection
+func GenericTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
+	var tConn *tls.Conn
+
+	for {
+		if err := conn.SetDeadline(time.Now().Add(time.Second * 5)); err != nil {
+			return nil, err
+		}
+
+		tConn = tFunc(conn, cfg)
+
+		// check if the connection is upgraded before returning
+		// we want to catch the error early
+		if err := tConn.Handshake(); err != nil {
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() || netErr.Temporary() {
+					continue
+				}
+			}
+			return nil, err
+		}
+		if err := conn.SetDeadline(time.Time{}); err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	return tConn, nil
+}
+
+// HTTP2ALPNTLSWrap returns a TLS connection that has been negotiated with `h2` ALPN
+// tFunc must be either tls.Client or tls.Server. See https://golang.org/pkg/crypto/tls/
+// for proper usage of the tls.Config with either of these options
+//
+// NOTE: The ALPN is a requirement of the spec for HTTP/2 capability discovery
+// While technically the golang implementation will allow us not to perform ALPN,
+// this breaks the http/2 spec. The goal here is to follow the RFC to the letter
+// as documented in http://httpwg.org/specs/rfc7540.html#starting
+func HTTP2ALPNTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
+	protoCfg := cfg.Clone()
+	// TODO: append here
+	protoCfg.NextProtos = []string{http2.NextProtoTLS}
+
+	var tlsConn *tls.Conn
+	for {
+		if err := conn.SetDeadline(time.Now().Add(time.Second * 5)); err != nil {
+			return nil, err
+		}
+		tlsConn = tFunc(conn, protoCfg)
+
+		if err := tlsConn.Handshake(); err != nil {
+			if netErr, ok := err.(net.Error); ok {
+				if netErr.Timeout() || netErr.Temporary() {
+					continue
+				}
+			}
+			return nil, err
+		}
+		if err := conn.SetDeadline(time.Time{}); err != nil {
+			return nil, err
+		}
+		break
+	}
+
+	// Check if we're creating a client conn before checking verification
+	if isTLSClient(tFunc) {
+		if !protoCfg.InsecureSkipVerify {
+			if err := tlsConn.VerifyHostname(protoCfg.ServerName); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	state := tlsConn.ConnectionState()
+	if p := state.NegotiatedProtocol; p != http2.NextProtoTLS {
+		return nil, fmt.Errorf("http2: unexpected ALPN protocol %q; want %q", p, http2.NextProtoTLS)
+	}
+
+	if !state.NegotiatedProtocolIsMutual {
+		return nil, fmt.Errorf("http2: could not negotiate protocol mutually")
+	}
+
+	return tlsConn, nil
+}
+
+func isTLSClient(tFunc TLSWrapperFunc) bool {
+	return reflect.ValueOf(tFunc).Pointer() == reflect.ValueOf(tls.Client).Pointer()
 }
 
 // CopyCloseIO establishes a full-duplex link between 2 ReadWriteClosers

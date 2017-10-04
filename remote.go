@@ -7,8 +7,8 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	handler "github.com/superfly/wormhole/remote"
 )
@@ -33,12 +33,13 @@ func StartRemote(cfg *config.ServerConfig) {
 		if err != nil {
 			log.Fatal(err)
 		}
-	case config.TLS:
-		server.TLSCert = &cfg.TLSCert
-		server.TLSPrivateKey = &cfg.TLSPrivateKey
-		fallthrough
 	case config.TCP:
 		h, err = handler.NewTCPHandler(cfg, redisPool)
+		if err != nil {
+			log.Fatal(err)
+		}
+	case config.HTTP2:
+		h, err = handler.NewHTTP2Handler(cfg, redisPool)
 		if err != nil {
 			log.Fatal(err)
 		}

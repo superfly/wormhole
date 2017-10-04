@@ -1,10 +1,14 @@
 language: go
 
 go:
-  - 1.7.x
+  - 1.8.x
   - 1.x
 
 install: make setup
+sudo: required # required for docker service
+services:
+  # Required for dockertest
+  - docker
 script:
   # check compilation on supported targets
   - GOOS=linux   GOARCH=amd64 make binaries
