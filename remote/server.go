@@ -1,57 +1,46 @@
 package remote
 
 import (
-	"crypto/tls"
 	"fmt"
 	"net"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 // Server contains configuration options for a TCP Server
 type Server struct {
-	TLSCert       *[]byte
-	TLSPrivateKey *[]byte
-	Logger        *logrus.Logger
+	Logger *logrus.Logger
 }
 
 // ListenAndServe accepts incoming wormhole connections and passes them to the handler
 func (s *Server) ListenAndServe(addr string, handler Handler) error {
 	log := s.Logger.WithFields(logrus.Fields{"prefix": "Server"})
-	listener, err := s.newListener(addr)
+	listener, err := s.newTCPListener(addr)
 	if err != nil {
 		return fmt.Errorf("Failed to listen on %s (%s)", addr, err.Error())
 	}
 
 	for {
-		conn, err := listener.Accept()
+		tcpConn, err := listener.AcceptTCP()
 		if err != nil {
 			log.Errorf("Failed to accept wormhole connection (%s)", err.Error())
 			break
 		}
-		log.Debugln("Accepted wormhole TCP conn from:", conn.RemoteAddr())
+		log.Debugln("Accepted wormhole TCP conn from:", tcpConn.RemoteAddr())
 
-		go handler.Serve(conn)
+		go handler.Serve(tcpConn)
 	}
 	return nil
 }
 
-func (s *Server) newListener(addr string) (net.Listener, error) {
-	if s.encrypted() {
-		cert, err := tls.X509KeyPair(*s.TLSCert, *s.TLSPrivateKey)
-		if err != nil {
-			return nil, err
-		}
-		return tls.Listen("tcp", addr, &tls.Config{
-			Certificates: []tls.Certificate{cert},
-		})
+func (s *Server) newTCPListener(addr string) (*net.TCPListener, error) {
+	ln, err := net.Listen("tcp", addr)
+	if err != nil {
+		return nil, err
 	}
-	return net.Listen("tcp", addr)
-}
-
-func (s *Server) encrypted() bool {
-	return s.TLSCert != nil &&
-		s.TLSPrivateKey != nil &&
-		len(*s.TLSCert) > 0 &&
-		len(*s.TLSPrivateKey) > 0
+	tcpLN, ok := ln.(*net.TCPListener)
+	if !ok {
+		return nil, fmt.Errorf("Could not create tcp listener")
+	}
+	return tcpLN, nil
 }
