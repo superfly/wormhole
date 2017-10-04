@@ -11,7 +11,6 @@ import (
 func TestParseTunnelProto(t *testing.T) {
 	Equals(t, ParseTunnelProto("bla"), UNSUPPORTED)
 	Equals(t, ParseTunnelProto("ssh"), SSH)
-	Equals(t, ParseTunnelProto("tls"), TLS)
 	Equals(t, ParseTunnelProto("tcp"), TCP)
 }
 

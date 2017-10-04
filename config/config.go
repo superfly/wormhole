@@ -31,6 +31,7 @@ func init() {
 
 	viper.SetDefault("proto", "ssh")
 	viper.SetDefault("log_level", "info")
+	viper.SetDefault("insecure", false)
 
 	// only set it when version is provided by the build system
 	if len(version) > 0 {
@@ -81,6 +82,9 @@ type Config struct {
 
 	// Logger instance
 	Logger *logrus.Logger
+
+	// Insecure allows one not to use tls for handlers which support it
+	Insecure bool
 }
 
 // ServerConfig stores wormhole server parameters
@@ -154,6 +158,7 @@ func NewServerConfig() (*ServerConfig, error) {
 		Localhost: viper.GetString("localhost"),
 		LogLevel:  viper.GetString("log_level"),
 		Logger:    logger,
+		Insecure:  viper.GetBool("insecure"),
 	}
 
 	cfg := &ServerConfig{
@@ -171,18 +176,20 @@ func NewServerConfig() (*ServerConfig, error) {
 			return nil, cfgErr(unsetEnvStr, "FLY_SSH_PRIVATE_KEY_FILE")
 		}
 		cfg.SSHPrivateKey = sshKey
-	case TLS:
-		tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
-		if err != nil {
-			return nil, cfgErr(unsetEnvStr, "FLY_TLS_PRIVATE_KEY_FILE")
-		}
-		cfg.TLSPrivateKey = tlsKey
+	case TCP:
+		if !cfg.Insecure {
+			tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
+			if err != nil {
+				return nil, cfgErr(unsetEnvStr, "FLY_TLS_PRIVATE_KEY_FILE")
+			}
+			cfg.TLSPrivateKey = tlsKey
 
-		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
-		if err != nil {
-			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+			tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+			if err != nil {
+				return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+			}
+			cfg.TLSCert = tlsCert
 		}
-		cfg.TLSCert = tlsCert
 	case HTTP2:
 		tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
 		if err != nil {
@@ -208,15 +215,26 @@ func (cfg *ServerConfig) validate() error {
 	switch cfg.Protocol {
 	case UNSUPPORTED:
 		return cfgErr(unsetEnvStr, "FLY_PROTO")
-	case TLS:
-		if len(cfg.TLSCert) == 0 {
-			return cfgErr(invalidStr, "FLY_TLS_CERT_FILE")
-		} else if len(cfg.TLSPrivateKey) == 0 {
-			return cfgErr(invalidStr, "FLY_TLS_PRIVATE_KEY_FILE")
+	case TCP:
+		if !cfg.Insecure {
+			if len(cfg.TLSCert) == 0 {
+				return cfgErr(invalidStr, "FLY_TLS_CERT_FILE")
+			} else if len(cfg.TLSPrivateKey) == 0 {
+				return cfgErr(invalidStr, "FLY_TLS_PRIVATE_KEY_FILE")
+			}
 		}
 	case SSH:
 		if len(cfg.SSHPrivateKey) == 0 {
 			return cfgErr(invalidStr, "FLY_SSH_PRIVATE_KEY_FILE")
+		}
+	case HTTP2:
+		if cfg.Insecure {
+			return cfgErr(invalidStr, "insecure")
+		}
+		if len(cfg.TLSCert) == 0 {
+			return cfgErr(invalidStr, "FLY_TLS_CERT_FILE")
+		} else if len(cfg.TLSPrivateKey) == 0 {
+			return cfgErr(invalidStr, "FLY_TLS_PRIVATE_KEY_FILE")
 		}
 	}
 
@@ -288,15 +306,18 @@ func NewClientConfig() (*ClientConfig, error) {
 		Localhost: viper.GetString("localhost"),
 		LogLevel:  viper.GetString("log_level"),
 		Logger:    logger,
+		Insecure:  viper.GetBool("insecure"),
 	}
 
 	switch protocol {
-	case TLS:
-		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
-		if err != nil {
-			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+	case TCP:
+		if !shared.Insecure {
+			tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+			if err != nil {
+				return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+			}
+			shared.TLSCert = tlsCert
 		}
-		shared.TLSCert = tlsCert
 	case HTTP2:
 		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
 		if err != nil {
@@ -326,10 +347,20 @@ func (cfg *ClientConfig) validate() error {
 	switch cfg.Protocol {
 	case UNSUPPORTED:
 		return cfgErr(unsetEnvStr, "FLY_PROTO")
-	case TLS:
+	case TCP:
+		if !cfg.Insecure {
+			if len(cfg.TLSCert) == 0 {
+				return cfgErr(invalidStr, "FLY_TLS_CERT_KEY_FILE")
+			}
+		}
+	case HTTP2:
+		if cfg.Insecure {
+			return cfgErr(invalidStr, "insecure")
+		}
 		if len(cfg.TLSCert) == 0 {
 			return cfgErr(invalidStr, "FLY_TLS_CERT_KEY_FILE")
 		}
+
 	}
 
 	if len(cfg.Port) == 0 {
@@ -368,8 +399,6 @@ const (
 	SSH TunnelProto = iota
 	// TCP connection pool
 	TCP
-	// TLS connection pool
-	TLS
 	// HTTP2 connection pool
 	HTTP2
 	_
@@ -386,8 +415,6 @@ func ParseTunnelProto(proto string) TunnelProto {
 		return SSH
 	case "tcp":
 		return TCP
-	case "tls":
-		return TLS
 	case "http2":
 		return HTTP2
 	default:
