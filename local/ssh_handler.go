@@ -118,7 +118,8 @@ func (s *SSHHandler) dial() (*ssh.Client, net.Listener, error) {
 		Auth: []ssh.AuthMethod{
 			ssh.Password(s.FlyToken),
 		},
-		Timeout: sshConnTimeout,
+		Timeout:         sshConnTimeout,
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
 
 	// SSH into wormhole server
