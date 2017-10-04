@@ -3,8 +3,8 @@ package remote
 import (
 	"net"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
 	"github.com/superfly/wormhole/session"

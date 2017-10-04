@@ -10,7 +10,7 @@ import (
 
 	msgpack "gopkg.in/vmihailenco/msgpack.v2"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
 	wnet "github.com/superfly/wormhole/net"

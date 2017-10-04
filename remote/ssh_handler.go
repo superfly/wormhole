@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
+	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	wnet "github.com/superfly/wormhole/net"
 	"github.com/superfly/wormhole/session"

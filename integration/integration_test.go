@@ -7,7 +7,7 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/Sirupsen/logrus"
+	"github.com/sirupsen/logrus"
 )
 
 var showTrace = flag.Bool("show-trace", false, "show stack trace after tests finish")

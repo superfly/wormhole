@@ -7,9 +7,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/garyburd/redigo/redis"
 	"github.com/rs/xid"
+	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/messages"
 	wnet "github.com/superfly/wormhole/net"
 )
