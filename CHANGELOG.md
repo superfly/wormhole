@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Removed
 
 ### Fixed
+* Complies with bug introduces from https://github.com/golang/go/issues/19767
 
 ## [0.5.35] - 2017-06-15
 ### Added
