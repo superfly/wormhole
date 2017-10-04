@@ -25,6 +25,6 @@ export FLY_TLS_CERT_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts/cert.p
 export FLY_TLS_PRIVATE_KEY_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts/key.pem
 
 
-WORMHOLE_BIN=$GOPATH/src/github.com/superfly/wormhole/cmd/wormhole/wormhole
+WORMHOLE_BIN=$GOPATH/src/github.com/superfly/wormhole/bin/wormhole
 
 $WORMHOLE_BIN -server
