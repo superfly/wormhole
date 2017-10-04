@@ -35,7 +35,7 @@ func NewTCPHandler(cfg *config.ServerConfig, pool *redis.Pool) (*TCPHandler, err
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
-func (h *TCPHandler) Serve(conn net.Conn) {
+func (h *TCPHandler) Serve(conn *net.TCPConn) {
 	buf := make([]byte, 1024)
 	nr, err := conn.Read(buf)
 	if err != nil {
