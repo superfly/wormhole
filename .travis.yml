@@ -4,7 +4,7 @@ go:
 - 1.x
 install: make setup
 sudo: required
-services:
+services: # required for docker service
 - docker
 script:
 - GOOS=linux   GOARCH=amd64 make binaries

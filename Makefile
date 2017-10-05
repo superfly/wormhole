@@ -72,7 +72,7 @@ build: ## build the go packages
 
 crossbuild: ## compile binaries for multiple archs/OSes
 	@echo "🎈 $@"
-	$$(scripts/compile.sh)
+	@exec ${ROOTDIR}scripts/compile.sh
 
 test: ## run tests, except integration tests
 	@echo "🎈 $@"
