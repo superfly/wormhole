@@ -76,8 +76,6 @@ done
 
 num_binaries=`ls pkg/wormhole* | wc -l`
 
-echo "NUM_BINARIES: $num_binaries"
-
 # right now we support 32- and 64-bit builds for Windows, macOS, Linux and FreeBSD
 # plus ARM on Linux ;)
 if [ $num_binaries -lt 9 ]; then
@@ -109,7 +107,7 @@ echo "Pushing binaries to S3"
 
 go get -u github.com/minio/mc
 
-mc config host add s3  https://s3.amazonaws.com $AWS_S3_ACCESS_KEY_ID $AWS_S3_SECRET_ACCESS_KEY
+mc config host add s3 https://s3.amazonaws.com $AWS_S3_ACCESS_KEY_ID $AWS_S3_SECRET_ACCESS_KEY
 
 mc cp pkg/wormhole* s3/flyio-wormhole-builds/$VERSION/
 
@@ -142,7 +140,7 @@ fi
 
 # this shouldn't happen, at this point we're either in "stable" or "beta" release
 if [ "${#tag_versions[@]}" -lt "1" ]; then
-  echo "expected to have some tags for the Docker image, got: '${tag_versions[@]}' instead"
+  echo "Expected to have some tags for the Docker image, got: '${tag_versions[@]}' instead"
   exit 1
 fi
 
