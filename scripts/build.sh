@@ -12,6 +12,7 @@ if [ -n "$TRAVIS_TAG" ]; then
     MINOR=${version_parts[1]}
     PATCH=${version_parts[2]}
     CHANNEL=stable
+    VERSION=$MAJOR.$MINOR.$PATCH
   else
     # tags should be of the form 'vX.Y.Z'
     # assuming this is some sort of beta tag
@@ -19,12 +20,14 @@ if [ -n "$TRAVIS_TAG" ]; then
     MINOR=0
     PATCH=0-beta.$TRAVIS_TAG
     CHANNEL=beta
+    VERSION=$MAJOR.$MINOR.$PATCH
   fi
 elif [ -z "$TRAVIS_TAG" ] && [ "$TRAVIS_BRANCH" = "master" ]; then
   MAJOR=0
   MINOR=0
   PATCH=0-beta.${BUILDKITE_COMMIT:0:7}
   CHANNEL=beta
+  VERSION=$MAJOR.$MINOR.$PATCH
 else
   echo "Not building a tag, nothing to do."
   exit 0
@@ -73,9 +76,11 @@ done
 
 num_binaries=`ls pkg/wormhole* | wc -l`
 
+echo "NUM_BINARIES: $num_binaries"
+
 # right now we support 32- and 64-bit builds for Windows, macOS, Linux and FreeBSD
 # plus ARM on Linux ;)
-if [ "$num_builds" -lt "9" ]; then
+if [ $num_binaries -lt 9 ]; then
   echo "Missing some wormhole binaries. Cannot make a release."
   exit 1
 fi
@@ -84,25 +89,33 @@ if [ "$CHANNEL" = "stable" ]; then
   GHR='./github-release'
 
   if [ ! -f $GHR ]; then
-    curl -Lk https://github.com/buildkite/github-release/releases/download/v1.0/github-release-linux-amd64 > $GHR
+    ghr_bin=github-release-linux-amd64
+    if [[ "$unamestr" == 'Darwin' ]]; then
+      ghr_bin=github-release-darwin-amd64
+    fi
+    curl -Lk https://github.com/buildkite/github-release/releases/download/v1.0/$ghr_bin > $GHR
     chmod +x $GHR
   fi
 
   echo " Creating GitHub release"
 
-  #$GHR $TRAVIS_TAG pkg/* --commit $TRAVIS_COMMIT \
-  #                          --tag $TRAVIS_TAG \
-  #                          --github-repository "superfly/wormhole" \
-  #                          --github-access-token $GITHUB_ACCESS_TOKEN
+  $GHR $TRAVIS_TAG pkg/* --commit $TRAVIS_COMMIT \
+                            --tag $TRAVIS_TAG \
+                            --github-repository "superfly/wormhole" \
+                            --github-access-token $GITHUB_ACCESS_TOKEN
 fi
 
 echo "Pushing binaries to S3"
 
-#buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/$VERSION
+go get -u github.com/minio/mc
+
+mc config host add s3  https://s3.amazonaws.com $AWS_S3_ACCESS_KEY_ID $AWS_S3_SECRET_ACCESS_KEY
+
+mc cp pkg/wormhole* s3/flyio-wormhole-builds/$VERSION/
 
 # also set the version as the latest
 # TODO: there must be a better way to copy/symlink objects in S3 instead of uploading again
-#buildkite-agent artifact upload "pkg/wormhole*" s3://flyio-wormhole-builds/$CHANNEL
+mc cp pkg/wormhole* s3/flyio-wormhole-builds/$CHANNEL/
 
 echo "Building and pushing to Docker Hub"
 
@@ -133,8 +146,10 @@ if [ "${#tag_versions[@]}" -lt "1" ]; then
   exit 1
 fi
 
-#for i in "${tag_versions[@]}"; do
-#  echo "Tagging and pushing ${base_image_name}:${i}"
-#  docker tag $base_image_name "${base_image_name}:${i}"
-#  docker push "${base_image_name}:${i}"
-#done
+docker login --username $DOCKER_LOGIN --password $DOCKER_PASSWORD
+
+for i in "${tag_versions[@]}"; do
+  echo "Tagging and pushing ${base_image_name}:${i}"
+  docker tag $base_image_name "${base_image_name}:${i}"
+  docker push "${base_image_name}:${i}"
+done

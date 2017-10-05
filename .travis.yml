@@ -4,7 +4,7 @@ go:
 - 1.x
 install: make setup
 sudo: required
-services: # required for docker service
+services:
 - docker
 script:
 - GOOS=linux   GOARCH=amd64 make binaries
@@ -14,21 +14,6 @@ script:
 - GOOS=linux   GOARCH=386   make binaries
 - make ci
 - make crossbuild
-deploy:
-  provider: releases
-  api_key:
-    secure: oVvdqAN8R+9stBFRT36jLlpzeCjQZTBrr9B/U1J9eJbRML5UQgJmuFbeuZItX8VUaWnxFJAWOab6QqFyRMPRk5AQesFAoZhFy6+43yh3wHhvV+eZPuxM4yS8tMbaVza6cyYQmmHbzsnSL+rW/CclcsjbFwFgf+DGQh8DWQ2JMCi+bX26Ct/my+NEGh21Ys7aUAu2lA+JnCIl0AzYOTgy1CKp7TsYNG9agQeOfBivgO3Edxvfaq8kiE2gp/nTtkvXjl/MtA54O/hjMNm4vuSq528+uIwOpcslda/t8LQIeZ1FHrnXFFabbEKI3ef2bLnqIEOi3UULcURNtwRZzLZSMhSqrQYPNoaFLm5zDRy2975gviBwx1BBPLXtIWjZ2/IElJzNWdnRR+6qzkCzdHHC4uPosG36CDkQLqMPGN7XiOktVRmxJ/MLW8Hs0RJzj6z1jBFp9kZ2EP2C2Zh+vS5HWU5v5l+zkevE2OBzhs9rlHqnRHqwzrXZz6yoFt01EA0IJUV1yp8X8Hit4c+olUxDIWTOFc6z/c+v5L947vvgw4+bCjpMrSPSHntGM8lTLVlEJmumDdIK6zYhIOQs0tkR10TEAbSvl5qjchUqoNYuH1Lcrh1YfNt/KJ6e2A1lTgBpheyr5y5siku8nlnSK41oRlGHw2wIBcApmwlBASAHsgE=
-  file:
-    - 'pkg/wormhole_linux_amd64'
-    - 'pkg/wormhole_linux_386'
-    - 'pkg/wormhole_linux_arm'
-    - 'pkg/wormhole_darwin_amd64'
-    - 'pkg/wormhole_darwin_386'
-    - 'pkg/wormhole_freebsd_amd64'
-    - 'pkg/wormhole_freebsd_386'
-    - 'pkg/wormhole_windows_amd64.exe'
-    - 'pkg/wormhole_windows_386.exe'
-  overwrite: true
-  on:
-    repo: superfly/wormhole
-    tags: true
+env:
+  global:
+    secure: hUrEX07yTuZuVvJT//0/+YQkyPksUosOxdmODcGJSDKTQb0BctXOkZQEzdVIbvfKUrPb43KW8f9hTPm4zKOtSEycwAwaLKqO89cYCo6uLNr+v94YcafsWv7nmnpLIQrCtUVLHAOfAicsWjhNsIm3QevqoAHOYRr/Da0i507h33LdBlINUcFN3EijbG/WgcVkdfYZ77YZk0n2WYyAPCJnTn6TnLHOM+jSU0wras1X3to8hVmkV19R3nfHbti0YzTeEndjd202o1Zi73OI3hLsUFWhQv29FoB3Zv1QBH187zip5CWRrK392tc64ygZnPBwqWBTCKM8r1CdI49/gu1CzlljFHHAjXjCpu7jG0j7x9DHrfYDIoBbe7GMl90IvmpyLn4pK3Te2EAuSvuxUy93CbdBKWj3QkgC7sadjwHA3kTdOaPtnIMhkE74Puhtm4J21UW1MB0N253bYlQikB+XKfPxPe9cP0CRFQDibe31ul5yAuL81HnlapDLuwPNAboUTQ1Zy7VdsIwwmkph3QrVId9E60NoXwySi7uV0Wz4kIVR/Ld55o5Y9KeJaTv5jqs0LT3hObgE0FEe6Vyhn7tWREUqdbW0DCX0xclzpvuRar5vf2Xlb9wXM5R9tCCuI1AJxCH8NsXU0q3bxt2XSROPGEcxEvcSY8HzpnOk64GAH3g=
