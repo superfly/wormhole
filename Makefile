@@ -22,7 +22,7 @@ BINARIES=$(addprefix bin/,$(COMMANDS))
 
 GO_LDFLAGS=-ldflags "-X `go list ./config`.version=$(VERSION)"
 
-.PHONY: clean all fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall
+.PHONY: clean all fmt vet lint build binaries test integration setup generate checkprotos coverage ci check help install uninstall crossbuild
 .DEFAULT: default
 
 all: check binaries test integration ## run fmt, vet, lint, build the binaries and run the tests
@@ -69,6 +69,10 @@ ineffassign: ## run ineffassign
 build: ## build the go packages
 	@echo "🎈 $@"
 	@go build -i -v ${GO_LDFLAGS} ${GO_GCFLAGS} ${PACKAGES}
+
+crossbuild: ## compile binaries for multiple archs/OSes
+	@echo "🎈 $@"
+	$$(scripts/compile.sh)
 
 test: ## run tests, except integration tests
 	@echo "🎈 $@"

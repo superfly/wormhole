@@ -1,20 +1,34 @@
 language: go
-
 go:
-  - 1.8.x
-  - 1.x
-
+- 1.8.x
+- 1.x
 install: make setup
-sudo: required # required for docker service
+sudo: required
 services:
-  # Required for dockertest
-  - docker
+- docker
 script:
-  # check compilation on supported targets
-  - GOOS=linux   GOARCH=amd64 make binaries
-  - GOOS=windows GOARCH=amd64 make binaries
-  - GOOS=darwin  GOARCH=amd64 make binaries
-  - GOOS=linux   GOARCH=arm   make binaries
-  - GOOS=linux   GOARCH=386   make binaries
-  # run tests
-  - make ci
+- GOOS=linux   GOARCH=amd64 make binaries
+- GOOS=windows GOARCH=amd64 make binaries
+- GOOS=darwin  GOARCH=amd64 make binaries
+- GOOS=linux   GOARCH=arm   make binaries
+- GOOS=linux   GOARCH=386   make binaries
+- make ci
+- make crossbuild
+deploy:
+  provider: releases
+  api_key:
+    secure: oVvdqAN8R+9stBFRT36jLlpzeCjQZTBrr9B/U1J9eJbRML5UQgJmuFbeuZItX8VUaWnxFJAWOab6QqFyRMPRk5AQesFAoZhFy6+43yh3wHhvV+eZPuxM4yS8tMbaVza6cyYQmmHbzsnSL+rW/CclcsjbFwFgf+DGQh8DWQ2JMCi+bX26Ct/my+NEGh21Ys7aUAu2lA+JnCIl0AzYOTgy1CKp7TsYNG9agQeOfBivgO3Edxvfaq8kiE2gp/nTtkvXjl/MtA54O/hjMNm4vuSq528+uIwOpcslda/t8LQIeZ1FHrnXFFabbEKI3ef2bLnqIEOi3UULcURNtwRZzLZSMhSqrQYPNoaFLm5zDRy2975gviBwx1BBPLXtIWjZ2/IElJzNWdnRR+6qzkCzdHHC4uPosG36CDkQLqMPGN7XiOktVRmxJ/MLW8Hs0RJzj6z1jBFp9kZ2EP2C2Zh+vS5HWU5v5l+zkevE2OBzhs9rlHqnRHqwzrXZz6yoFt01EA0IJUV1yp8X8Hit4c+olUxDIWTOFc6z/c+v5L947vvgw4+bCjpMrSPSHntGM8lTLVlEJmumDdIK6zYhIOQs0tkR10TEAbSvl5qjchUqoNYuH1Lcrh1YfNt/KJ6e2A1lTgBpheyr5y5siku8nlnSK41oRlGHw2wIBcApmwlBASAHsgE=
+  file:
+    - 'pkg/wormhole_linux_amd64'
+    - 'pkg/wormhole_linux_386'
+    - 'pkg/wormhole_linux_arm'
+    - 'pkg/wormhole_darwin_amd64'
+    - 'pkg/wormhole_darwin_386'
+    - 'pkg/wormhole_freebsd_amd64'
+    - 'pkg/wormhole_freebsd_386'
+    - 'pkg/wormhole_windows_amd64.exe'
+    - 'pkg/wormhole_windows_386.exe'
+  overwrite: true
+  on:
+    repo: superfly/wormhole
+    tags: true
