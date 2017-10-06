@@ -134,8 +134,10 @@ rm -f ./app
 
 if [ "$CHANNEL" = "stable" ]; then
   tag_versions=("${MAJOR}" "${MAJOR}.${MINOR}" "${MAJOR}.${MINOR}.${PATCH}" "$CHANNEL")
-elif [ "$CHANNEL" = "beta" ]; then
-  tag_versions=("$CHANNEL")
+elif [ "$CHANNEL" = "beta" ] && [ "$TRAVIS_BRANCH" = "master" ]; then
+  tag_versions=("${VERSION}" "${CHANNEL}")
+else
+  tag_versions=("$VERSION")
 fi
 
 # this shouldn't happen, at this point we're either in "stable" or "beta" release
