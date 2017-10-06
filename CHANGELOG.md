@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 * Complies breaking ssh behavior changes from https://github.com/golang/go/issues/19767
+* Fully migrated testing/building/releasing to Travis CI
 
 ## [0.5.35] - 2017-06-15
 ### Added
