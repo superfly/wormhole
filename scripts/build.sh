@@ -25,7 +25,7 @@ if [ -n "$TRAVIS_TAG" ]; then
 elif [ -z "$TRAVIS_TAG" ] && [ "$TRAVIS_BRANCH" = "master" ]; then
   MAJOR=0
   MINOR=0
-  PATCH=0-beta.${BUILDKITE_COMMIT:0:7}
+  PATCH=0-beta.${TRAVIS_COMMIT:0:7}
   CHANNEL=beta
   VERSION=$MAJOR.$MINOR.$PATCH
 else
