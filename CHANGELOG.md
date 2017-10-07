@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Added
 * Experimental HTTP2 support
 * Experimental connection pool
+* Travis CI integration with fly.io/slack
 
 ### Changed
 * The top-level listener at the wh-server level now only listens on TCP - allowing each handler control over TLS/SSH
