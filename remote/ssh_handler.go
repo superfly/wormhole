@@ -65,7 +65,7 @@ func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, err
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
-func (s *SSHHandler) Serve(conn net.Conn) {
+func (s *SSHHandler) Serve(conn *net.TCPConn) {
 	conn.RemoteAddr()
 	ctx, err := s.limiter.Get(ipForConn(conn))
 	if err != nil {

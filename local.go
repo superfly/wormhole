@@ -35,9 +35,7 @@ func StartLocal(cfg *config.ClientConfig) {
 	case config.SSH:
 		handler = local.NewSSHHandler(cfg, release)
 	case config.TCP:
-		handler = local.NewTCPHandler(cfg, release)
-	case config.TLS:
-		handler, err = local.NewTLSHandler(cfg, release)
+		handler, err = local.NewTCPHandler(cfg, release)
 		if err != nil {
 			log.Fatal(err)
 		}

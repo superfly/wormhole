@@ -39,8 +39,8 @@ type TCPHandler struct {
 
 // NewTCPHandler returns a TCPHandler struct
 // WARNING: TCPHandler is insecure and shouldn't be used in production
-func NewTCPHandler(cfg *config.ClientConfig, release *messages.Release) *TCPHandler {
-	return &TCPHandler{
+func NewTCPHandler(cfg *config.ClientConfig, release *messages.Release) (*TCPHandler, error) {
+	h := &TCPHandler{
 		FlyToken:       cfg.Token,
 		RemoteEndpoint: cfg.RemoteEndpoint,
 		LocalEndpoint:  cfg.LocalEndpoint,
@@ -48,27 +48,14 @@ func NewTCPHandler(cfg *config.ClientConfig, release *messages.Release) *TCPHand
 		Version:        cfg.Version,
 		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
-}
-
-// NewTLSHandler returns a TCPHandler struct with TLS encryption
-func NewTLSHandler(cfg *config.ClientConfig, release *messages.Release) (*TCPHandler, error) {
-	rootCAs := x509.NewCertPool()
-	ok := rootCAs.AppendCertsFromPEM(cfg.TLSCert)
-	if !ok {
-		return nil, fmt.Errorf("couln't append a root CA")
+	if !cfg.Insecure {
+		rootCAs := x509.NewCertPool()
+		ok := rootCAs.AppendCertsFromPEM(cfg.TLSCert)
+		if !ok {
+			return nil, fmt.Errorf("couln't append a root CA: ")
+		}
+		h.tlsConfig = &tls.Config{RootCAs: rootCAs}
 	}
-
-	h := &TCPHandler{
-		FlyToken:       cfg.Token,
-		RemoteEndpoint: cfg.RemoteEndpoint,
-		LocalEndpoint:  cfg.LocalEndpoint,
-		Release:        release,
-		Version:        cfg.Version,
-		encrypted:      true,
-		tlsConfig:      &tls.Config{RootCAs: rootCAs},
-		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "TLSHandler"}),
-	}
-
 	return h, nil
 }
 
@@ -158,7 +145,7 @@ func (s *TCPHandler) Close() error {
 func (s *TCPHandler) dial() (conn net.Conn, err error) {
 	// TCP into wormhole server
 
-	if s.encrypted {
+	if s.tlsConfig != nil {
 		conn, err = tls.Dial("tcp", s.RemoteEndpoint, s.tlsConfig)
 	} else {
 		conn, err = net.Dial("tcp", s.RemoteEndpoint)

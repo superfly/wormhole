@@ -6,6 +6,6 @@ import "net"
 // It's the entry point for starting a session, managing a handshake, auth
 // and encryption (e.g. SSH)
 type Handler interface {
-	Serve(net.Conn)
+	Serve(*net.TCPConn)
 	Close()
 }

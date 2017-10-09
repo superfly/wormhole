@@ -48,14 +48,8 @@ func NewHTTP2Handler(cfg *config.ServerConfig, pool *redis.Pool) (*HTTP2Handler,
 // We are explicit with the *net.TCPConn since we need to be this way - and let the handler and
 // sessions handle wrapping in TLS. Having a TCPConn all the way down will highlight the dangers
 // of sending data over the socket without first wrapping in TLS
-func (h *HTTP2Handler) Serve(conn net.Conn) {
-	// TODO: Have remote only hand off *net.TCPConn
-	tcpConn, ok := conn.(*net.TCPConn)
-	if !ok {
-		h.logger.Errorf("was not given TCP socket")
-		return
-	}
-	tlsConn, err := h.genericTLSWrap(tcpConn)
+func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
+	tlsConn, err := h.genericTLSWrap(conn)
 	if err != nil {
 		h.logger.Errorf("error establishing tls session: " + err.Error())
 		return
@@ -86,7 +80,7 @@ func (h *HTTP2Handler) Serve(conn net.Conn) {
 			h.logger.Debugf("Adding New tunnel conn to session: %s", sess.ID())
 			http2Sess := sess.(*session.HTTP2Session)
 
-			alpnConn, err := h.http2ALPNTLSWrap(tcpConn)
+			alpnConn, err := h.http2ALPNTLSWrap(conn)
 			if err != nil {
 				h.logger.Errorf("Couldn't establish ALPN connection")
 				return

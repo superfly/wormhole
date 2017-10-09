@@ -12,12 +12,14 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Changed
 * The top-level listener at the wh-server level now only listens on TCP - allowing each handler control over TLS/SSH
+* TCPHandler now accepts both TCP and TLS depending on configuration
 
 ### Removed
 
 ### Fixed
-* Complies breaking ssh behavior changes from https://github.com/golang/go/issues/19767
+* Complies with breaking ssh behavior changes introduced in https://github.com/golang/go/issues/19767
 * Fully migrated testing/building/releasing to Travis CI
+* Bug with unhandled error in TLS wrappers
 
 ## [0.5.35] - 2017-06-15
 ### Added

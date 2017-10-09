@@ -1,12 +1,14 @@
 package remote
 
 import (
+	"crypto/tls"
 	"net"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
+	wnet "github.com/superfly/wormhole/net"
 	"github.com/superfly/wormhole/session"
 )
 
@@ -18,6 +20,7 @@ type TCPHandler struct {
 	clusterURL string
 	sessions   map[string]session.Session
 	pool       *redis.Pool
+	tlsConfig  *tls.Config
 	logger     *logrus.Entry
 }
 
@@ -31,13 +34,38 @@ func NewTCPHandler(cfg *config.ServerConfig, pool *redis.Pool) (*TCPHandler, err
 		pool:       pool,
 		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
+
+	if len(cfg.TLSCert) != 0 && len(cfg.TLSPrivateKey) != 0 {
+		keyPair, err := tls.X509KeyPair(cfg.TLSCert, cfg.TLSPrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		sConf := &tls.Config{
+			Certificates: []tls.Certificate{keyPair},
+		}
+		h.tlsConfig = sConf
+	}
+
 	return &h, nil
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
-func (h *TCPHandler) Serve(conn net.Conn) {
+func (h *TCPHandler) Serve(conn *net.TCPConn) {
+	var useConn net.Conn
+	if h.tlsConfig != nil {
+		var err error
+		useConn, err = wnet.GenericTLSWrap(conn, h.tlsConfig, tls.Server)
+		if err != nil {
+			h.logger.Errorf("Error establishing TLS wrapping: " + err.Error())
+			return
+		}
+	} else {
+		useConn = conn
+	}
+
 	buf := make([]byte, 1024)
-	nr, err := conn.Read(buf)
+	nr, err := useConn.Read(buf)
 	if err != nil {
 		h.logger.Errorf("error reading from stream: " + err.Error())
 		return
@@ -50,7 +78,7 @@ func (h *TCPHandler) Serve(conn net.Conn) {
 
 	switch m := msg.(type) {
 	case *messages.AuthControl:
-		go h.tcpSessionHandler(conn)
+		go h.tcpSessionHandler(useConn)
 	case *messages.AuthTunnel:
 		if sess, ok := h.sessions[m.ClientID]; !ok {
 			h.logger.Error("New tunnel conn not associated with any session. Closing")
@@ -59,7 +87,7 @@ func (h *TCPHandler) Serve(conn net.Conn) {
 			// open a proxy conn on current session
 			h.logger.Debugf("Adding New tunnel conn to session: %s", sess.ID())
 			tcpSess := sess.(*session.TCPSession)
-			tcpSess.AddTunnel(conn)
+			tcpSess.AddTunnel(useConn)
 		}
 	default:
 		h.logger.Error("unparsable response")
