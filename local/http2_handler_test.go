@@ -222,6 +222,9 @@ func TestHTTP2Handler(t *testing.T) {
 			assert.Equal(t, authTunMsg.Token, h.FlyToken, "Should have matching tokens")
 
 			alpnConn, err := wnet.HTTP2ALPNTLSWrap(tunConn, testTLSServerConfig, tls.Server)
+			for err != nil {
+				alpnConn, err = wnet.HTTP2ALPNTLSWrap(tunConn, testTLSServerConfig, tls.Server)
+			}
 			assert.NoError(t, err, "Should be no error wrapping alpnConn")
 
 			tr := &http2.Transport{}
