@@ -56,7 +56,7 @@ func GenericTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*
 	var tConn *tls.Conn
 
 	for {
-		if err := conn.SetDeadline(time.Now().Add(time.Second * 5)); err != nil {
+		if err := conn.SetDeadline(time.Now().Add(time.Second * 10)); err != nil {
 			return nil, err
 		}
 
@@ -96,7 +96,7 @@ func HTTP2ALPNTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) 
 
 	var tlsConn *tls.Conn
 	for {
-		if err := conn.SetDeadline(time.Now().Add(time.Second * 5)); err != nil {
+		if err := conn.SetDeadline(time.Now().Add(time.Second * 10)); err != nil {
 			return nil, err
 		}
 		tlsConn = tFunc(conn, protoCfg)
