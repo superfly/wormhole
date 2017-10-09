@@ -34,7 +34,7 @@ else
   PATCH=0-alpha.${TRAVIS_COMMIT:0:7}
   CHANNEL=alpha
   VERSION=$MAJOR.$MINOR.$PATCH
-  BUILD_UPLOAD=false
+  BUILD_UPLOAD=${BUILD_UPLOAD:-false}
 fi
 
 # download glide if it's not available
