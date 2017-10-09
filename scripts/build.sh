@@ -29,8 +29,12 @@ elif [ -z "$TRAVIS_TAG" ] && [ "$TRAVIS_BRANCH" == "master" ]; then
   CHANNEL=beta
   VERSION=$MAJOR.$MINOR.$PATCH
 else
-  echo "Not building a tag, nothing to do."
-  exit 0
+  MAJOR=0
+  MINOR=0
+  PATCH=0-alpha.${TRAVIS_COMMIT:0:7}
+  CHANNEL=alpha
+  VERSION=$MAJOR.$MINOR.$PATCH
+  BUILD_UPLOAD=false
 fi
 
 # download glide if it's not available
@@ -83,7 +87,7 @@ if [ $num_binaries -lt 9 ]; then
   exit 1
 fi
 
-if [ -z "$BUILD_UPLOAD" ]; then
+if [ -z "$BUILD_UPLOAD" ] || [ "$BUILD_UPLOAD" == "false" ]; then
   echo "BUILD_UPLOAD is not set. Not going to upload binaries."
   exit 0
 fi
