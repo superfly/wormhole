@@ -1,7 +1,11 @@
 language: go
 go:
 - 1.8.x
-- 1.x
+- 1.9.x
+matrix:
+  include:
+    go: '1.9.x'
+    env: BUILD_UPLOAD=true
 install: make setup
 sudo: required
 services:
