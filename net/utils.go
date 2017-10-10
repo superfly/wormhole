@@ -55,12 +55,15 @@ type TLSWrapperFunc func(conn net.Conn, cfg *tls.Config) *tls.Conn
 func GenericTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
 	var tConn *tls.Conn
 
+	tCfg := cfg.Clone()
+	tCfg.MinVersion = tls.VersionTLS12
+
 	for {
 		if err := conn.SetDeadline(time.Now().Add(time.Second * 10)); err != nil {
 			return nil, err
 		}
 
-		tConn = tFunc(conn, cfg)
+		tConn = tFunc(conn, tCfg)
 
 		// check if the connection is upgraded before returning
 		// we want to catch the error early
@@ -93,6 +96,7 @@ func HTTP2ALPNTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) 
 	protoCfg := cfg.Clone()
 	// TODO: append here
 	protoCfg.NextProtos = []string{http2.NextProtoTLS}
+	protoCfg.MinVersion = tls.VersionTLS12
 
 	var tlsConn *tls.Conn
 	for {

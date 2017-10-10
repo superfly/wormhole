@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -210,7 +211,11 @@ func TestHTTP2Handler(t *testing.T) {
 			buf = make([]byte, 1024)
 
 			nr, err := tunTLSConn.Read(buf)
-			assert.NoError(t, err, "Should have no error reading from tunnel conn")
+			assert.True(t, err == nil || err == io.EOF, "Should have no error reading from tunnel conn")
+
+			for err != io.EOF {
+				_, err = tunTLSConn.Read(buf)
+			}
 
 			msg, err := messages.Unpack(buf[:nr])
 			assert.NoError(t, err, "Should have no error unpacking message")
@@ -221,10 +226,10 @@ func TestHTTP2Handler(t *testing.T) {
 			assert.Equal(t, authTunMsg.ClientID, oMsg.ClientID, "Should have same clientID as openTunnel")
 			assert.Equal(t, authTunMsg.Token, h.FlyToken, "Should have matching tokens")
 
+			err = tunTLSConn.CloseWrite()
+			assert.NoError(t, err, "Should be no error closing conn")
+
 			alpnConn, err := wnet.HTTP2ALPNTLSWrap(tunConn, testTLSServerConfig, tls.Server)
-			for err != nil {
-				alpnConn, err = wnet.HTTP2ALPNTLSWrap(tunConn, testTLSServerConfig, tls.Server)
-			}
 			assert.NoError(t, err, "Should be no error wrapping alpnConn")
 
 			tr := &http2.Transport{}

@@ -2,6 +2,7 @@ package remote
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
 
 	"github.com/garyburd/redigo/redis"
@@ -57,10 +58,16 @@ func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
 
 	buf := make([]byte, 1024)
 
+	waitClose := true
 	nr, err := tlsConn.Read(buf)
 	if err != nil {
-		h.logger.Errorf("error reading from stream: " + err.Error())
-		return
+		// optimize for closing of initial TLS conn
+		if err == io.EOF {
+			waitClose = false
+		} else {
+			h.logger.Errorf("error reading from stream: " + err.Error())
+			return
+		}
 	}
 	msg, err := messages.Unpack(buf[:nr])
 	if err != nil {
@@ -80,6 +87,19 @@ func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
 			h.logger.Debugf("Adding New tunnel conn to session: %s", sess.ID())
 			http2Sess := sess.(*session.HTTP2Session)
 
+			for waitClose {
+				if _, err := tlsConn.Read(buf); err != nil {
+					if err != io.EOF {
+						h.logger.Errorf("Failed to get TLS Closed: %s", err.Error())
+						return
+					}
+					waitClose = false
+				}
+			}
+
+			if err := tlsConn.CloseWrite(); err != nil {
+				h.logger.Errorf("failed to close tls conn: %s", err.Error())
+			}
 			alpnConn, err := h.http2ALPNTLSWrap(conn)
 			if err != nil {
 				h.logger.Errorf("Couldn't establish ALPN connection")

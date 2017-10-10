@@ -122,6 +122,17 @@ func (s *HTTP2Handler) ListenAndServe() error {
 			if err != nil {
 				return fmt.Errorf("Failed to auth tunnel: %s", err.Error())
 			}
+			if err := genericTLSConn.CloseWrite(); err != nil {
+				return fmt.Errorf("Failed to close tls: %s", err.Error())
+			}
+
+			for err == nil {
+				_, err = genericTLSConn.Read(b)
+			}
+			if err != io.EOF {
+				return fmt.Errorf("Failed to close tls: %s", err.Error())
+			}
+
 			// TODO: Listen for auth ACK
 
 			http2TLSConn, err := s.http2ALPNTLSWrap(tcpConn)
