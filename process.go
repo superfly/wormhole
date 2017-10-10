@@ -21,7 +21,7 @@ type Process struct {
 
 // NewProcess returns the Process to execute a named program
 func NewProcess(logger *logrus.Logger, program string, closer io.Closer) *Process {
-	cs := []string{"/bin/sh", "-c", program}
+	cs := shellArgs(program)
 	cmd := exec.Command(cs[0], cs[1:]...)
 	cmd.Stdin = nil
 	cmd.Stdout = os.Stdout
