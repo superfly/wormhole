@@ -22,15 +22,19 @@ if [ -n "$TRAVIS_TAG" ]; then
     CHANNEL=beta
     VERSION=$MAJOR.$MINOR.$PATCH
   fi
-elif [ -z "$TRAVIS_TAG" ] && [ "$TRAVIS_BRANCH" = "master" ]; then
+elif [ -z "$TRAVIS_TAG" ] && [ "$TRAVIS_BRANCH" == "master" ]; then
   MAJOR=0
   MINOR=0
   PATCH=0-beta.${TRAVIS_COMMIT:0:7}
   CHANNEL=beta
   VERSION=$MAJOR.$MINOR.$PATCH
 else
-  echo "Not building a tag, nothing to do."
-  exit 0
+  MAJOR=0
+  MINOR=0
+  PATCH=0-alpha.${TRAVIS_COMMIT:0:7}
+  CHANNEL=alpha
+  VERSION=$MAJOR.$MINOR.$PATCH
+  BUILD_UPLOAD=${BUILD_UPLOAD:-false}
 fi
 
 # download glide if it's not available
@@ -83,7 +87,12 @@ if [ $num_binaries -lt 9 ]; then
   exit 1
 fi
 
-if [ "$CHANNEL" = "stable" ]; then
+if [ -z "$BUILD_UPLOAD" ] || [ "$BUILD_UPLOAD" == "false" ]; then
+  echo "BUILD_UPLOAD is not set. Not going to upload binaries."
+  exit 0
+fi
+
+if [ "$CHANNEL" == "stable" ]; then
   GHR='./github-release'
 
   if [ ! -f $GHR ]; then
@@ -95,7 +104,7 @@ if [ "$CHANNEL" = "stable" ]; then
     chmod +x $GHR
   fi
 
-  echo " Creating GitHub release"
+  echo "Creating GitHub release"
 
   $GHR $TRAVIS_TAG pkg/* --commit $TRAVIS_COMMIT \
                             --tag $TRAVIS_TAG \
@@ -122,7 +131,7 @@ base_image_name="flyio/wormhole"
 # ensure we have the binary before building an image
 wormhole_linux_bin=pkg/wormhole_linux_amd64
 if [ ! -f "$wormhole_linux_bin" ]; then
-  echo "missing wormhole binary in $wormhole_linux_bin"
+  echo "Missing wormhole binary in $wormhole_linux_bin"
   exit 1
 fi
 
@@ -132,9 +141,9 @@ docker build -t $base_image_name .
 # clean up
 rm -f ./app
 
-if [ "$CHANNEL" = "stable" ]; then
+if [ "$CHANNEL" == "stable" ]; then
   tag_versions=("${MAJOR}" "${MAJOR}.${MINOR}" "${MAJOR}.${MINOR}.${PATCH}" "$CHANNEL")
-elif [ "$CHANNEL" = "beta" ] && [ "$TRAVIS_BRANCH" = "master" ]; then
+elif [ "$CHANNEL" == "beta" ] && [ "$TRAVIS_BRANCH" = "master" ]; then
   tag_versions=("${VERSION}" "${CHANNEL}")
 else
   tag_versions=("$VERSION")

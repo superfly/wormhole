@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 * Complies with breaking ssh behavior changes introduced in https://github.com/golang/go/issues/19767
 * Fully migrated testing/building/releasing to Travis CI
 * Bug with unhandled error in TLS wrappers
+* Bug in build script that caused binaries to be uploaded for each Go version (#22)
 
 ## [0.5.35] - 2017-06-15
 ### Added
