@@ -5,6 +5,10 @@ The format is based on [Keep a Changelog](http://keepachangelog.com/)
 and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
+### Added
+
+### Fixed
+* Race condition with session access in remote/http2 (#26)
 
 
 ## [0.5.36] - 2017-10-09
@@ -25,7 +29,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 * Bug with unhandled error in TLS wrappers
 * Bug in build script that caused binaries to be uploaded for each Go version (#22)
 * Wormhole start up in supervisor mode on Windows (#24)
-* Race condition with session access in remote/http2
+
 
 ## [0.5.35] - 2017-06-15
 ### Added
