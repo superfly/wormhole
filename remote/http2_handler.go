@@ -2,7 +2,9 @@ package remote
 
 import (
 	"crypto/tls"
+	"io"
 	"net"
+	"sync"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/sirupsen/logrus"
@@ -18,6 +20,7 @@ type HTTP2Handler struct {
 	localhost  string
 	clusterURL string
 	sessions   map[string]session.Session
+	sl         sync.RWMutex
 	pool       *redis.Pool
 	logger     *logrus.Entry
 	tlsConfig  *tls.Config
@@ -57,10 +60,16 @@ func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
 
 	buf := make([]byte, 1024)
 
+	waitClose := true
 	nr, err := tlsConn.Read(buf)
 	if err != nil {
-		h.logger.Errorf("error reading from stream: " + err.Error())
-		return
+		// optimize for closing of initial TLS conn
+		if err == io.EOF {
+			waitClose = false
+		} else {
+			h.logger.Errorf("error reading from stream: " + err.Error())
+			return
+		}
 	}
 	msg, err := messages.Unpack(buf[:nr])
 	if err != nil {
@@ -72,14 +81,30 @@ func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
 	case *messages.AuthControl:
 		go h.http2SessionHandler(tlsConn)
 	case *messages.AuthTunnel:
+		h.sl.RLock()
 		if sess, ok := h.sessions[m.ClientID]; !ok {
 			h.logger.Error("New tunnel conn not associated with any session. Closing")
 			tlsConn.Close()
+			h.sl.RUnlock()
 		} else {
+			h.sl.RUnlock()
 			// open a proxy conn on current session
 			h.logger.Debugf("Adding New tunnel conn to session: %s", sess.ID())
 			http2Sess := sess.(*session.HTTP2Session)
 
+			for waitClose {
+				if _, err := tlsConn.Read(buf); err != nil {
+					if err != io.EOF {
+						h.logger.Errorf("Failed to get TLS Closed: %s", err.Error())
+						return
+					}
+					waitClose = false
+				}
+			}
+
+			if err := tlsConn.CloseWrite(); err != nil {
+				h.logger.Errorf("failed to close tls conn: %s", err.Error())
+			}
 			alpnConn, err := h.http2ALPNTLSWrap(conn)
 			if err != nil {
 				h.logger.Errorf("Couldn't establish ALPN connection")
@@ -111,6 +136,8 @@ func (h *HTTP2Handler) http2ALPNTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
 
 // Close closes all sessions handled by HTTP2Handler
 func (h *HTTP2Handler) Close() {
+	h.sl.Lock()
+	defer h.sl.Unlock()
 	for _, sess := range h.sessions {
 		sess.Close()
 		delete(h.sessions, sess.ID())
@@ -131,7 +158,9 @@ func (h *HTTP2Handler) http2SessionHandler(conn net.Conn) {
 		h.logger.WithField("client_addr", conn.RemoteAddr().String()).Errorln("error creating a session:", err)
 		return
 	}
+	h.sl.Lock()
 	h.sessions[sess.ID()] = sess
+	h.sl.Unlock()
 
 	if err := sess.RequireStream(); err != nil {
 		h.logger.WithField("client_addr", conn.RemoteAddr().String()).Errorln("error getting a stream:", err)
@@ -167,5 +196,7 @@ func (h *HTTP2Handler) http2SessionHandler(conn net.Conn) {
 
 func (h *HTTP2Handler) closeSession(sess session.Session) {
 	sess.Close()
+	h.sl.Lock()
 	delete(h.sessions, sess.ID())
+	h.sl.Unlock()
 }

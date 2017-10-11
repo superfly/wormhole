@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 
 	"fmt"
+	"io"
 	"net"
 	_ "net/http"
 	_ "net/http/httptest"
@@ -227,12 +228,10 @@ func TestWrapsTLSOnServe(t *testing.T) {
 
 func wrapClientConn(cConn *net.TCPConn, tlsConf *tls.Config, alpn bool) (*tls.Conn, error) {
 
-	if alpn {
-		tlsConf = tlsConf.Clone()
-		// TODO: append here
-		tlsConf.NextProtos = []string{http2.NextProtoTLS}
-
-	}
+	tlsConf = tlsConf.Clone()
+	// TODO: append here
+	tlsConf.NextProtos = []string{http2.NextProtoTLS}
+	tlsConf.MinVersion = tls.VersionTLS12
 
 	var tlsClientConn *tls.Conn
 
@@ -331,7 +330,13 @@ func TestCreatesFullSession(t *testing.T) {
 	_, err = tlsCTunnelConn.Write(authTunData)
 	assert.NoError(t, err, "Should have no error writing to tunnel conn")
 
-	cTunnelConn.SetDeadline(time.Now().Add(time.Second * 15))
+	err = tlsCTunnelConn.CloseWrite()
+	assert.NoError(t, err, "Should have no error closing tunnel conn")
+
+	for err == nil {
+		_, err = tlsCTunnelConn.Read(tunData)
+	}
+	assert.Equal(t, err, io.EOF, "Read closing should establish EOF close-notify")
 
 	alpnTunnelConn, err := wrapClientConn(cTunnelConn, clientTLSConfig, true)
 

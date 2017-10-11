@@ -92,6 +92,11 @@ if [ -z "$BUILD_UPLOAD" ] || [ "$BUILD_UPLOAD" == "false" ]; then
   exit 0
 fi
 
+if [ "$TRAVIS_SECURE_ENV_VARS" == "false" ]; then
+  echo "Untrusted source. Not going to upload binaries."
+  exit 0
+fi
+
 if [ "$CHANNEL" == "stable" ]; then
   GHR='./github-release'
 
