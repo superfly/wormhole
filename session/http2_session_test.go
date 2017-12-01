@@ -69,7 +69,7 @@ func TestMain(m *testing.M) {
 
 	if err := pool.Retry(func() error {
 		var err error
-		c, err := redis.DialURL(fmt.Sprintf("redis://localhost:%s", redisResource.GetPort("6379/tcp")))
+		c, err := redis.DialURL(fmt.Sprintf("redis://127.0.0.1:%s", redisResource.GetPort("6379/tcp")))
 		if err != nil {
 			return err
 		}
