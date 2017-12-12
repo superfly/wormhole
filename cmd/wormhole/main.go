@@ -66,7 +66,7 @@ Modes
       wormhole bundle exec rails server -p 3000
 
       # Go, setting a full endpoint
-      export FLY_ENDPOINT=127.0.0.1:3000 # Defaults to: 127.0.0.1:5000
+      export FLY_LOCAL_ENDPOINT=127.0.0.1:3000 # Defaults to: 127.0.0.1:5000
       wormhole path/to/app
 
   Sidecar
@@ -84,7 +84,7 @@ Modes
       wormhole
 
       # Setting a full endpoint
-      export FLY_ENDPOINT=127.0.0.1:3000 # Defaults to: 127.0.0.1:5000
+      export FLY_LOCAL_ENDPOINT=127.0.0.1:3000 # Defaults to: 127.0.0.1:5000
       wormhole
 
 Other commands
