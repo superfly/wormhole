@@ -18,9 +18,9 @@ fi
 
 export FLY_PROTO=ssh
 export FLY_LOG_LEVEL=debug
-export FLY_REDIS_URL=redis://localhost:6379
-export FLY_CLUSTER_URL=localhost
-export FLY_LOCALHOST=localhost
+export FLY_REDIS_URL=redis://127.0.0.1:6379
+export FLY_CLUSTER_URL=127.0.0.1
+export FLY_LOCALHOST=127.0.0.1
 export FLY_TLS_CERT_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts/cert.pem
 export FLY_TLS_PRIVATE_KEY_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts/key.pem
 

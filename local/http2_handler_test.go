@@ -97,17 +97,17 @@ func TestNewHTTP2Handler(t *testing.T) {
 	assert.NoError(t, err, "Should be no error creating new handler")
 
 	controlHandler := &HTTP2Handler{
-		RemoteEndpoint: testRemoteListener.Addr().String(),
-		FlyToken:       "test_token",
-		Version:        "test_version",
-		LocalEndpoint:  httpTestServer.Listener.Addr().String(),
-		tlsConfig:      testTLSClientConfig,
+		RemoteEndpoint:  testRemoteListener.Addr().String(),
+		FlyToken:        "test_token",
+		Version:         "test_version",
+		LocalEndpoint:   httpTestServer.Listener.Addr().String(),
+		remoteTLSConfig: testTLSClientConfig,
 	}
 
 	assert.Equal(t, expHandler.RemoteEndpoint, controlHandler.RemoteEndpoint, "Remote endpoints should match")
 	assert.Equal(t, expHandler.LocalEndpoint, controlHandler.LocalEndpoint, "Local endpoints should match")
 	assert.Equal(t, expHandler.Version, controlHandler.Version, "Versions should match")
-	assert.EqualValues(t, expHandler.tlsConfig, controlHandler.tlsConfig, "TLS Configs should match")
+	assert.EqualValues(t, expHandler.remoteTLSConfig, controlHandler.remoteTLSConfig, "TLS Configs should match")
 }
 
 func newTestHTTP2Handler() (*HTTP2Handler, error) {

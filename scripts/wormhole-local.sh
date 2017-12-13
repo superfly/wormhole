@@ -21,17 +21,19 @@ dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
 # wormhole client defaults
 export FLY_PROTO=ssh
+export FLY_LOCAL_ENDPOINT_USE_TLS=1
+export FLY_LOCAL_ENDPOINT_INSECURE_SKIP_VERIFY=1
 export FLY_LOG_LEVEL=debug
-export FLY_REMOTE_ENDPOINT=localhost:10000
+export FLY_REMOTE_ENDPOINT=127.0.0.1:10000
 export FLY_TLS_CERT_FILE=$dir/cert.pem
 
 
 LOCAL_SERVER_CMD=\
 "go run $GOPATH/src/github.com/valyala/fasthttp/examples/fileserver/fileserver.go"\
-" -addrTLS localhost:$TLS_PORT"\
+" -addrTLS 127.0.0.1:$TLS_PORT"\
 " -certFile=$dir/cert.pem"\
 " -keyFile=$dir/key.pem"\
-" -addr localhost:$PORT"\
+" -addr 127.0.0.1:$PORT"\
 " -dir $dir"
 
 echo "LOCAL CMD: $LOCAL_SERVER_CMD"
@@ -48,7 +50,7 @@ register_client() {
 spawn_wormhole() {
   token=$1
 
-  FLY_TOKEN=$token FLY_PORT=$PORT $GOPATH/src/github.com/superfly/wormhole/bin/wormhole &
+  FLY_TOKEN=$token FLY_PORT=$TLS_PORT $GOPATH/src/github.com/superfly/wormhole/bin/wormhole &
   CHILD_PIDS+=("$!")
   echo "DONE (PID: $!)"
 }

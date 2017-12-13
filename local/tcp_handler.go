@@ -23,18 +23,19 @@ const (
 // TCPHandler type represents the handler that opens a TCP conn to wormhole server and serves
 // incoming requests
 type TCPHandler struct {
-	RemoteEndpoint string
-	LocalEndpoint  string
-	FlyToken       string
-	Release        *messages.Release
-	Version        string
-	ln             net.Listener
-	control        net.Conn
-	conns          []net.Conn
-	encrypted      bool
-	tlsConfig      *tls.Config
-	lastPongAt     int64
-	logger         *logrus.Entry
+	RemoteEndpoint         string
+	LocalEndpoint          string
+	FlyToken               string
+	Release                *messages.Release
+	Version                string
+	ln                     net.Listener
+	control                net.Conn
+	conns                  []net.Conn
+	encrypted              bool
+	remoteTLSConfig        *tls.Config
+	localEndpointTLSConfig *tls.Config
+	lastPongAt             int64
+	logger                 *logrus.Entry
 }
 
 // NewTCPHandler returns a TCPHandler struct
@@ -48,13 +49,31 @@ func NewTCPHandler(cfg *config.ClientConfig, release *messages.Release) (*TCPHan
 		Version:        cfg.Version,
 		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
+
+	if cfg.LocalEndpointUseTLS {
+		h.localEndpointTLSConfig = &tls.Config{
+			InsecureSkipVerify: cfg.LocalEndpointInsecureSkipVerify,
+		}
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, err
+		}
+		if len(cfg.LocalEndpointCACert) != 0 {
+			ok := rootCAs.AppendCertsFromPEM(cfg.LocalEndpointCACert)
+			if !ok {
+				return nil, fmt.Errorf("couln't append a root CA")
+			}
+		}
+		h.localEndpointTLSConfig.RootCAs = rootCAs
+	}
+
 	if !cfg.Insecure {
 		rootCAs := x509.NewCertPool()
 		ok := rootCAs.AppendCertsFromPEM(cfg.TLSCert)
 		if !ok {
 			return nil, fmt.Errorf("couln't append a root CA: ")
 		}
-		h.tlsConfig = &tls.Config{RootCAs: rootCAs}
+		h.remoteTLSConfig = &tls.Config{RootCAs: rootCAs}
 	}
 	return h, nil
 }
@@ -145,8 +164,8 @@ func (s *TCPHandler) Close() error {
 func (s *TCPHandler) dial() (conn net.Conn, err error) {
 	// TCP into wormhole server
 
-	if s.tlsConfig != nil {
-		conn, err = tls.Dial("tcp", s.RemoteEndpoint, s.tlsConfig)
+	if s.remoteTLSConfig != nil {
+		conn, err = tls.Dial("tcp", s.RemoteEndpoint, s.remoteTLSConfig)
 	} else {
 		conn, err = net.Dial("tcp", s.RemoteEndpoint)
 	}
@@ -203,7 +222,14 @@ func (s *TCPHandler) heartbeat() {
 func (s *TCPHandler) forwardConnection(tunnel net.Conn, local string) {
 	s.logger.Debugf("Accepted TCP session on %s", tunnel.RemoteAddr())
 
-	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
+	var localConn net.Conn
+	var err error
+	if s.localEndpointTLSConfig != nil {
+		dialer := &net.Dialer{Timeout: localConnTimeout}
+		localConn, err = tls.DialWithDialer(dialer, "tcp", local, s.localEndpointTLSConfig)
+	} else {
+		localConn, err = net.DialTimeout("tcp", local, localConnTimeout)
+	}
 	if err != nil {
 		s.logger.Errorf("Failed to reach local server: %s", err.Error())
 	}

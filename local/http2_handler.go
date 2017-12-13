@@ -21,20 +21,21 @@ import (
 // HTTP2Handler type represents the handler that opens a TCP conn to wormhole server and serves
 // incoming requests
 type HTTP2Handler struct {
-	RemoteEndpoint string
-	LocalEndpoint  string
-	FlyToken       string
-	Release        *messages.Release
-	Version        string
-	ln             net.Listener
-	control        net.Conn
-	conns          []net.Conn
-	server         *http2.Server
-	transport      *http2.Transport
-	fClient        *http.Client
-	tlsConfig      *tls.Config
-	lastPongAt     int64
-	logger         *logrus.Entry
+	RemoteEndpoint         string
+	LocalEndpoint          string
+	FlyToken               string
+	Release                *messages.Release
+	Version                string
+	ln                     net.Listener
+	control                net.Conn
+	conns                  []net.Conn
+	server                 *http2.Server
+	fClient                *http.Client
+	remoteTLSConfig        *tls.Config
+	localEndpointTLSConfig *tls.Config
+	lastPongAt             int64
+	logger                 *logrus.Entry
+	localEndpointTLS       bool
 }
 
 // NewHTTP2Handler returns a HTTP2Handler struct with TLS encryption
@@ -42,7 +43,7 @@ func NewHTTP2Handler(cfg *config.ClientConfig, release *messages.Release) (*HTTP
 	rootCAs := x509.NewCertPool()
 	ok := rootCAs.AppendCertsFromPEM(cfg.TLSCert)
 	if !ok {
-		return nil, fmt.Errorf("couln't append a root CA")
+		return nil, fmt.Errorf("couldn't append a root CA")
 	}
 
 	tlsHost, _, err := net.SplitHostPort(cfg.RemoteEndpoint)
@@ -50,17 +51,39 @@ func NewHTTP2Handler(cfg *config.ClientConfig, release *messages.Release) (*HTTP
 		return nil, err
 	}
 
+	t := http.DefaultTransport.(*http.Transport)
+
+	if cfg.LocalEndpointUseTLS {
+		t.TLSClientConfig = &tls.Config{
+			InsecureSkipVerify: cfg.LocalEndpointInsecureSkipVerify,
+		}
+
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, err
+		}
+		if len(cfg.LocalEndpointCACert) != 0 {
+			ok := rootCAs.AppendCertsFromPEM(cfg.LocalEndpointCACert)
+			if !ok {
+				return nil, fmt.Errorf("couln't append a root CA")
+			}
+		}
+		t.TLSClientConfig.RootCAs = rootCAs
+	}
+
+	client := &http.Client{Transport: t}
+
 	h := &HTTP2Handler{
-		FlyToken:       cfg.Token,
-		RemoteEndpoint: cfg.RemoteEndpoint,
-		LocalEndpoint:  cfg.LocalEndpoint,
-		Release:        release,
-		Version:        cfg.Version,
-		tlsConfig:      &tls.Config{RootCAs: rootCAs, ServerName: tlsHost},
-		server:         &http2.Server{},
-		transport:      &http2.Transport{},
-		fClient:        &http.Client{},
-		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "HTTP2Handler"}),
+		FlyToken:         cfg.Token,
+		RemoteEndpoint:   cfg.RemoteEndpoint,
+		LocalEndpoint:    cfg.LocalEndpoint,
+		Release:          release,
+		Version:          cfg.Version,
+		remoteTLSConfig:  &tls.Config{RootCAs: rootCAs, ServerName: tlsHost},
+		server:           &http2.Server{},
+		fClient:          client,
+		logger:           cfg.Logger.WithFields(logrus.Fields{"prefix": "HTTP2Handler"}),
+		localEndpointTLS: cfg.LocalEndpointUseTLS,
 	}
 
 	return h, nil
@@ -162,8 +185,11 @@ func (s *HTTP2Handler) ListenAndServe() error {
 
 func (s *HTTP2Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	r.URL.Host = s.LocalEndpoint
-	// TODO: Figure out support for https
-	r.URL.Scheme = "http"
+	if s.localEndpointTLS {
+		r.URL.Scheme = "https"
+	} else {
+		r.URL.Scheme = "http"
+	}
 	r.Host = s.LocalEndpoint
 	r.RequestURI = ""
 
@@ -241,7 +267,7 @@ func (s *HTTP2Handler) dialControl() (net.Conn, error) {
 }
 
 func (s *HTTP2Handler) genericTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
-	return wnet.GenericTLSWrap(conn, s.tlsConfig, tls.Client)
+	return wnet.GenericTLSWrap(conn, s.remoteTLSConfig, tls.Client)
 }
 
 // This wrapper fulfills the requirement for specifying the 'h2' ALPN TLS negotiation for
@@ -252,7 +278,7 @@ func (s *HTTP2Handler) genericTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
 // this breaks the http/2 spec. The goal here is to follow the RFC to the letter
 // as documented in http://httpwg.org/specs/rfc7540.html#starting
 func (s *HTTP2Handler) http2ALPNTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
-	return wnet.HTTP2ALPNTLSWrap(conn, s.tlsConfig, tls.Client)
+	return wnet.HTTP2ALPNTLSWrap(conn, s.remoteTLSConfig, tls.Client)
 }
 
 func (s *HTTP2Handler) heartbeat() {

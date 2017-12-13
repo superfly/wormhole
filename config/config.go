@@ -72,19 +72,21 @@ type Config struct {
 	// for client this means the hostname or IP address of the local server
 	Localhost string
 
-	// TLS cert is used when TLS conn pool is used as transportation layer
+	// TLSCert is used when TLS conn pool is used as transportation layer
 	// Server also needs TLSPrivateKey
 	// Client should only need a cert if the cert is not verifiable using system Root CAs
+	// Note: this is only for use with conns between wh-server <-> wh-client
 	TLSCert []byte
+
+	// Insecure allows one not to use tls for handlers which support it
+	// this is only for use with wh-server <-> wh-client conns
+	Insecure bool
 
 	// Logging level
 	LogLevel string
 
 	// Logger instance
 	Logger *logrus.Logger
-
-	// Insecure allows one not to use tls for handlers which support it
-	Insecure bool
 }
 
 // ServerConfig stores wormhole server parameters
@@ -263,6 +265,18 @@ type ClientConfig struct {
 	// <HOST>:<PORT> of the user's server (e.g. Rails server)
 	LocalEndpoint string
 
+	// LocalUseTLS allows us to specify whether to connect to local
+	// Note: this is for wh-client <-> local-endpoint only
+	LocalEndpointUseTLS bool
+
+	// LocalEndpointInsecureSkipVerify disables SSL cert verification for local endpoints
+	// Note: this is for wh-client <-> local-endpoint only
+	LocalEndpointInsecureSkipVerify bool
+
+	// LocalCACert is the data for a CACert to verify the local endpoint
+	// Note: this is for wh-client <-> local-endpoint only
+	LocalEndpointCACert []byte
+
 	// <HOST>:<PORT> of the wormhole server
 	RemoteEndpoint string
 
@@ -327,13 +341,25 @@ func NewClientConfig() (*ClientConfig, error) {
 	}
 
 	cfg := &ClientConfig{
-		LocalEndpoint:  viper.GetString("local_endpoint"),
-		RemoteEndpoint: viper.GetString("remote_endpoint"),
-		Token:          viper.GetString("token"),
-		ReleaseID:      os.Getenv(viper.GetString("release_id_var")),
-		ReleaseBranch:  os.Getenv(viper.GetString("release_branch_var")),
-		ReleaseDesc:    os.Getenv(viper.GetString("release_desc_var")),
-		Config:         shared,
+		LocalEndpoint:                   viper.GetString("local_endpoint"),
+		LocalEndpointUseTLS:             viper.GetBool("local_endpoint_use_tls"),
+		LocalEndpointInsecureSkipVerify: viper.GetBool("local_endpoint_insecure_skip_verify"),
+		RemoteEndpoint:                  viper.GetString("remote_endpoint"),
+		Token:                           viper.GetString("token"),
+		ReleaseID:                       os.Getenv(viper.GetString("release_id_var")),
+		ReleaseBranch:                   os.Getenv(viper.GetString("release_branch_var")),
+		ReleaseDesc:                     os.Getenv(viper.GetString("release_desc_var")),
+		Config:                          shared,
+	}
+
+	if cfg.LocalEndpointUseTLS {
+		if !cfg.LocalEndpointInsecureSkipVerify {
+			caCert, err := ioutil.ReadFile(viper.GetString("local_endpoint_ca_cert_file"))
+			if err != nil {
+				return nil, cfgErr(unsetEnvStr, "FLY_LOCAL_ENDPOINT_CA_CERT_FILE")
+			}
+			cfg.LocalEndpointCACert = caCert
+		}
 	}
 
 	if err := cfg.validate(); err != nil {
@@ -361,6 +387,12 @@ func (cfg *ClientConfig) validate() error {
 			return cfgErr(invalidStr, "FLY_TLS_CERT_KEY_FILE")
 		}
 
+	}
+
+	if cfg.LocalEndpointUseTLS {
+		if !cfg.LocalEndpointInsecureSkipVerify && len(cfg.LocalEndpointCACert) == 0 {
+			return cfgErr(invalidStr, "FLY_LOCAL_ENDPOINT_CA_CERT")
+		}
 	}
 
 	if len(cfg.Port) == 0 {
