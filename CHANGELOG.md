@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ### Fixed
 * Race condition with session access in remote/http2 (#26)
+* Errant `FLY_ENDPOINT` references in usage output
 
 
 ## [0.5.36] - 2017-10-09
