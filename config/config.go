@@ -60,13 +60,16 @@ type Config struct {
 	// e.g. SSH tunneling, TLS conn pool, etc.
 	Protocol TunnelProto
 
+	// Port...
 	// for server this means its listening port
 	// for client this means listening port of the local server
 	Port string
 
+	// Version...
 	// wormhole's version
 	Version string
 
+	// Localhost...
 	// for server this means hostname or IP address of the host/container running
 	// a particular server instance
 	// for client this means the hostname or IP address of the local server
@@ -82,7 +85,7 @@ type Config struct {
 	// this is only for use with wh-server <-> wh-client conns
 	Insecure bool
 
-	// Logging level
+	// LogLevel represents which level we should log eg: info, debug ...
 	LogLevel string
 
 	// Logger instance
@@ -93,30 +96,30 @@ type Config struct {
 type ServerConfig struct {
 	Config
 
-	// cluster identifier of wormhole servers
+	// ClusterURL identifies of wormhole servers
 	// used as metadata for session storage
 	ClusterURL string
 
-	// URL of Redis instance
+	// RedisURL is url of Redis instance
 	// Redis powers the session storage
 	RedisURL string
 
-	// ID of the wormhole server
+	// NodeID of the wormhole server
 	// used as metadata for session storage
 	NodeID string
 
-	// SSH private key is used by the server when SSH tunneling is used
+	// SSHPrivateKey is used by the server when SSH tunneling is used
 	// as transportation layer
 	SSHPrivateKey []byte
 
-	// TLS Private key is used by the server when TLS conn pool is used
+	// TLSPrivatekey is used by the server when TLS conn pool is used
 	// as transportation layer
 	TLSPrivateKey []byte
 
-	// API token for error reporting to Bugsnag
+	// BugsnagAPIKey is token for error reporting to Bugsnag
 	BugsnagAPIKey string
 
-	// Port used by HTTP server to serve metrics
+	// MetricsAPIPort used by HTTP server to serve metrics
 	// Used by Prometheus to scrape wormhole server endpoint
 	MetricsAPIPort string
 }
@@ -262,10 +265,10 @@ func (cfg *ServerConfig) validate() error {
 type ClientConfig struct {
 	Config
 
-	// <HOST>:<PORT> of the user's server (e.g. Rails server)
+	// LocalEndpoint <HOST>:<PORT> of the user's server (e.g. Rails server)
 	LocalEndpoint string
 
-	// LocalUseTLS allows us to specify whether to connect to local
+	// LocalEndpointUseTLS allows us to specify whether to connect to local
 	// Note: this is for wh-client <-> local-endpoint only
 	LocalEndpointUseTLS bool
 
@@ -273,24 +276,27 @@ type ClientConfig struct {
 	// Note: this is for wh-client <-> local-endpoint only
 	LocalEndpointInsecureSkipVerify bool
 
-	// LocalCACert is the data for a CACert to verify the local endpoint
+	// LocalEndpointCACert is the data for a CACert to verify the local endpoint
 	// Note: this is for wh-client <-> local-endpoint only
 	LocalEndpointCACert []byte
 
-	// <HOST>:<PORT> of the wormhole server
+	// RemoteEndpoint <HOST>:<PORT> of the wormhole server
 	RemoteEndpoint string
 
-	// Authentication token when connecting to wormhole server
+	// Token for auth when connecting to wormhole server
 	Token string
 
+	// ReleaseID...
 	// when set this will override the default VCS ID (i.e. git commit SHA1)
 	// defaults to FLY_RELASE_ID (but can be overridden with FLY_RELEASE_ID_VAR to point ot a different ENV)
 	ReleaseID string
 
+	// ReleaseDesc...
 	// when set this will override the default VCS message (i.e. git commit message)
 	// defaults to FLY_RELASE_DESC (but can be overridden with FLY_RELEASE_DESC_VAR to point ot a different ENV)
 	ReleaseDesc string
 
+	// ReleaseBranch...
 	// when set this will override the default VCS branch
 	// defaults to FLY_RELASE_BRANCH (but can be overridden with FLY_RELEASE_BRANCH_VAR to point ot a different ENV)
 	ReleaseBranch string
