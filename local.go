@@ -33,7 +33,10 @@ func StartLocal(cfg *config.ClientConfig) {
 
 	switch cfg.Protocol {
 	case config.SSH:
-		handler = local.NewSSHHandler(cfg, release)
+		handler, err = local.NewSSHHandler(cfg, release)
+		if err != nil {
+			log.Fatal(err)
+		}
 	case config.TCP:
 		handler, err = local.NewTCPHandler(cfg, release)
 		if err != nil {

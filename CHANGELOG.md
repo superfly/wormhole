@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ## [Unreleased]
 ### Added
 
+* Can now connect to local endpoints via TLS
+
 ### Fixed
 * Race condition with session access in remote/http2 (#26)
 * Errant `FLY_ENDPOINT` references in usage output

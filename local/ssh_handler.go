@@ -1,6 +1,8 @@
 package local
 
 import (
+	"crypto/tls"
+	"crypto/x509"
 	"fmt"
 	"io"
 	"net"
@@ -28,29 +30,49 @@ const (
 // SSHHandler type represents the handler that SSHs to wormhole server and serves
 // incoming requests
 type SSHHandler struct {
-	RemoteEndpoint       string
-	LocalEndpoint        string
-	FlyToken             string
-	Release              *messages.Release
-	Version              string
-	ssh                  *ssh.Client
-	ln                   net.Listener
-	shutdown             *utils.Shutdown
-	logger               *logrus.Entry
-	lastKeepaliveReplyAt int64
+	RemoteEndpoint         string
+	LocalEndpoint          string
+	FlyToken               string
+	Release                *messages.Release
+	Version                string
+	ssh                    *ssh.Client
+	ln                     net.Listener
+	shutdown               *utils.Shutdown
+	logger                 *logrus.Entry
+	lastKeepaliveReplyAt   int64
+	localEndpointTLSConfig *tls.Config
 }
 
 // NewSSHHandler initializes SSHHandler
-func NewSSHHandler(cfg *config.ClientConfig, release *messages.Release) ConnectionHandler {
-	return &SSHHandler{
-		FlyToken:       cfg.Token,
-		RemoteEndpoint: cfg.RemoteEndpoint,
-		LocalEndpoint:  cfg.LocalEndpoint,
-		Release:        release,
-		Version:        cfg.Version,
-		shutdown:       utils.NewShutdown(),
-		logger:         cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
+func NewSSHHandler(cfg *config.ClientConfig, release *messages.Release) (ConnectionHandler, error) {
+	var localTLSConfig *tls.Config
+	if cfg.LocalEndpointUseTLS {
+		localTLSConfig = &tls.Config{
+			InsecureSkipVerify: cfg.LocalEndpointInsecureSkipVerify,
+		}
+		rootCAs, err := x509.SystemCertPool()
+		if err != nil {
+			return nil, err
+		}
+		if len(cfg.LocalEndpointCACert) != 0 {
+			ok := rootCAs.AppendCertsFromPEM(cfg.LocalEndpointCACert)
+			if !ok {
+				return nil, fmt.Errorf("couln't append a root CA")
+			}
+		}
+		localTLSConfig.RootCAs = rootCAs
 	}
+
+	return &SSHHandler{
+		FlyToken:               cfg.Token,
+		RemoteEndpoint:         cfg.RemoteEndpoint,
+		LocalEndpoint:          cfg.LocalEndpoint,
+		Release:                release,
+		Version:                cfg.Version,
+		shutdown:               utils.NewShutdown(),
+		logger:                 cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
+		localEndpointTLSConfig: localTLSConfig,
+	}, nil
 }
 
 // ListenAndServe accepts requests coming from wormhole server
@@ -141,7 +163,14 @@ func (s *SSHHandler) dial() (*ssh.Client, net.Listener, error) {
 func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
 	s.logger.Debugf("Accepted SSH session on %s", conn.RemoteAddr())
 
-	localConn, err := net.DialTimeout("tcp", local, localConnTimeout)
+	var localConn net.Conn
+	var err error
+	if s.localEndpointTLSConfig == nil {
+		localConn, err = net.DialTimeout("tcp", local, localConnTimeout)
+	} else {
+		dialer := &net.Dialer{Timeout: localConnTimeout}
+		localConn, err = tls.DialWithDialer(dialer, "tcp", local, s.localEndpointTLSConfig)
+	}
 	if err != nil {
 		s.shutdown.Begin(fmt.Errorf("Failed to reach local server: %s", err.Error()))
 		return
