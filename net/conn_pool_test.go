@@ -12,12 +12,7 @@ import (
 
 type testConnPoolObj struct {
 	canContinue bool
-	shouldQueue bool
 	sync.Mutex
-}
-
-func (c *testConnPoolObj) ShouldQueue() bool {
-	return c.shouldQueue
 }
 
 func (c *testConnPoolObj) Close() error {
@@ -28,7 +23,7 @@ func (c *testConnPoolObj) ShouldDelete() bool {
 	return !c.canContinue
 }
 
-func newBaseConnPool(initial []ConnPoolObject, max int) (ConnPool, error) {
+func newBaseConnPool(initial []ConnPoolObject, max int64) (ConnPool, error) {
 	logger := logrus.WithFields(logrus.Fields{"scope": "testing"})
 	return NewConnPool(logger, max, initial)
 }
@@ -39,14 +34,17 @@ func TestInsert(t *testing.T) {
 
 	obj := &testConnPoolObj{
 		canContinue: true,
-		shouldQueue: true,
 	}
 	ok, err := pool.Insert(obj)
 	assert.True(t, ok, "Should have room in pool")
 	assert.NoError(t, err, "Should have no error inserting into pool")
 
 	objSame := pool.Get()
-	assert.Equal(t, obj, objSame, "With just one object in pool we should have only one come back")
+	assert.Equal(t, obj, objSame.ConnPoolObject(), "With just one object in pool we should have only one come back")
+	objSame.Done()
+
+	objSame = pool.Get()
+	assert.Equal(t, obj, objSame.ConnPoolObject(), "When we are done with a val it should get queued again on the loopback")
 }
 
 func TestInsertMulti(t *testing.T) {
@@ -56,7 +54,6 @@ func TestInsertMulti(t *testing.T) {
 
 	obj1 := &testConnPoolObj{
 		canContinue: true,
-		shouldQueue: true,
 	}
 	logger.Info("Insert 1")
 	ok, err := pool.Insert(obj1)
@@ -65,7 +62,6 @@ func TestInsertMulti(t *testing.T) {
 
 	obj2 := &testConnPoolObj{
 		canContinue: true,
-		shouldQueue: true,
 	}
 	logger.Info("Insert 2")
 	ok, err = pool.Insert(obj2)
@@ -80,16 +76,7 @@ func TestInsertMulti(t *testing.T) {
 	logger.Info("Get 2")
 	objGet2 := pool.Get()
 
-	logger.Info("Get 3")
-	objGet3 := pool.Get()
+	assert.True(t, objGet1.ConnPoolObject() == obj1 || objGet1.ConnPoolObject() == obj2, "Everything we get should be in the set we inserted-1")
+	assert.True(t, objGet2.ConnPoolObject() == obj1 || objGet2.ConnPoolObject() == obj2, "Everything we get should be in the set we inserted-2")
 
-	logger.Info("Get 4")
-	objGet4 := pool.Get()
-
-	assert.True(t, objGet1 == obj1 || objGet1 == obj2, "Everything we get should be in the set we inserted-1")
-	assert.True(t, objGet2 == obj1 || objGet2 == obj2, "Everything we get should be in the set we inserted-2")
-	assert.True(t, objGet3 == obj1 || objGet3 == obj2, "Everything we get should be in the set we inserted-3")
-	assert.True(t, objGet4 == obj1 || objGet4 == obj2, "Everything we get should be in the set we inserted-4")
-
-	assert.True(t, objGet1 != objGet2 || objGet1 != objGet3 || objGet1 != objGet4, "Use demorgan's to test for set completeness")
 }

@@ -86,6 +86,8 @@ type http2Tunnel struct {
 	cc          *http2.ClientConn
 	cStreams    uint32
 	maxCStreams uint32
+
+	valC chan int
 }
 
 func (c *http2Tunnel) Close() error {
@@ -96,10 +98,8 @@ func (c *http2Tunnel) ShouldDelete() bool {
 	return !c.cc.CanTakeNewRequest()
 }
 
-func (c *http2Tunnel) ShouldQueue() bool {
-	cs := atomic.LoadUint32(&c.cStreams)
-
-	return cs <= c.maxCStreams
+func (c *http2Tunnel) Value() <-chan int {
+	return c.valC
 }
 
 func (c *http2Tunnel) incrementStreamCount() {
@@ -117,11 +117,17 @@ func (c *http2Tunnel) rewriteRequest(r *http.Request) {
 	r.RequestURI = ""
 }
 
+func (c *http2Tunnel) updateValue() {
+	c.valC <- int(atomic.LoadUint32(&c.cStreams))
+}
+
 func (c *http2Tunnel) RoundTrip(r *http.Request) (*http.Response, error) {
 	c.rewriteRequest(r)
 
 	c.incrementStreamCount()
 	defer c.decrementStreamCount()
+
+	go c.updateValue()
 
 	return c.cc.RoundTrip(r)
 }
@@ -138,8 +144,11 @@ func (s *HTTP2Session) AddTunnel(conn *tls.Conn) error {
 		cc:          cc,
 		cStreams:    0,
 		maxCStreams: 10,
+		valC:        make(chan int, 1),
 	}
 
+	// set initial value to 0
+	poolObj.valC <- 0
 	ok, err := s.conns.Insert(poolObj)
 	if err != nil {
 		return err
@@ -209,8 +218,9 @@ func (s *HTTP2Session) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var err error
 	for {
 		obj := s.conns.Get()
+		defer obj.Done()
 
-		conn, ok := obj.(*http2Tunnel)
+		conn, ok := obj.ConnPoolObject().(*http2Tunnel)
 		if !ok {
 			s.logger.Error("Got wrong object type from connection pool")
 			return

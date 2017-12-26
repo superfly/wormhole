@@ -1,31 +1,12 @@
 package net
 
 import (
+	"container/heap"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"sync"
 	"sync/atomic"
 )
-
-// connPool is designed to be a speedy connection pool
-// Extensive testing for race conditions is a priority.
-// DO NOT edit without updating or checking against existing tests
-type connPool struct {
-	currentConn *connNode
-	numConns    int64
-	maxConns    int
-
-	logger              *logrus.Entry
-	delConnCh           chan *connNode
-	goodConnCh          chan *connNode
-	insertedWhileNoneCh chan interface{}
-	waitingForConn      int32
-
-	// Can't use RWMutex because even when reading we are modifying the currentConn
-	// Due to this we will never defer, since this is critical path code. Make SURE you unlock
-	// at every exit point. And attempt to have as few exit points as possible
-	sync.Mutex
-}
 
 // ConnPoolObject represents an object to be handled by the connection pool
 // NOTE: All functions implemented must be concurrency safe!
@@ -34,16 +15,65 @@ type ConnPoolObject interface {
 	// and is called whenever an object has been queued for deletion
 	Close() error
 
-	// ShouldQueue indicates whether a ConnPoolObject should be queued in the connection pool
-	// An example here could be, if an conn-object can't be multiplexed, then return false
-	// whenever the object is in-use
-	// NOTE: ShouldQueue should resolve quickly, as it has the possibility to deadlock the queue
-	ShouldQueue() bool
-
 	// ShouldDelete indicates whether a ConnPoolObject should be deleted from the pool
 	// An example here would be if an http2 connection runs out of streams
 	// NOTE: ShouldDelete should resolve quickly, as it has the possibility to deadlock the queue
 	ShouldDelete() bool
+}
+
+// ConnPoolObjectCanMux is an optimization for connections with muxable connections
+// If used then they will be ordered by load value in a min-heap for extraction order
+type ConnPoolObjectCanMux interface {
+	ConnPoolObject
+	Value() <-chan int
+}
+
+// ConnPoolContext is what a ConnPool returns from a Get
+type ConnPoolContext interface {
+	ConnPoolObject() ConnPoolObject
+	// NumberOfUsers can be used in determining value for min heap
+	NumberOfUsers() int64
+	// Done reports to the ConnPool that you are done using this ConnPoolObject.
+	// This should be done after ALL operations against the object are resolved
+	Done()
+}
+
+// connNode is a circulary linked list of connection
+// instead of using an array where the earlier connections would
+// get much higher load, we'll just run around the loop, so we balance
+// in true round-robin fashion
+type connNode struct {
+	obj ConnPoolObject
+
+	numberUsers int64
+	loopback    chan<- *connNode
+
+	// only for use if obj is ConnPoolObjectCanMux
+	index int
+	value int
+
+	deleted uint32
+}
+
+func (cn *connNode) incrementUsers() int64 {
+	return atomic.AddInt64(&cn.numberUsers, 1)
+}
+
+func (cn *connNode) decrementUsers() int64 {
+	return atomic.AddInt64(&cn.numberUsers, -1)
+}
+
+func (cn *connNode) ConnPoolObject() ConnPoolObject {
+	return cn.obj
+}
+
+func (cn *connNode) NumberOfUsers() int64 {
+	return atomic.LoadInt64(&cn.numberUsers)
+}
+
+func (cn *connNode) Done() {
+	cn.decrementUsers()
+	cn.loopback <- cn
 }
 
 // ConnPool is a fast concurrency safe connection pool structure
@@ -51,19 +81,102 @@ type ConnPool interface {
 	// Insert returns a no error false case only when we try to insert
 	// beyond our max connections limit
 	Insert(ConnPoolObject) (bool, error)
-	Get() ConnPoolObject
+	Get() ConnPoolContext
+}
+
+// connPool is designed to be a speedy connection pool
+// Extensive testing for race conditions is a priority.
+// DO NOT edit without updating or checking against existing tests
+type connPool struct {
+	numConns        int64
+	numMuxableConns int64
+	maxConns        int64
+
+	logger           *logrus.Entry
+	delConnCh        chan *connNode
+	noActivityConnCh chan *connNode
+	loopbackConnCh   chan *connNode
+
+	muxHeap            muxableConnHeap
+	muxHeapEmptyMutex  sync.RWMutex // protects from reading 0 index
+	muxHeapChangeMutex sync.Mutex
+}
+
+type muxableConnHeap []*connNode
+
+func (mh muxableConnHeap) Len() int { return len(mh) }
+
+func (mh muxableConnHeap) Less(i, j int) bool {
+	return mh[i].value < mh[j].value
+}
+
+func (mh muxableConnHeap) Swap(i, j int) {
+	mh[i], mh[j] = mh[j], mh[i]
+	mh[i].index = i
+	mh[j].index = j
+}
+
+func (mh *muxableConnHeap) Push(x interface{}) {
+	n := len(*mh)
+	cn := x.(*connNode)
+	cn.index = n
+	*mh = append(*mh, cn)
+}
+
+func (mh *muxableConnHeap) Pop() interface{} {
+	old := *mh
+	n := len(old)
+	cn := old[n-1]
+	cn.index = -1 // for safety
+	*mh = old[0 : n-1]
+	return cn
+}
+
+func (pool *connPool) getMuxableConn() <-chan ConnPoolContext {
+	cc := make(chan ConnPoolContext)
+
+	go func(cc chan<- ConnPoolContext) {
+		pool.muxHeapEmptyMutex.RLock()
+		cn := pool.muxHeap[0]
+		pool.muxHeapEmptyMutex.RUnlock()
+		cc <- cn
+	}(cc)
+
+	return cc
+}
+
+func (pool *connPool) deleteMuxableConn(cn *connNode) {
+	// lets us lazily get min in getMuxableConn
+	// without risking index out of bound
+	if atomic.AddInt64(&pool.numMuxableConns, -1) == 0 {
+		pool.muxHeapEmptyMutex.Lock()
+	}
+
+	pool.muxHeapChangeMutex.Lock()
+	heap.Remove(&pool.muxHeap, cn.index)
+	pool.muxHeapChangeMutex.Unlock()
+}
+
+func (pool *connPool) addMuxableConn(cn *connNode) {
+	pool.muxHeapChangeMutex.Lock()
+	heap.Push(&pool.muxHeap, cn)
+	pool.muxHeapChangeMutex.Unlock()
+
+	if atomic.AddInt64(&pool.numMuxableConns, 1) == 1 {
+		pool.muxHeapEmptyMutex.Unlock()
+	}
 }
 
 // NewConnPool creates a new ConnPool
-func NewConnPool(logger *logrus.Entry, maxConns int, initialConns []ConnPoolObject) (ConnPool, error) {
+func NewConnPool(logger *logrus.Entry, maxConns int64, initialConns []ConnPoolObject) (ConnPool, error) {
 	pool := &connPool{
-		maxConns:            maxConns,
-		logger:              logger,
-		delConnCh:           make(chan *connNode, maxConns),
-		goodConnCh:          make(chan *connNode, maxConns),
-		insertedWhileNoneCh: make(chan interface{}),
-		waitingForConn:      0,
+		maxConns:         maxConns,
+		logger:           logger,
+		delConnCh:        make(chan *connNode, maxConns),
+		noActivityConnCh: make(chan *connNode, maxConns),
+		loopbackConnCh:   make(chan *connNode, maxConns),
 	}
+	pool.muxHeapEmptyMutex.Lock()
 
 	for _, conn := range initialConns {
 		ok, err := pool.Insert(conn)
@@ -75,23 +188,9 @@ func NewConnPool(logger *logrus.Entry, maxConns int, initialConns []ConnPoolObje
 		}
 	}
 
-	go pool.populateAvailable()
+	go pool.handleLoopback()
 	go pool.delLoop()
 	return pool, nil
-}
-
-// connNode is a circulary linked list of connection
-// instead of using an array where the earlier connections would
-// get much higher load, we'll just run around the loop, so we balance
-// in true round-robin fashion
-type connNode struct {
-	prev *connNode
-	next *connNode
-	obj  ConnPoolObject
-
-	// deleted is not updated concurrently
-	// safe to manipulate unlocked
-	deleted uint32
 }
 
 func (pool *connPool) delLoop() {
@@ -106,138 +205,106 @@ func (pool *connPool) delLoop() {
 }
 
 // delExistingConn deletes an connNode from the pool
-// to be called after all requests/streams have been resolved
-// or else the garbage collector could reap the connection before
-// all data has been transferred
 // the node MUST be in the list currently or be deleted
 // NOTE: this is only to be called from the delete chan loop
+// NOTE: this only really does anything when a node is muxable
 func (pool *connPool) delExistingConn(hc *connNode) {
-	pool.Lock()
-
-	// mark deleted in case
-	alreadyDeleted := !atomic.CompareAndSwapUint32(&hc.deleted, 0, 1)
-	if alreadyDeleted {
-		pool.Unlock()
-		pool.logger.Info("Caught multiple delete request")
-		return
-	}
-
-	if atomic.LoadInt64(&pool.numConns) == 1 {
-		if err := hc.obj.Close(); err != nil {
-			pool.logger.Errorf("Error cleaning up connection object: %v+", err)
+	// we only need to delete the conn if it was muxable
+	// otherwise it simply isn't round tripped from the loopback
+	// and is garbage collected
+	if _, ok := hc.obj.(ConnPoolObjectCanMux); ok {
+		alreadyDeleted := !atomic.CompareAndSwapUint32(&hc.deleted, 0, 1)
+		if alreadyDeleted {
+			pool.logger.Info("Caught multiple delete request")
+			return
 		}
-		pool.currentConn = nil
-		atomic.StoreInt64(&pool.numConns, 0)
+		pool.deleteMuxableConn(hc)
+	}
 
-		pool.Unlock()
-		return
-	}
-	if hc == pool.currentConn {
-		pool.currentConn = pool.currentConn.next
-	}
-	hc.prev.next = hc.next
-	hc.next.prev = hc.prev
+	// whether muxable or not we need to decrement the number of total conns
 	atomic.AddInt64(&pool.numConns, -1)
-
-	pool.Unlock()
-	return
 }
 
 // Insert adds a new conn to the end of the circulary linked list
 func (pool *connPool) Insert(obj ConnPoolObject) (bool, error) {
-	pool.Lock()
-	// don't defer here. Defer has perf implications and this is critical path
-
 	// don't insert a new connection when we've maxed out
-	if atomic.LoadInt64(&pool.numConns) >= int64(pool.maxConns) && pool.maxConns > 0 {
-		pool.Unlock()
+	if atomic.AddInt64(&pool.numConns, 1) > pool.maxConns {
+		// if we've overstepped then decrement and bail
+		atomic.AddInt64(&pool.numConns, -1)
 		return false, nil
 	}
 
 	newConn := &connNode{
-		obj: obj,
+		obj:      obj,
+		loopback: pool.loopbackConnCh,
 	}
 
-	if atomic.LoadInt64(&pool.numConns) == 0 {
-		newConn.next = newConn
-		newConn.prev = newConn
-		pool.currentConn = newConn
-		atomic.AddInt64(&pool.numConns, 1)
+	newConn.incrementUsers()
+	pool.noActivityConnCh <- newConn
 
-		if atomic.CompareAndSwapInt32(&pool.waitingForConn, 1, 0) {
-			pool.insertedWhileNoneCh <- struct{}{}
-		}
+	if mc, ok := obj.(ConnPoolObjectCanMux); ok {
+		// hack to get first value
+		valC := make(chan int)
+		go func(valC chan<- int, mc ConnPoolObjectCanMux) {
+			val := <-mc.Value()
+			valC <- val
+		}(valC, mc)
+		newConn.value = <-valC
 
-		pool.Unlock()
-		return true, nil
+		pool.addMuxableConn(newConn)
+		go pool.handleRevalue(newConn)
 	}
 
-	newConn.next = pool.currentConn
-	newConn.prev = pool.currentConn.prev
-	pool.currentConn.prev.next = newConn
-	pool.currentConn.prev = newConn
-	atomic.AddInt64(&pool.numConns, 1)
-
-	pool.Unlock()
 	return true, nil
 }
 
+func (pool *connPool) handleRevalue(c *connNode) error {
+	if mc, ok := c.obj.(ConnPoolObjectCanMux); ok {
+		for val := range mc.Value() {
+			pool.muxHeapChangeMutex.Lock()
+			c.value = val
+			heap.Fix(&pool.muxHeap, c.index)
+			pool.muxHeapChangeMutex.Unlock()
+		}
+	} else {
+		return errors.New("connNode does not represent a muxable conn")
+	}
+
+	return nil
+}
+
 // populateAvailable is a run loop which constantly updates the channel of
-// connections to be used
-func (pool *connPool) populateAvailable() {
-	for {
-
-		pool.Lock()
-
-		if pool.currentConn == nil {
-			// ensure the Insert knows we're waiting for a connection
-			atomic.StoreInt32(&pool.waitingForConn, 1)
-			pool.Unlock()
-
-			pool.logger.Warn("No connections in connection pool currently: waiting")
-
-			// wait for insertion
-			//<-pool.insertedWhileNoneCh
-			<-pool.insertedWhileNoneCh
-
-			pool.logger.Warn("No connections in connection pool currently: got new conn notification")
-			// TODO: add more connections in this case. Some sort of queue or signal system
-			continue
-		}
-
-		if pool.currentConn.obj.ShouldQueue() {
-			retConn := pool.currentConn
-
-			// iterate to next conn for next request
-			pool.currentConn = pool.currentConn.next
-
-			select {
-			case pool.goodConnCh <- retConn:
-			default:
+// non-active connections to be used
+func (pool *connPool) handleLoopback() {
+	for c := range pool.loopbackConnCh {
+		go func(c *connNode) {
+			if c.obj.ShouldDelete() {
+				pool.delConnCh <- c
+				return
 			}
-			pool.Unlock()
-			continue
-		} else if pool.currentConn.obj.ShouldDelete() {
-			// mark for deletion
-			// NOTE: Once a Connection can no longer take a new request
-			// it never will be able to again. Therefore a conn will always go down the delete
-			// chan. Repeats down the chan are handled in the del method
-			pool.delConnCh <- pool.currentConn
-			// after marking for deletion, move on to next connection
-			pool.currentConn = pool.currentConn.next
-		}
 
-		pool.Unlock()
+			if ok := atomic.CompareAndSwapInt64(&c.numberUsers, 0, 1); ok {
+				pool.noActivityConnCh <- c
+			}
+		}(c)
 	}
 }
 
 // Get returns a ConnPoolObject
 // TODO: Allow set timeout
-func (pool *connPool) Get() ConnPoolObject {
-	conn := <-pool.goodConnCh
-	for !conn.obj.ShouldQueue() {
-		// ensure state of conn hasn't changed before we return it
-		conn = <-pool.goodConnCh
+func (pool *connPool) Get() ConnPoolContext {
+	// since select chooses a chan at random when both are populated we want
+	// to prioritize the noActicityConnCh first
+	select {
+	case conn := <-pool.noActivityConnCh:
+		return conn
+	default:
 	}
-	return conn.obj
+
+	select {
+	case conn := <-pool.noActivityConnCh:
+		return conn
+	case conn := <-pool.getMuxableConn():
+		return conn
+	}
 }
