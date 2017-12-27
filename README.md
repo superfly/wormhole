@@ -32,3 +32,17 @@ Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 
     # The tunnel will be accessible on a randomly chosen port (look at wormhole-server logs):
     # [Feb 20 20:43:50]  INFO SSHHandler: Started session 29ff7b66abcc9871cdf1bc551f6e89728202f3e24e48675ecd9b8556a5dbd60b for Mats-MBP.local ([::1]:63169). Listening on: localhost:63170
+
+## Feature Status
+
+| Feature				| Status       |
+| :-----:				| :----:       |
+| SSH Tunnel				| Supported    |
+| TCP Tunnel				| Experimental - currently lacking some auth |
+| TLS Tunnel              		| Experimental - currently lacking some auth |
+| HTTP2 Tunnel            		| Experimental - currently lacking some auth |
+| Local Endpoint over TCP		| Supported |
+| Local Endpoint over TLS		| Supported |
+| Single Tunnel Type per WH Server 	| Supported    |
+| Multiple Tunnel Types per WH Server 	| Pending [#10](https://github.com/superfly/wormhole/issues/10) |
+| Healthcheck for Local Endpoint 	| Pending [#33](https://github.com/superfly/wormhole/issues/33) |
