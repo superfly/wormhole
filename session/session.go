@@ -16,7 +16,8 @@ type Session interface {
 	Client() string
 	ClientIP() string
 	Cluster() string
-	Endpoint() string
+	Endpoints() []net.Addr
+	AddEndpoint(endpoint net.Addr)
 	Key() string
 	Release() *messages.Release
 	RequireStream() error
@@ -25,13 +26,13 @@ type Session interface {
 }
 
 type baseSession struct {
-	id           string
-	agent        string
-	nodeID       string
-	backendID    string
-	clientAddr   string
-	EndpointAddr string
-	ClusterURL   string
+	id         string
+	agent      string
+	nodeID     string
+	backendID  string
+	clientAddr string
+	endpoints  []net.Addr
+	ClusterURL string
 
 	release *messages.Release
 	store   *RedisStore
@@ -67,8 +68,12 @@ func (s *baseSession) Cluster() string {
 	return s.ClusterURL
 }
 
-func (s *baseSession) Endpoint() string {
-	return s.EndpointAddr
+func (s *baseSession) Endpoints() []net.Addr {
+	return s.endpoints
+}
+
+func (s *baseSession) AddEndpoint(e net.Addr) {
+	s.endpoints = append(s.endpoints, e)
 }
 
 func (s *baseSession) Key() string {

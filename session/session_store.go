@@ -1,9 +1,11 @@
 package session
 
 import (
+	"net"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
+	wnet "github.com/superfly/wormhole/net"
 )
 
 const (
@@ -70,8 +72,10 @@ func (r *RedisStore) RegisterDisconnection(s Session) error {
 	redisConn.Send("ZREM", connectedSessionsKey, s.ID())
 	redisConn.Send("SREM", "node:"+s.NodeID()+":sessions", s.ID())
 	redisConn.Send("SREM", "backend:"+s.BackendID()+":sessions", s.ID())
-	redisConn.Send("SREM", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
-	redisConn.Send("DEL", "backend:"+s.BackendID()+":endpoint:"+s.Endpoint())
+	for _, endpointAddr := range s.Endpoints() {
+		redisConn.Send("SREM", "backend:"+s.BackendID()+":endpoints", redisEndpointString(endpointAddr))
+		redisConn.Send("DEL", "backend:"+s.BackendID()+":endpoint:"+redisEndpointString(endpointAddr))
+	}
 	redisConn.Send("EXPIRE", s.Key(), sessionTTL)
 	_, err := redisConn.Do("EXEC")
 	return err
@@ -85,18 +89,27 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 	defer redisConn.Close()
 
 	redisConn.Send("MULTI")
-	redisConn.Send("HSET", s.Key(), "endpoint_addr", s.Endpoint())
 	redisConn.Send("HSET", s.Key(), "cluster", s.Cluster())
-	redisConn.Send("SADD", "backend:"+s.BackendID()+":endpoints", s.Endpoint())
-	endpoint := map[string]string{
-		"session_id":   s.ID(),
-		"backend_id":   s.BackendID(),
-		"socket":       s.Endpoint(),
-		"cluster":      s.Cluster(),
-		"connected_at": t.String(),
-		"last_seen_at": t.String(),
+	for _, endpointAddr := range s.Endpoints() {
+		redisConn.Send("SADD", "backend:"+s.BackendID()+":endpoints", redisEndpointString(endpointAddr))
+		endpoint := map[string]string{
+			"session_id":   s.ID(),
+			"backend_id":   s.BackendID(),
+			"cluster":      s.Cluster(),
+			"connected_at": t.String(),
+			"last_seen_at": t.String(),
+		}
+
+		if extended, ok := endpointAddr.(wnet.ExtendedAddr); ok {
+			switch t := extended.Data().(type) {
+			case wnet.SharedTLSAddrExtendedData:
+				endpoint["ca_cert"] = string(t.CACert)
+			default:
+			}
+		}
+
+		redisConn.Send("HMSET", redis.Args{}.Add(endpointKey(s, endpointAddr)).AddFlat(endpoint)...)
 	}
-	redisConn.Send("HMSET", redis.Args{}.Add(endpointKey(s)).AddFlat(endpoint)...)
 	_, err := redisConn.Do("EXEC")
 	return err
 }
@@ -110,7 +123,9 @@ func (r *RedisStore) RegisterRelease(s Session) error {
 	redisConn.Send("MULTI")
 	redisConn.Send("ZADD", "backend:"+s.BackendID()+":releases", "NX", timeToScore(t), s.Release().ID)
 	redisConn.Send("HMSET", redis.Args{}.Add("backend:"+s.BackendID()+":release:"+s.Release().ID).AddFlat(s.Release())...)
-	redisConn.Send("HSET", endpointKey(s), "branch", s.Release().Branch)
+	for _, endpointAddr := range s.Endpoints() {
+		redisConn.Send("HSET", endpointKey(s, endpointAddr), "branch", s.Release().Branch)
+	}
 	_, err := redisConn.Do("EXEC")
 	return err
 }
@@ -123,7 +138,9 @@ func (r *RedisStore) RegisterHeartbeat(s Session) error {
 
 	redisConn.Send("MULTI")
 	redisConn.Send("HSET", s.Key(), "last_seen_at", t.String())
-	redisConn.Send("HSET", endpointKey(s), "last_seen_at", t.String())
+	for _, endpointAddr := range s.Endpoints() {
+		redisConn.Send("HSET", endpointKey(s, endpointAddr), "last_seen_at", t.String())
+	}
 	_, err := redisConn.Do("EXEC")
 	return err
 }
@@ -157,6 +174,14 @@ func dailyClientIpsKey(s Session, date string) string {
 	return "node:" + s.NodeID() + ":clients:" + date
 }
 
-func endpointKey(s Session) string {
-	return "backend:" + s.BackendID() + ":endpoint:" + s.Endpoint()
+func endpointKey(s Session, endpoint net.Addr) string {
+	return "backend:" + s.BackendID() + ":endpoint:" + redisEndpointString(endpoint)
+}
+
+func redisEndpointString(e net.Addr) string {
+	prefix := ""
+	if e.Network() == "tcp+tls" {
+		prefix = "tls:"
+	}
+	return prefix + e.String()
 }

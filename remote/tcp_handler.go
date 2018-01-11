@@ -22,16 +22,18 @@ type TCPHandler struct {
 	pool       *redis.Pool
 	tlsConfig  *tls.Config
 	logger     *logrus.Entry
+	lFactory   wnet.ListenerFactory
 }
 
 // NewTCPHandler ...
-func NewTCPHandler(cfg *config.ServerConfig, pool *redis.Pool) (*TCPHandler, error) {
+func NewTCPHandler(cfg *config.ServerConfig, pool *redis.Pool, factory wnet.ListenerFactory) (*TCPHandler, error) {
 	h := TCPHandler{
 		nodeID:     cfg.NodeID,
 		sessions:   make(map[string]session.Session),
 		localhost:  cfg.Localhost,
 		clusterURL: cfg.ClusterURL,
 		pool:       pool,
+		lFactory:   factory,
 		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "TCPHandler"}),
 	}
 
@@ -124,22 +126,44 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 	defer h.closeSession(sess)
 
-	ln, err := listenTCP("tcp_ingress", sess)
+	/*
+		ln, err := listenTCP("tcp_ingress", sess)
+		if err != nil {
+			h.logger.Errorln(err)
+			return
+		}
+	*/
+
+	lnArgs := &wnet.ListenerFromFactoryArgs{
+		ID:       sess.ID(),
+		BindHost: h.localhost,
+	}
+
+	ln, err := h.lFactory.Listener(lnArgs)
 	if err != nil {
 		h.logger.Errorln(err)
 		return
 	}
 
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
-	sess.EndpointAddr = h.localhost + ":" + port
+	h.logger.Infof("Started session %s for %s (%s)", sess.ID(), sess.NodeID(), sess.Client())
+
+	addr := ln.Addr()
+	if multi, ok := addr.(wnet.MultiAddr); ok {
+		for _, a := range multi.Addrs() {
+			sess.AddEndpoint(a)
+		}
+	} else {
+		sess.AddEndpoint(addr)
+	}
 	sess.ClusterURL = h.clusterURL
+	for _, e := range sess.Endpoints() {
+		h.logger.Infof("Session %s for %s (%s) listening on %s addr: %s", sess.ID(), sess.NodeID(), sess.Client(), e.Network(), e.String())
+	}
 
 	if err = sess.RegisterEndpoint(); err != nil {
 		h.logger.Errorln("Error registering endpoint:", err)
 		return
 	}
-
-	h.logger.Infof("Started session %s for %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }

@@ -31,12 +31,13 @@ type SSHHandler struct {
 	pool       *redis.Pool
 	logger     *logrus.Entry
 	limiter    *limiter.Limiter
+	lFactory   wnet.ListenerFactory
 
 	mu sync.Mutex
 }
 
 // NewSSHHandler returns a new SSHHandler
-func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, error) {
+func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool, factory wnet.ListenerFactory) (*SSHHandler, error) {
 	rate, err := limiter.NewRateFromFormatted("240-H")
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create a rate limit for SSHHandler: %s", err.Error())
@@ -60,6 +61,7 @@ func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool) (*SSHHandler, err
 		config:     config,
 		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
 		limiter:    limiterInstance,
+		lFactory:   factory,
 	}
 	return &s, nil
 }
@@ -117,21 +119,44 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 	defer s.closeSession(sess)
 
-	ln, err := listenTCP("ssh_ingress", sess)
+	/*
+		ln, err := listenTCP("ssh_ingress", sess)
+		if err != nil {
+			s.logger.Errorln(err)
+			return
+		}
+	*/
+
+	lnArgs := &wnet.ListenerFromFactoryArgs{
+		ID:       sess.ID(),
+		BindHost: s.localhost,
+	}
+
+	ln, err := s.lFactory.Listener(lnArgs)
 	if err != nil {
 		s.logger.Errorln(err)
 		return
 	}
 
-	_, port, _ := net.SplitHostPort(ln.Addr().String())
-	sess.EndpointAddr = s.localhost + ":" + port
+	s.logger.Infof("Started session %s for %s (%s)", sess.ID(), sess.NodeID(), sess.Client())
+
+	addr := ln.Addr()
+	if multi, ok := addr.(wnet.MultiAddr); ok {
+		for _, a := range multi.Addrs() {
+			sess.AddEndpoint(a)
+		}
+	} else {
+		sess.AddEndpoint(addr)
+	}
+	sess.ClusterURL = s.clusterURL
+	for _, e := range sess.Endpoints() {
+		s.logger.Infof("Session %s for %s (%s) listening on %s addr: %s", sess.ID(), sess.NodeID(), sess.Client(), e.Network(), e.String())
+	}
 
 	if err = sess.RegisterEndpoint(); err != nil {
 		s.logger.Errorln("Error registering endpoint:", err)
 		return
 	}
-
-	s.logger.Infof("Started session %s for %s %s (%s). Listening on: %s", sess.ID(), sess.NodeID(), sess.Agent(), sess.Client(), sess.Endpoint())
 
 	sess.HandleRequests(ln)
 }

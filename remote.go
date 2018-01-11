@@ -1,6 +1,7 @@
 package wormhole
 
 import (
+	"crypto/tls"
 	"net/url"
 	"os"
 	"os/signal"
@@ -10,6 +11,7 @@ import (
 	"github.com/garyburd/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
+	wnet "github.com/superfly/wormhole/net"
 	handler "github.com/superfly/wormhole/remote"
 )
 
@@ -27,19 +29,24 @@ func StartRemote(cfg *config.ServerConfig) {
 	var err error
 	server := &handler.Server{Logger: cfg.Logger}
 
+	listenerFactory, err := listenerFactoryFromConfig(cfg)
+	if err != nil {
+		log.Fatalf("Could not create listener factory: %+v", err)
+	}
+
 	switch cfg.Protocol {
 	case config.SSH:
-		h, err = handler.NewSSHHandler(cfg, redisPool)
+		h, err = handler.NewSSHHandler(cfg, redisPool, listenerFactory)
 		if err != nil {
 			log.Fatal(err)
 		}
 	case config.TCP:
-		h, err = handler.NewTCPHandler(cfg, redisPool)
+		h, err = handler.NewTCPHandler(cfg, redisPool, listenerFactory)
 		if err != nil {
 			log.Fatal(err)
 		}
 	case config.HTTP2:
-		h, err = handler.NewHTTP2Handler(cfg, redisPool)
+		h, err = handler.NewHTTP2Handler(cfg, redisPool, listenerFactory)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -49,6 +56,60 @@ func StartRemote(cfg *config.ServerConfig) {
 
 	go handleDeath(h)
 	server.ListenAndServe(":"+cfg.Port, h)
+}
+
+func listenerFactoryFromConfig(cfg *config.ServerConfig) (wnet.ListenerFactory, error) {
+	multiPortFactoryArgs := &wnet.MultiPortTCPListenerFactoryArgs{
+		BindAddr: "0.0.0.0",
+		Logger:   cfg.Logger,
+	}
+
+	listenerFactory, err := wnet.NewMultiPortTCPListenerFactory(multiPortFactoryArgs)
+	if err != nil {
+		return nil, err
+	}
+
+	if cfg.UseSharedPortForwarding {
+		keyPair, err := tls.X509KeyPair(cfg.SharedPortTLSCert, cfg.SharedPortTLSPrivateKey)
+		if err != nil {
+			return nil, err
+		}
+
+		tlsConf := &tls.Config{
+			Certificates: []tls.Certificate{keyPair},
+		}
+
+		sharedArgs := &wnet.SharedPortTLSListenerFactoryArgs{
+			Address:   ":" + cfg.SharedTLSForwardingPort,
+			Logger:    cfg.Logger,
+			TLSConfig: tlsConf,
+		}
+		sharedL, err := wnet.NewSharedPortTLSListenerFactory(sharedArgs)
+		if err != nil {
+			return nil, err
+		}
+
+		fanInArgs := &wnet.FanInListenerFactoryArgs{
+			Factories: []wnet.FanInListenerFactoryEntry{
+				{
+					Factory:       sharedL,
+					ShouldCleanup: true,
+				},
+				{
+					Factory:       listenerFactory,
+					ShouldCleanup: true,
+				},
+			},
+			Logger: cfg.Logger,
+		}
+		fanInListener, err := wnet.NewFanInListenerFactory(fanInArgs)
+		if err != nil {
+			return nil, err
+		}
+
+		listenerFactory = fanInListener
+	}
+	return listenerFactory, nil
 }
 
 func ensureRemoteEnvironment(cfg *config.ServerConfig) {

@@ -35,14 +35,15 @@ Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 
 ## Feature Status
 
-| Feature				| Status       |
-| :-----:				| :----:       |
-| SSH Tunnel				| Supported    |
-| TCP Tunnel				| Experimental - currently lacking some auth |
-| TLS Tunnel              		| Experimental - currently lacking some auth |
-| HTTP2 Tunnel            		| Experimental - currently lacking some auth |
-| Local Endpoint over TCP		| Supported |
-| Local Endpoint over TLS		| Supported |
-| Single Tunnel Type per WH Server 	| Supported    |
-| Multiple Tunnel Types per WH Server 	| Pending [#10](https://github.com/superfly/wormhole/issues/10) |
-| Healthcheck for Local Endpoint 	| Pending [#33](https://github.com/superfly/wormhole/issues/33) |
+| Feature					| Status       |
+| :-----:					| :----:       |
+| SSH Tunnel					| Supported |
+| TCP Tunnel					| Experimental - currently lacking some auth |
+| TLS Tunnel              			| Experimental - currently lacking some auth |
+| HTTP2 Tunnel            			| Experimental - currently lacking some auth |
+| Local Endpoint over TCP			| Supported |
+| Local Endpoint over TLS			| Supported |
+| Single Tunnel Type per WH Server 		| Supported |
+| Multiple Tunnel Types per WH Server 		| Pending [#10](https://github.com/superfly/wormhole/issues/10) |
+| Healthcheck for Local Endpoint 		| Pending [#33](https://github.com/superfly/wormhole/issues/33) |
+| WH Server Shared Port TLS+SNI forwarding 	| Supported |
