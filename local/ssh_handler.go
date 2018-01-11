@@ -44,7 +44,7 @@ type SSHHandler struct {
 }
 
 // NewSSHHandler initializes SSHHandler
-func NewSSHHandler(cfg *config.ClientConfig, release *messages.Release) (ConnectionHandler, error) {
+func NewSSHHandler(cfg *config.ClientConfig, release *messages.Release) (*SSHHandler, error) {
 	var localTLSConfig *tls.Config
 	if cfg.LocalEndpointUseTLS {
 		localTLSConfig = &tls.Config{
