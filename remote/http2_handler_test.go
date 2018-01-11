@@ -21,6 +21,7 @@ import (
 	"github.com/superfly/tlstest"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
+	wnet "github.com/superfly/wormhole/net"
 	"github.com/superfly/wormhole/session"
 	"golang.org/x/net/http2"
 	"gopkg.in/ory-am/dockertest.v3"
@@ -29,10 +30,19 @@ import (
 var redisPool *redis.Pool
 var serverTLSConfig *tls.Config
 var clientTLSConfig *tls.Config
+var listenerFactory wnet.ListenerFactory
 
 var serverTLSCert tls.Certificate
 var serverCrtPEM []byte
 var serverKeyPEM []byte
+
+type testListenerFactory struct{}
+
+func (f *testListenerFactory) Close() error { return nil }
+
+func (f *testListenerFactory) Listener(args *wnet.ListenerFromFactoryArgs) (net.Listener, error) {
+	return net.Listen("tcp", "127.0.0.1:0")
+}
 
 func TestMain(m *testing.M) {
 	var rootCrtPEM []byte
@@ -58,6 +68,8 @@ func TestMain(m *testing.M) {
 		RootCAs:    certPool,
 		ServerName: "127.0.0.1",
 	}
+
+	listenerFactory = &testListenerFactory{}
 
 	pool, err := dockertest.NewPool("")
 	if err != nil {
@@ -138,7 +150,7 @@ func TestNewHTTP2Handler(t *testing.T) {
 		ClusterURL:    "localhost",
 	}
 
-	h, err := NewHTTP2Handler(cfg, redisPool)
+	h, err := NewHTTP2Handler(cfg, redisPool, listenerFactory)
 	assert.NoError(t, err, "Should be no error creating http2 handler")
 
 	hControl := &HTTP2Handler{
@@ -149,6 +161,7 @@ func TestNewHTTP2Handler(t *testing.T) {
 		clusterURL: "localhost",
 		sessions:   make(map[string]session.Session),
 		nodeID:     "1",
+		lFactory:   listenerFactory,
 	}
 
 	assert.EqualValues(t, hControl, h, "Control and test HTTP2Handlers should match values")
@@ -163,6 +176,7 @@ func newTestHTTP2Handler() (*HTTP2Handler, error) {
 		clusterURL: "localhost",
 		sessions:   make(map[string]session.Session),
 		nodeID:     "1",
+		lFactory:   listenerFactory,
 	}
 
 	return h, nil
