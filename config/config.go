@@ -112,11 +112,28 @@ type ServerConfig struct {
 	// as transportation layer
 	SSHPrivateKey []byte
 
-	// TLSPrivatekey is used by the server when TLS conn pool is used
-	// as transportation layer
+	// TLSPrivateKey is used as the global private key for all listening ports
+	// Currently this includes TLS tunnels and receiving conns used for SNI
+	// based client forwarding
 	TLSPrivateKey []byte
 
-	// BugsnagAPIKey is token for error reporting to Bugsnag
+	// UseSharedPortForwarding indicates we should use a shared bound port for forwarding connections
+	// And determine the endpoint to forward to via an ID in the SNI eg: <uid>.wormhole.server.com:443
+	//
+	// NOTE: We still use the old version along side shared port when in use. When not specified we use
+	// the legacy 1-port per session only
+	UseSharedPortForwarding bool
+
+	// SharedTLSForwardingPort is the port we should bind the shared tls forwarding to
+	SharedTLSForwardingPort string
+
+	// SharedPortTLSCert is the tls cert to be used by the shared port listener
+	SharedPortTLSCert []byte
+
+	// SharedPortPrivateKey is the tls Private key to be used by the shared port listener
+	SharedPortTLSPrivateKey []byte
+
+	// BugsnagAPIKey token for error reporting to Bugsnag
 	BugsnagAPIKey string
 
 	// MetricsAPIPort used by HTTP server to serve metrics
@@ -132,6 +149,8 @@ func NewServerConfig() (*ServerConfig, error) {
 	viper.SetDefault("node_id", nodeID)
 	viper.SetDefault("port", "10000")
 	viper.SetDefault("metrics_api_port", "9191")
+	viper.SetDefault("use_shared_port_forwarding", false)
+	viper.SetDefault("shared_tls_forwarding_port", "443")
 	viper.BindEnv("bugsnag_api_key", "BUGSNAG_API_KEY")
 
 	logger := logrus.New()
@@ -167,11 +186,13 @@ func NewServerConfig() (*ServerConfig, error) {
 	}
 
 	cfg := &ServerConfig{
-		ClusterURL:     viper.GetString("cluster_url"),
-		RedisURL:       viper.GetString("redis_url"),
-		NodeID:         viper.GetString("node_id"),
-		MetricsAPIPort: viper.GetString("metrics_api_port"),
-		Config:         shared,
+		ClusterURL:              viper.GetString("cluster_url"),
+		RedisURL:                viper.GetString("redis_url"),
+		NodeID:                  viper.GetString("node_id"),
+		MetricsAPIPort:          viper.GetString("metrics_api_port"),
+		UseSharedPortForwarding: viper.GetBool("use_shared_port_forwarding"),
+		SharedTLSForwardingPort: viper.GetString("shared_tls_forwarding_port"),
+		Config:                  shared,
 	}
 
 	switch protocol {
@@ -207,6 +228,20 @@ func NewServerConfig() (*ServerConfig, error) {
 			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
 		}
 		cfg.TLSCert = tlsCert
+	}
+
+	if cfg.UseSharedPortForwarding {
+		tlsKey, err := ioutil.ReadFile(viper.GetString("tls_private_key_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_PRIVATE_KEY_FILE")
+		}
+		cfg.SharedPortTLSPrivateKey = tlsKey
+
+		tlsCert, err := ioutil.ReadFile(viper.GetString("tls_cert_file"))
+		if err != nil {
+			return nil, cfgErr(unsetEnvStr, "FLY_TLS_CERT_FILE")
+		}
+		cfg.SharedPortTLSCert = tlsCert
 	}
 
 	if err := cfg.validate(); err != nil {
