@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"strconv"
-	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
@@ -125,11 +124,12 @@ func init() {
 type SSHSession struct {
 	baseSession
 
-	config  *ssh.ServerConfig
-	tcpConn net.Conn
-	conn    *ssh.ServerConn
-	reqs    <-chan *ssh.Request
-	chans   <-chan ssh.NewChannel
+	sshSessionID string
+	config       *ssh.ServerConfig
+	tcpConn      net.Conn
+	conn         *ssh.ServerConn
+	reqs         <-chan *ssh.Request
+	chans        <-chan ssh.NewChannel
 }
 
 type tcpipForward struct {
@@ -219,13 +219,19 @@ func (s *SSHSession) HandleRequests(ln net.Listener) {
 // TODO: figure out a better interface for Session
 func (s *SSHSession) RequireAuthentication() error {
 	// done as a hook to ssh handshake
-	go s.RegisterConnection(time.Now())
+	go s.store.RegisterConnection(s)
 	return nil
+}
+
+// RegisterEndpoint registers the endpoint and adds it to the current session record
+// The endpoint is a particular instance of a running wormhole client
+func (s *SSHSession) RegisterEndpoint() error {
+	return s.store.RegisterEndpoint(s)
 }
 
 // Close closes SSHSession and registers disconnection
 func (s *SSHSession) Close() {
-	s.RegisterDisconnection()
+	s.store.RegisterDisconnection(s)
 	s.logger.Infof("Closed session %s for %s %s (%s).", s.ID(), s.NodeID(), s.Agent(), s.Client())
 	go func() {
 		openSessionsMetric.With(labels(s)).Sub(1)
@@ -241,9 +247,17 @@ func (s *SSHSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permis
 	if backendID == "" {
 		return nil, errors.New("token rejected")
 	}
+
+	// assume false if not set
+	requiresClientAuth, err := s.store.BackendRequiresClientAuth(backendID)
+	if err != nil {
+		return nil, err
+	}
+
 	s.backendID = backendID
 	s.agent = string(c.ClientVersion())
-	s.id = hex.EncodeToString(c.SessionID())
+	s.sshSessionID = hex.EncodeToString(c.SessionID())
+	s.requiresClientAuth = requiresClientAuth
 	s.clientAddr = c.RemoteAddr().String()
 
 	return nil, nil
@@ -353,7 +367,7 @@ func (s *SSHSession) handleKeepalive(req *ssh.Request) {
 		req.Reply(true, nil)
 	}
 	go func() {
-		if err := s.RegisterHeartbeat(); err != nil {
+		if err := s.store.RegisterHeartbeat(s); err != nil {
 			s.logger.Warnf("Failed to register session heartbeat: %s", err.Error())
 		}
 	}()
@@ -377,33 +391,6 @@ func (s *SSHSession) registerRelease(req *ssh.Request) {
 	} else {
 		s.logger.Warnf("Couldn't process release info: Unexpected message type")
 	}
-}
-
-// RegisterConnection creates and stores a new session record
-func (s *SSHSession) RegisterConnection(t time.Time) error {
-	return s.store.RegisterConnection(s)
-}
-
-// RegisterDisconnection destroys the session record
-func (s *SSHSession) RegisterDisconnection() error {
-	return s.store.RegisterDisconnection(s)
-}
-
-// RegisterEndpoint registers the endpoint and adds it to the current session record
-// The endpoint is a particular instance of a running wormhole client
-func (s *SSHSession) RegisterEndpoint() error {
-	return s.store.RegisterEndpoint(s)
-}
-
-// UpdateAttribute updates a particular attribute of the current session record
-func (s *SSHSession) UpdateAttribute(name string, value interface{}) error {
-	return s.store.UpdateAttribute(s, name, value)
-}
-
-// RegisterHeartbeat updates appropriate session records to indicate the session
-// is still alive
-func (s *SSHSession) RegisterHeartbeat() error {
-	return s.store.RegisterHeartbeat(s)
 }
 
 func labels(s Session) prometheus.Labels {

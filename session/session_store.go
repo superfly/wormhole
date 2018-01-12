@@ -19,8 +19,13 @@ type Store interface {
 	RegisterConnection(s Session) error
 	RegisterDisconnection(s Session) error
 	RegisterRelease(s Session) error
+	RegisterEndpoint(s Session) error
+	RegisterHeartbeat(s Session) error
 	UpdateAttribute(s Session, name string, value interface{}) error
 	BackendIDFromToken(token string) (string, error)
+	BackendRequiresClientAuth(backendID string) (bool, error)
+	ValidCertificate(backendID, fingerprint string) (bool, error)
+	GetClientCAs(backendID string) ([]byte, error)
 }
 
 // RedisStore is session persistence using Redis
@@ -153,6 +158,28 @@ func (r *RedisStore) BackendIDFromToken(token string) (string, error) {
 	return redis.String(redisConn.Do("HGET", "backend_tokens", token))
 }
 
+// BackendRequiresClientAuth returns a backendID for the token or errors out if none found
+func (r *RedisStore) BackendRequiresClientAuth(backendID string) (bool, error) {
+	redisConn := r.pool.Get()
+	defer redisConn.Close()
+
+	// assume client auth is required unless explicitly disabled
+	authDisabled, err := redis.Bool(redisConn.Do("HGET", "backend:"+backendID, "client_auth_disabled"))
+	if err != nil {
+		if err == redis.ErrNil {
+			return true, nil
+		}
+
+		// in case there's conn error and err handling is not properly handled up the chain,
+		// require client auth just to be on the safe side
+		return true, err
+	}
+
+	// might seem a bit unintuitive, but backend requires client auth if authDisabled is false
+	// and doesn't when authDisabled is true
+	return !authDisabled, nil
+}
+
 // UpdateAttribute updates a single Session attribute in Redis
 func (r *RedisStore) UpdateAttribute(s Session, name string, value interface{}) error {
 	redisConn := r.pool.Get()
@@ -160,6 +187,23 @@ func (r *RedisStore) UpdateAttribute(s Session, name string, value interface{}) 
 
 	_, err := redisConn.Do("HSET", s.Key(), name, value)
 	return err
+}
+
+// GetClientCAs returns full unparsed certificate chain for the client auth for the backend
+func (r *RedisStore) GetClientCAs(backendID string) ([]byte, error) {
+	redisConn := r.pool.Get()
+	defer redisConn.Close()
+
+	return redis.Bytes(redisConn.Do("HGET", "backend:"+backendID, "client_auth_chain"))
+}
+
+// ValidCertificate returns true if a fingerprint is a in the list of
+// valid certificates for the backend.
+func (r *RedisStore) ValidCertificate(backendID, fingerprint string) (bool, error) {
+	redisConn := r.pool.Get()
+	defer redisConn.Close()
+
+	return redis.Bool(redisConn.Do("SISMEMBER", "backend:"+backendID+":valid_certificates", fingerprint))
 }
 
 func timeToScore(t time.Time) int64 {

@@ -45,6 +45,7 @@ register_client() {
   token=$2
 
   redis-cli HSET backend_tokens $token $client_id
+  redis-cli HSET backend:$client_id client_auth_disabled true
 }
 
 spawn_wormhole() {
