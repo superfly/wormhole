@@ -102,9 +102,9 @@ func (sl *sharedPortTLSListenerFactory) populateCh() error {
 					} else {
 						return err
 					}
-				} else {
-					return err
 				}
+
+				return err
 			}
 			sl.logger.Debugf("Accepted conn from: %s", conn.RemoteAddr().String())
 
@@ -176,7 +176,17 @@ func (l *sharedPortTLSListener) Close() error {
 
 // Accept accepts a conn from the listener
 func (l *sharedPortTLSListener) Accept() (net.Conn, error) {
-	return <-l.connCh, nil
+	c, ok := <-l.connCh
+	if !ok {
+		return nil, &net.OpError{
+			Op:     "accept",
+			Net:    "tcp+tls",
+			Source: l.addr,
+			Addr:   l.addr,
+			Err:    fmt.Errorf("SNI TLS Listener closed"),
+		}
+	}
+	return c, nil
 }
 
 // Addr returns the listener's address

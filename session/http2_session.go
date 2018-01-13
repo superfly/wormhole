@@ -198,15 +198,17 @@ func (s *HTTP2Session) Close() {
 // TODO: Currently only handles TCP not TLS
 func (s *HTTP2Session) handleRemoteForward(ln net.Listener) {
 	defer func() {
-		err := ln.Close()
-		if err != nil {
-			s.logger.Debugf("Couldn't close ingress conn: %s", err)
-			return
-		}
 		s.logger.Debugf("Closed ingress conn: %s", ln.Addr().String())
 	}()
 
 	if err := s.server.Serve(ln); err != nil {
+		if err != http.ErrServerClosed {
+			err := ln.Close()
+			if err != nil {
+				s.logger.Debugf("Couldn't close listener: %s", err)
+				return
+			}
+		}
 		s.logger.Errorf("Stopped being able to serve ingress traffic: %v+", err)
 		return
 	}
