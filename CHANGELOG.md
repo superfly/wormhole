@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 * Can now connect to local endpoints via TLS
 * wh-server forwards ingress traffic from a single shared TLS port via SNI
+* Messages are packed with messagepack instead of json
 
 ### Fixed
 * Race condition with session access in remote/http2 (#26)
