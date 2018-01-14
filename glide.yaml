@@ -22,5 +22,7 @@ import:
 - package: github.com/ulule/limiter
 - package: github.com/sirupsen/logrus
   version: ^1.0.3
+- package: github.com/tinylib/msgp
+  version: ^1.0.2
 testImport:
 - package: github.com/alicebob/miniredis

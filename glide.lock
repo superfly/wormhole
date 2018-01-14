@@ -1,5 +1,5 @@
-hash: 3e702f3a69224da236dac6b56faf98f63c3fdd4fc12d9d08409c303215fa3599
-updated: 2017-10-03T15:43:17.102621816-07:00
+hash: d7b8acf48ef7dbb29d9de2d215990b2f200749580e7298af1fe1aab15ad23f6d
+updated: 2018-01-13T19:38:50.782316535-08:00
 imports:
 - name: github.com/ant0ine/go-json-rest
   version: ebb33769ae013bd5f518a8bac348c310dea768b8
@@ -68,6 +68,8 @@ imports:
   version: a3647f8e31d79543b2d0f0ae2fe5c379d72cedc0
 - name: github.com/pelletier/go-toml
   version: 2009e44b6f182e34d8ce081ac2767622937ea3d4
+- name: github.com/philhofer/fwd
+  version: bb6d471dc95d4fe11e432687f8b70ff496cf3136
 - name: github.com/pkg/errors
   version: 2b3a18b5f0fb6b4f9190549597d3f962c02bc5eb
 - name: github.com/prometheus/client_golang
@@ -98,7 +100,7 @@ imports:
 - name: github.com/Shopify/logrus-bugsnag
   version: 6dbc35f2c30d1e37549f9673dd07912452ab28a5
 - name: github.com/sirupsen/logrus
-  version: f006c2ac4710855cf0f916dd6b77acf6b048dc6e
+  version: d682213848ed68c0a260ca37d6dd5ace8423f5ba
 - name: github.com/spf13/afero
   version: 8a6ade7159a9b7fff5d2feac091c425177ac1b28
   subpackages:
@@ -117,6 +119,10 @@ imports:
   - scanner
   - token
   - types
+- name: github.com/tinylib/msgp
+  version: b2b6a672cf1e5b90748f79b8b81fc8c5cf0571a1
+  subpackages:
+  - msgp
 - name: github.com/ulule/limiter
   version: 619f3ae8cc00f54934d27591e7010c8f6216c5ca
 - name: github.com/x-cray/logrus-prefixed-formatter
@@ -154,17 +160,6 @@ imports:
   - transform
   - unicode/bidi
   - unicode/norm
-- name: google.golang.org/appengine
-  version: 24e4144ec923c2374f6b06610c0df16a9222c3d9
-  subpackages:
-  - datastore
-  - internal
-  - internal/app_identity
-  - internal/base
-  - internal/datastore
-  - internal/log
-  - internal/modules
-  - internal/remote_api
 - name: gopkg.in/src-d/go-billy.v3
   version: c329b7bc7b9d24905d2bc1b85bfa29f7ae266314
   subpackages:
@@ -216,8 +211,6 @@ imports:
   - utils/merkletrie/noder
 - name: gopkg.in/vmihailenco/msgpack.v2
   version: 200315d5c8aab339f5a5cd44219f4b50ad0782df
-  subpackages:
-  - codes
 - name: gopkg.in/warnings.v0
   version: 8a331561fe74dadba6edfc59f3be66c22c3b065d
 - name: gopkg.in/yaml.v2
