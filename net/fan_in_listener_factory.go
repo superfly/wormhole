@@ -3,6 +3,7 @@ package net
 import (
 	"github.com/sirupsen/logrus"
 
+	"fmt"
 	"net"
 )
 
@@ -55,6 +56,7 @@ func (f *fanInListenerFactory) Listener(args *ListenerFromFactoryArgs) (net.List
 	l := &fanInListener{
 		listeners: listeners,
 		connCh:    make(chan net.Conn),
+		done:      make(chan struct{}),
 	}
 
 	l.populateCh()
@@ -98,15 +100,16 @@ func (l *fanInListener) populateChListener(ln net.Listener) error {
 		default:
 			conn, err := ln.Accept()
 			if err != nil {
+
 				if oErr, ok := err.(*net.OpError); ok {
 					if oErr.Temporary() {
 						continue
 					} else {
 						return err
 					}
-				} else {
-					return err
 				}
+
+				return err
 			}
 
 			go func(c net.Conn) {
@@ -121,7 +124,15 @@ func (l *fanInListener) populateChListener(ln net.Listener) error {
 }
 
 func (l *fanInListener) Accept() (net.Conn, error) {
-	return <-l.connCh, nil
+	c, ok := <-l.connCh
+	if !ok {
+		return nil, &net.OpError{
+			Op:  "accept",
+			Net: "unknown",
+			Err: fmt.Errorf("SNI TLS Listener closed"),
+		}
+	}
+	return c, nil
 }
 
 func (l *fanInListener) Addr() net.Addr {
