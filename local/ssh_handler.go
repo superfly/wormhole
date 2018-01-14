@@ -10,8 +10,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
@@ -225,7 +223,7 @@ func (s *SSHHandler) stayAlive() {
 
 func (s *SSHHandler) registerRelease() {
 	s.logger.Info("Sending release info...")
-	releaseBytes, err := msgpack.Marshal(s.Release)
+	releaseBytes, err := messages.Pack(s.Release)
 	_, _, err = s.ssh.SendRequest("register-release", false, releaseBytes)
 	if err != nil {
 		s.logger.Errorf("Failed to send release info: %s", err.Error())
