@@ -9,8 +9,6 @@ import (
 	"strconv"
 	"time"
 
-	msgpack "gopkg.in/vmihailenco/msgpack.v2"
-
 	"github.com/garyburd/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/xid"
@@ -365,12 +363,19 @@ func (s *SSHSession) registerRelease(req *ssh.Request) {
 	if req.WantReply {
 		req.Reply(true, nil)
 	}
-	var release messages.Release
-	if err := msgpack.Unmarshal(req.Payload, &release); err == nil {
-		s.release = &release
+
+	msg, err := messages.Unpack(req.Payload)
+
+	if err != nil {
+		s.logger.Warnf("Couldn't process release info: %s", err.Error())
+		return
+	}
+
+	if release, ok := msg.(*messages.Release); ok {
+		s.release = release
 		s.store.RegisterRelease(s)
 	} else {
-		s.logger.Warnf("Couldn't process release info: %s", err.Error())
+		s.logger.Warnf("Couldn't process release info: Unexpected message type")
 	}
 }
 
