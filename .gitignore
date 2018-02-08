@@ -6,3 +6,4 @@ scripts/id_rsa*
 vendor
 *coverage.txt
 github-release
+tmp

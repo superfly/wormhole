@@ -28,6 +28,7 @@ import (
 )
 
 var redisPool *redis.Pool
+var registry *session.Registry
 var serverTLSConfig *tls.Config
 var clientTLSConfig *tls.Config
 var listenerFactory wnet.ListenerFactory
@@ -70,6 +71,8 @@ func TestMain(m *testing.M) {
 	}
 
 	listenerFactory = &testListenerFactory{}
+
+	registry = session.NewRegistry(log.New())
 
 	pool, err := dockertest.NewPool("")
 	if err != nil {
@@ -150,7 +153,7 @@ func TestNewHTTP2Handler(t *testing.T) {
 		ClusterURL:    "localhost",
 	}
 
-	h, err := NewHTTP2Handler(cfg, redisPool, listenerFactory)
+	h, err := NewHTTP2Handler(cfg, registry, redisPool, listenerFactory)
 	assert.NoError(t, err, "Should be no error creating http2 handler")
 
 	hControl := &HTTP2Handler{
@@ -159,7 +162,7 @@ func TestNewHTTP2Handler(t *testing.T) {
 		pool:       redisPool,
 		localhost:  "localhost",
 		clusterURL: "localhost",
-		sessions:   make(map[string]session.Session),
+		registry:   registry,
 		nodeID:     "1",
 		lFactory:   listenerFactory,
 	}
@@ -174,7 +177,7 @@ func newTestHTTP2Handler() (*HTTP2Handler, error) {
 		pool:       redisPool,
 		localhost:  "localhost",
 		clusterURL: "localhost",
-		sessions:   make(map[string]session.Session),
+		registry:   registry,
 		nodeID:     "1",
 		lFactory:   listenerFactory,
 	}

@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 
 	"github.com/garyburd/redigo/redis"
@@ -27,17 +26,15 @@ type SSHHandler struct {
 	nodeID     string
 	localhost  string
 	clusterURL string
-	sessions   map[string]session.Session
+	registry   *session.Registry
 	pool       *redis.Pool
 	logger     *logrus.Entry
 	limiter    *limiter.Limiter
 	lFactory   wnet.ListenerFactory
-
-	mu sync.Mutex
 }
 
 // NewSSHHandler returns a new SSHHandler
-func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool, factory wnet.ListenerFactory) (*SSHHandler, error) {
+func NewSSHHandler(cfg *config.ServerConfig, registry *session.Registry, pool *redis.Pool, factory wnet.ListenerFactory) (*SSHHandler, error) {
 	rate, err := limiter.NewRateFromFormatted("240-H")
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create a rate limit for SSHHandler: %s", err.Error())
@@ -54,7 +51,7 @@ func NewSSHHandler(cfg *config.ServerConfig, pool *redis.Pool, factory wnet.List
 
 	s := SSHHandler{
 		nodeID:     cfg.NodeID,
-		sessions:   make(map[string]session.Session),
+		registry:   registry,
 		localhost:  cfg.Localhost,
 		clusterURL: cfg.ClusterURL,
 		pool:       pool,
@@ -93,16 +90,9 @@ func makeConfig(key []byte) (*ssh.ServerConfig, error) {
 	return config, nil
 }
 
-func (s *SSHHandler) setSession(sess session.Session) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.sessions[sess.ID()] = sess
-}
-
 func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sess := session.NewSSHSession(s.logger.Logger, s.clusterURL, s.nodeID, s.pool, conn, s.config)
-	s.setSession(sess)
 	err := sess.RequireStream()
 	if err != nil {
 		s.logger.WithField("client_addr", conn.RemoteAddr().String()).Errorln("error getting a stream:", err)
@@ -119,17 +109,9 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 	defer s.closeSession(sess)
 
-	/*
-		ln, err := listenTCP("ssh_ingress", sess)
-		if err != nil {
-			s.logger.Errorln(err)
-			return
-		}
-	*/
-
 	lnArgs := &wnet.ListenerFromFactoryArgs{
 		ID:       sess.ID(),
-		BindHost: s.localhost,
+		BindHost: s.nodeID,
 	}
 
 	ln, err := s.lFactory.Listener(lnArgs)
@@ -158,25 +140,19 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 		return
 	}
 
+	s.registry.AddSession(sess)
+
 	sess.HandleRequests(ln)
 }
 
 func (s *SSHHandler) closeSession(sess session.Session) {
 	sess.Close()
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	delete(s.sessions, sess.ID())
+	s.registry.RemoveSession(sess)
 }
 
 // Close closes all sessions handled by SSHandler
 func (s *SSHHandler) Close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	for _, sess := range s.sessions {
-		sess.Close()
-		delete(s.sessions, sess.ID())
-	}
+	s.lFactory.Close()
 }
 
 func listenTCP(name string, sess session.Session) (net.Listener, error) {

@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 * Can now connect to local endpoints via TLS
 * wh-server forwards ingress traffic from a single shared TLS port via SNI
 * Messages are packed with messagepack instead of json
+* Client certificate authentication for ingress traffic using TLS
 
 ### Fixed
 * Race condition with session access in remote/http2 (#26)
 * Errant `FLY_ENDPOINT` references in usage output
-
 
 
 ## [0.5.36] - 2017-10-09

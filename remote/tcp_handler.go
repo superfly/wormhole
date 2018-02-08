@@ -18,7 +18,7 @@ type TCPHandler struct {
 	nodeID     string
 	localhost  string
 	clusterURL string
-	sessions   map[string]session.Session
+	registry   *session.Registry
 	pool       *redis.Pool
 	tlsConfig  *tls.Config
 	logger     *logrus.Entry
@@ -26,10 +26,10 @@ type TCPHandler struct {
 }
 
 // NewTCPHandler ...
-func NewTCPHandler(cfg *config.ServerConfig, pool *redis.Pool, factory wnet.ListenerFactory) (*TCPHandler, error) {
+func NewTCPHandler(cfg *config.ServerConfig, registry *session.Registry, pool *redis.Pool, factory wnet.ListenerFactory) (*TCPHandler, error) {
 	h := TCPHandler{
 		nodeID:     cfg.NodeID,
-		sessions:   make(map[string]session.Session),
+		registry:   registry,
 		localhost:  cfg.Localhost,
 		clusterURL: cfg.ClusterURL,
 		pool:       pool,
@@ -82,7 +82,7 @@ func (h *TCPHandler) Serve(conn *net.TCPConn) {
 	case *messages.AuthControl:
 		go h.tcpSessionHandler(useConn)
 	case *messages.AuthTunnel:
-		if sess, ok := h.sessions[m.ClientID]; !ok {
+		if sess := h.registry.GetSession(m.ClientID); sess == nil {
 			h.logger.Error("New tunnel conn not associated with any session. Closing")
 			conn.Close()
 		} else {
@@ -99,16 +99,13 @@ func (h *TCPHandler) Serve(conn *net.TCPConn) {
 
 // Close closes all sessions handled by TCPHandler
 func (h *TCPHandler) Close() {
-	for _, sess := range h.sessions {
-		sess.Close()
-		delete(h.sessions, sess.ID())
-	}
+	h.lFactory.Close()
 }
 
 func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
 	sess := session.NewTCPSession(h.logger.Logger, h.nodeID, h.pool, conn)
-	h.sessions[sess.ID()] = sess
+	h.registry.AddSession(sess)
 
 	err := sess.RequireStream()
 	if err != nil {
@@ -136,7 +133,7 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 	lnArgs := &wnet.ListenerFromFactoryArgs{
 		ID:       sess.ID(),
-		BindHost: h.localhost,
+		BindHost: h.nodeID,
 	}
 
 	ln, err := h.lFactory.Listener(lnArgs)
@@ -170,5 +167,5 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 func (h *TCPHandler) closeSession(sess session.Session) {
 	sess.Close()
-	delete(h.sessions, sess.ID())
+	h.registry.RemoveSession(sess)
 }

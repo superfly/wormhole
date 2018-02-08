@@ -180,13 +180,19 @@ func (s *HTTP2Session) HandleRequests(ln net.Listener) {
 // RequireAuthentication registers the connection
 // TODO: add authentication here
 func (s *HTTP2Session) RequireAuthentication() error {
-	s.RegisterConnection(time.Now())
+	s.store.RegisterConnection(s)
 	return nil
+}
+
+// RegisterEndpoint registers the endpoint and adds it to the current session record
+// The endpoint is a particular instance of a running wormhole client
+func (s *HTTP2Session) RegisterEndpoint() error {
+	return s.store.RegisterEndpoint(s)
 }
 
 // Close closes SSHSession and registers disconnection
 func (s *HTTP2Session) Close() {
-	s.RegisterDisconnection()
+	s.store.RegisterDisconnection(s)
 	s.logger.Infof("Closed session %s for %s %s (%s).", s.ID(), s.NodeID(), s.Agent(), s.Client())
 	s.server.Close()
 	s.control.Close()
@@ -349,25 +355,4 @@ func (s *HTTP2Session) controlLoop() {
 			s.logger.Warn("Unrecognized command. Ignoring.")
 		}
 	}
-}
-
-// RegisterConnection creates and stores a new session record
-func (s *HTTP2Session) RegisterConnection(t time.Time) error {
-	return s.store.RegisterConnection(s)
-}
-
-// RegisterDisconnection destroys the session record
-func (s *HTTP2Session) RegisterDisconnection() error {
-	return s.store.RegisterDisconnection(s)
-}
-
-// RegisterEndpoint registers the endpoint and adds it to the current session record
-// The endpoint is a particular instance of a running wormhole client
-func (s *HTTP2Session) RegisterEndpoint() error {
-	return s.store.RegisterEndpoint(s)
-}
-
-// UpdateAttribute updates a particular attribute of the current session record
-func (s *HTTP2Session) UpdateAttribute(name string, value interface{}) error {
-	return s.store.UpdateAttribute(s, name, value)
 }

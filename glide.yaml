@@ -20,9 +20,13 @@ import:
   subpackages:
   - prometheus
 - package: github.com/ulule/limiter
+  version: ~1.x
 - package: github.com/sirupsen/logrus
   version: ^1.0.3
 - package: github.com/tinylib/msgp
   version: ^1.0.2
 testImport:
 - package: github.com/alicebob/miniredis
+- package: github.com/go-test/deep
+- package: github.com/stretchr/testify
+- package: github.com/superfly/tlstest

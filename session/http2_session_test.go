@@ -2,127 +2,20 @@ package session
 
 import (
 	"crypto/tls"
-	"crypto/x509"
 	"fmt"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"net/url"
-	"os"
 	"testing"
-	"time"
 
-	"github.com/garyburd/redigo/redis"
 	"github.com/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/superfly/tlstest"
 	_ "github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
 	wnet "github.com/superfly/wormhole/net"
 	"golang.org/x/net/http2"
-	"gopkg.in/ory-am/dockertest.v3"
 )
-
-var redisPool *redis.Pool
-var serverTLSConfig *tls.Config
-var clientTLSConfig *tls.Config
-
-var serverTLSCert tls.Certificate
-var serverCrtPEM []byte
-var serverKeyPEM []byte
-
-func TestMain(m *testing.M) {
-	var rootCrtPEM []byte
-	var err error
-	rootCrtPEM, serverCrtPEM, serverKeyPEM, err = tlstest.CreateServerCertKeyPEMPairWithRootCert()
-	if err != nil {
-		log.Fatalf("tlstest could not generate x509 certs %v+", err)
-	}
-
-	serverTLSCert, err = tls.X509KeyPair(serverCrtPEM, serverKeyPEM)
-	if err != nil {
-		log.Fatalf("Couldn't create tls cert from keypair %v+", err)
-	}
-
-	serverTLSConfig = &tls.Config{
-		Certificates: []tls.Certificate{serverTLSCert},
-	}
-
-	certPool := x509.NewCertPool()
-	certPool.AppendCertsFromPEM(rootCrtPEM)
-
-	clientTLSConfig = &tls.Config{
-		RootCAs:    certPool,
-		ServerName: "127.0.0.1",
-	}
-
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Dockertest could not connect to docker: %s", err)
-	}
-
-	redisResource, err := pool.Run("redis", "4.0.1", []string{})
-	if err != nil {
-		log.Fatalf("Could not create redis container")
-	}
-
-	if err := pool.Retry(func() error {
-		var err error
-		c, err := redis.DialURL(fmt.Sprintf("redis://127.0.0.1:%s", redisResource.GetPort("6379/tcp")))
-		if err != nil {
-			return err
-		}
-		_, err = c.Do("PING")
-		return err
-	}); err != nil {
-		log.Fatalf("Could not connect to redis container: %s", err)
-	}
-
-	redisPool = newRedisPool(fmt.Sprintf("redis://localhost:%s", redisResource.GetPort("6379/tcp")))
-
-	code := m.Run()
-
-	if err := pool.Purge(redisResource); err != nil {
-		log.Fatalf("Could not purge redis: %s", err)
-	}
-
-	os.Exit(code)
-}
-
-func newRedisPool(redisURL string) *redis.Pool {
-	return &redis.Pool{
-		MaxIdle:     3,
-		IdleTimeout: 240 * time.Second,
-		Dial: func() (redis.Conn, error) {
-			conn, err := redis.DialURL(redisURL)
-			if err != nil {
-				return nil, err
-			}
-
-			parsedURL, err := url.Parse(redisURL)
-			if err != nil {
-				return nil, err
-			}
-			if parsedURL.User != nil {
-				if password, hasPassword := parsedURL.User.Password(); hasPassword == true {
-					if _, authErr := conn.Do("AUTH", password); authErr != nil {
-						conn.Close()
-						return nil, authErr
-					}
-				}
-			}
-			return conn, nil
-		},
-		TestOnBorrow: func(conn redis.Conn, t time.Time) error {
-			if time.Since(t) < time.Minute {
-				return nil
-			}
-			_, err := conn.Do("PING")
-			return err
-		},
-	}
-}
 
 func newServerClientTLSConns(alpn bool) (serverTLSConn *tls.Conn, clientTLSConn *tls.Conn, err error) {
 	sConnCh := make(chan *net.TCPConn)

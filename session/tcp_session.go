@@ -118,13 +118,13 @@ func (s *TCPSession) HandleRequests(ln net.Listener) {
 // RequireAuthentication registers the connection
 // TODO: add authentication here
 func (s *TCPSession) RequireAuthentication() error {
-	go s.RegisterConnection(time.Now())
+	go s.store.RegisterConnection(s)
 	return nil
 }
 
 // Close closes SSHSession and registers disconnection
 func (s *TCPSession) Close() {
-	s.RegisterDisconnection()
+	s.store.RegisterDisconnection(s)
 	s.logger.Infof("Closed session %s for %s %s (%s).", s.ID(), s.NodeID(), s.Agent(), s.Client())
 	s.control.Close()
 }
@@ -247,23 +247,8 @@ func (s *TCPSession) controlLoop() {
 	}
 }
 
-// RegisterConnection creates and stores a new session record
-func (s *TCPSession) RegisterConnection(t time.Time) error {
-	return s.store.RegisterConnection(s)
-}
-
-// RegisterDisconnection destroys the session record
-func (s *TCPSession) RegisterDisconnection() error {
-	return s.store.RegisterDisconnection(s)
-}
-
 // RegisterEndpoint registers the endpoint and adds it to the current session record
 // The endpoint is a particular instance of a running wormhole client
 func (s *TCPSession) RegisterEndpoint() error {
 	return s.store.RegisterEndpoint(s)
-}
-
-// UpdateAttribute updates a particular attribute of the current session record
-func (s *TCPSession) UpdateAttribute(name string, value interface{}) error {
-	return s.store.UpdateAttribute(s, name, value)
 }
