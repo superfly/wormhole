@@ -1,6 +1,7 @@
 package session
 
 import (
+	"bytes"
 	"net"
 	"time"
 
@@ -95,6 +96,7 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 
 	redisConn.Send("MULTI")
 	redisConn.Send("HSET", s.Key(), "cluster", s.Cluster())
+	redisConn.Send("HSET", s.Key(), "endpoint_addrs", endpointAddrs(s))
 	for _, endpointAddr := range s.Endpoints() {
 		redisConn.Send("SADD", "backend:"+s.BackendID()+":endpoints", redisEndpointString(endpointAddr))
 		endpoint := map[string]string{
@@ -220,6 +222,18 @@ func dailyClientIpsKey(s Session, date string) string {
 
 func endpointKey(s Session, endpoint net.Addr) string {
 	return "backend:" + s.BackendID() + ":endpoint:" + redisEndpointString(endpoint)
+}
+
+func endpointAddrs(s Session) string {
+	buf := bytes.NewBufferString("")
+	for i, endpointAddr := range s.Endpoints() {
+		if i == 0 {
+			buf.WriteString(redisEndpointString(endpointAddr))
+		} else {
+			buf.WriteString("," + redisEndpointString(endpointAddr))
+		}
+	}
+	return buf.String()
 }
 
 func redisEndpointString(e net.Addr) string {
