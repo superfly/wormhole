@@ -175,7 +175,8 @@ func (s *SSHHandler) forwardConnection(conn net.Conn, local string) {
 	}
 
 	s.logger.Debugf("Dialed local server on %s", local)
-	_, _, err = wnet.CopyCloseIO(localConn, conn)
+	localConnWritten, connWritten, err := wnet.CopyCloseIO(localConn, conn)
+	s.logger.Debugf("CopyCloseIO: Received: %d bytes, Sent: %d bytes", localConnWritten, connWritten)
 	if err != nil && err != io.EOF {
 		s.logger.Error(err)
 	}

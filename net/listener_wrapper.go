@@ -2,8 +2,10 @@
 package net
 
 import (
+	"fmt"
 	"io"
 	"net"
+	"reflect"
 
 	"time"
 )
@@ -140,6 +142,7 @@ func (ct *connTrackTCPListener) Accept() (net.Conn, error) {
 	if tcpConn, ok := conn.(*net.TCPConn); ok && ct.opts.tcpKeepAlive > 0 {
 		tcpConn.SetKeepAlive(true)
 		tcpConn.SetKeepAlivePeriod(ct.opts.tcpKeepAlive)
+		return newServerTCPConnTracker(tcpConn, ct.opts), nil
 	}
 	return newServerConnTracker(conn, ct.opts), nil
 }
@@ -173,24 +176,6 @@ func newServerConnTracker(inner net.Conn, opts *listenerOpts) net.Conn {
 	return tracker
 }
 
-// ReadFrom delegates to TCPConn's ReadFrom
-func (ct *ServerConnTracker) ReadFrom(r io.Reader) (n int64, err error) {
-	if tcpConn, ok := ct.Conn.(*net.TCPConn); ok {
-		n, err = tcpConn.ReadFrom(r)
-	}
-	return
-}
-
-// Read delegates to TCPConn's Read
-func (ct *ServerConnTracker) Read(b []byte) (n int, err error) {
-	return ct.Conn.Read(b)
-}
-
-// Write delegates to TCPConn's Write
-func (ct *ServerConnTracker) Write(b []byte) (n int, err error) {
-	return ct.Conn.Write(b)
-}
-
 // Close closes the connection and records metrics
 func (ct *ServerConnTracker) Close() error {
 	err := ct.Conn.Close()
@@ -205,4 +190,33 @@ func (ct *ServerConnTracker) Close() error {
 func (ct *ServerConnTracker) ReportDataMetrics(sentBytes, rcvdBytes int64) {
 	reportConnRcvdBytes(ct.opts.name, ct.opts.labels, float64(rcvdBytes))
 	reportConnSentBytes(ct.opts.name, ct.opts.labels, float64(sentBytes))
+}
+
+// ServerTCPConnTracker is a wrapper around Net.Conn that tracks when connection is opened,
+// closed and the duration of the connection
+type ServerTCPConnTracker struct {
+	ServerConnTracker
+}
+
+func newServerTCPConnTracker(inner *net.TCPConn, opts *listenerOpts) net.Conn {
+
+	tracker := &ServerTCPConnTracker{
+		ServerConnTracker{
+			Conn:      inner,
+			opts:      opts,
+			startedAt: time.Now(),
+		},
+	}
+	if opts.monitoring {
+		reportListenerConnAccepted(opts.name, opts.labels)
+	}
+	return tracker
+}
+
+// ReadFrom delegates to TCPConn's ReadFrom
+func (ct *ServerTCPConnTracker) ReadFrom(r io.Reader) (int64, error) {
+	if tcpConn, ok := ct.Conn.(*net.TCPConn); ok {
+		return tcpConn.ReadFrom(r)
+	}
+	return 0, fmt.Errorf("ServerTCPConnTracker: expected Conn to be net.TCPConn, but got %s", reflect.TypeOf(ct.Conn))
 }

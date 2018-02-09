@@ -3,6 +3,7 @@ package remote
 import (
 	"crypto/tls"
 	"net"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/sirupsen/logrus"
@@ -123,14 +124,6 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 
 	defer h.closeSession(sess)
 
-	/*
-		ln, err := listenTCP("tcp_ingress", sess)
-		if err != nil {
-			h.logger.Errorln(err)
-			return
-		}
-	*/
-
 	lnArgs := &wnet.ListenerFromFactoryArgs{
 		ID:       sess.ID(),
 		BindHost: h.nodeID,
@@ -142,9 +135,20 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 		return
 	}
 
+	// wrap the listener, so we can attach conn metrics
+	listener, err := wnet.NewListener(ln, wnet.TrackWithName("tcp_ingress"),
+		wnet.TrackWithDeadline(1*time.Second),
+		wnet.TrackWithLabels(map[string]string{"cluster": sess.Cluster(), "backend": sess.BackendID(), "node": sess.NodeID()}),
+	)
+	if err != nil {
+		h.logger.Error("Couldn't instrument ingress listener:", err)
+		// instrumentation failed, log error and carry-on
+		listener = ln
+	}
+
 	h.logger.Infof("Started session %s for %s (%s)", sess.ID(), sess.NodeID(), sess.Client())
 
-	addr := ln.Addr()
+	addr := listener.Addr()
 	if multi, ok := addr.(wnet.MultiAddr); ok {
 		for _, a := range multi.Addrs() {
 			sess.AddEndpoint(a)
@@ -162,7 +166,7 @@ func (h *TCPHandler) tcpSessionHandler(conn net.Conn) {
 		return
 	}
 
-	sess.HandleRequests(ln)
+	sess.HandleRequests(listener)
 }
 
 func (h *TCPHandler) closeSession(sess session.Session) {

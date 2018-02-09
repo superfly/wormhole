@@ -1,7 +1,6 @@
 package remote
 
 import (
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -120,9 +119,20 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 		return
 	}
 
+	// wrap the listener, so we can attach conn metrics
+	listener, err := wnet.NewListener(ln, wnet.TrackWithName("ssh_ingress"),
+		wnet.TrackWithDeadline(1*time.Second),
+		wnet.TrackWithLabels(map[string]string{"cluster": sess.Cluster(), "backend": sess.BackendID(), "node": sess.NodeID()}),
+	)
+	if err != nil {
+		s.logger.Error("Couldn't instrument ingress listener:", err)
+		// instrumentation failed, log error and carry-on
+		listener = ln
+	}
+
 	s.logger.Infof("Started session %s for %s (%s)", sess.ID(), sess.NodeID(), sess.Client())
 
-	addr := ln.Addr()
+	addr := listener.Addr()
 	if multi, ok := addr.(wnet.MultiAddr); ok {
 		for _, a := range multi.Addrs() {
 			sess.AddEndpoint(a)
@@ -142,7 +152,7 @@ func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 
 	s.registry.AddSession(sess)
 
-	sess.HandleRequests(ln)
+	sess.HandleRequests(listener)
 }
 
 func (s *SSHHandler) closeSession(sess session.Session) {
@@ -153,21 +163,6 @@ func (s *SSHHandler) closeSession(sess session.Session) {
 // Close closes all sessions handled by SSHandler
 func (s *SSHHandler) Close() {
 	s.lFactory.Close()
-}
-
-func listenTCP(name string, sess session.Session) (net.Listener, error) {
-	addr, err := net.ResolveTCPAddr("tcp4", ":0")
-	if err != nil {
-		return nil, errors.New("could not parse TCP addr: " + err.Error())
-	}
-	ln, err := net.ListenTCP("tcp4", addr)
-	if err != nil {
-		return nil, errors.New("could not listen on: " + err.Error())
-	}
-	listener := wnet.NewTCPListener(ln, wnet.TrackWithName(name),
-		wnet.TrackWithDeadline(1*time.Second),
-		wnet.TrackWithLabels(map[string]string{"cluster": sess.Cluster(), "backend": sess.BackendID(), "node": sess.NodeID()}))
-	return listener, nil
 }
 
 func ipForConn(conn net.Conn) string {

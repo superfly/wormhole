@@ -340,6 +340,7 @@ func (s *SSHSession) handleRemoteForward(req *ssh.Request, ln net.Listener) {
 				go openChannelsMetric.With(labels(s)).Add(1)
 				go func() {
 					chWritten, ingressConnWritten, err := wnet.CopyCloseIO(ch, ingressConn)
+					s.logger.Debugf("CopyCloseIO: Received: %d bytes, Sent: %d bytes", ingressConnWritten, chWritten)
 					openChannelsMetric.With(labels(s)).Sub(1)
 					if connWithMetrics, ok := ingressConn.(*wnet.ServerConnTracker); ok {
 						connWithMetrics.ReportDataMetrics(ingressConnWritten, chWritten)
