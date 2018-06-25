@@ -15,8 +15,8 @@ import (
 
 const (
 	localServerRetry   = 200 * time.Millisecond // how often to retry local server until ready
-	minWormholeBackoff = 200 * time.Millisecond // min backoff between retries to wormhole server
-	maxWormholeBackoff = 2 * time.Minute        // max backoff between retries to wormhole server
+	minWormholeBackoff = 100 * time.Millisecond // min backoff between retries to wormhole server
+	maxWormholeBackoff = 5 * time.Second        // max backoff between retries to wormhole server
 )
 
 // StartLocal ...

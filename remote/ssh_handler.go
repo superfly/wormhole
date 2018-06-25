@@ -35,7 +35,7 @@ type SSHHandler struct {
 
 // NewSSHHandler returns a new SSHHandler
 func NewSSHHandler(cfg *config.ServerConfig, registry *session.Registry, pool *redis.Pool, factory wnet.ListenerFactory) (*SSHHandler, error) {
-	rate, err := limiter.NewRateFromFormatted("240-H")
+	rate, err := limiter.NewRateFromFormatted("30-M")
 	if err != nil {
 		return nil, fmt.Errorf("Couldn't create a rate limit for SSHHandler: %s", err.Error())
 	}
