@@ -7,6 +7,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 
 	"github.com/garyburd/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
@@ -240,7 +241,7 @@ func (s *SSHSession) Close() {
 }
 
 func (s *SSHSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
-	backendID, err := s.store.BackendIDFromToken(string(pass))
+	backendID, err := s.store.BackendIDFromToken(strings.TrimSpace(string(pass)))
 	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}
