@@ -241,11 +241,11 @@ func (s *SSHSession) Close() {
 
 func (s *SSHSession) authFromToken(c ssh.ConnMetadata, pass []byte) (*ssh.Permissions, error) {
 	backendID, err := s.store.BackendIDFromToken(string(pass))
-	if err != nil {
+	if err != nil && err != redis.ErrNil {
 		return nil, err
 	}
 	if backendID == "" {
-		return nil, errors.New("token rejected")
+		return nil, errors.New("token '" + string(pass) + "' rejected")
 	}
 
 	// assume false if not set
