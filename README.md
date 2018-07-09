@@ -1,11 +1,4 @@
-[![Fly.io Community Slack](https://fly.io/slack/badge.svg)](https://fly.io/slack/)
-[![Build Status](https://travis-ci.org/superfly/wormhole.svg?branch=master)](https://travis-ci.org/superfly/wormhole)
-
-# wormhole - Fly.io reverse Proxy
-
-<p align="center">
-  <img src="wormhole.png">
-</p>
+# wormhole - reverse Proxy
 
 ## What is wormhole?
 Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
@@ -13,8 +6,8 @@ Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 ## Compiling
 **Wormhole requires Go1.8+**
 
-    go get github.com/superfly/wormhole
-    cd $GOPATH/src/github.com/superfly/wormhole
+    go get github.com/oknoah/wormhole
+    cd $GOPATH/src/github.com/oknoah/wormhole
     make setup
     make binaries
 
@@ -44,6 +37,4 @@ Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 | Local Endpoint over TCP			| Supported |
 | Local Endpoint over TLS			| Supported |
 | Single Tunnel Type per WH Server 		| Supported |
-| Multiple Tunnel Types per WH Server 		| Pending [#10](https://github.com/superfly/wormhole/issues/10) |
-| Healthcheck for Local Endpoint 		| Pending [#33](https://github.com/superfly/wormhole/issues/33) |
 | WH Server Shared Port TLS+SNI forwarding 	| Supported |

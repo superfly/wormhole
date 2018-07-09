@@ -7,7 +7,7 @@ DESTDIR=/usr/local
 # Used to populate version variable in main package.
 VERSION=$(shell git describe --match 'v[0-9]*' --dirty='.m' --always)
 
-PROJECT_ROOT=github.com/superfly/wormhole
+PROJECT_ROOT=github.com/oknoah/wormhole
 
 # Race detector is only supported on amd64.
 RACE := $(shell test $$(go env GOARCH) != "amd64" || (echo "-race"))

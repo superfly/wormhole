@@ -7,8 +7,8 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	log "github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole"
-	"github.com/superfly/wormhole/config"
+	"github.com/oknoah/wormhole"
+	"github.com/oknoah/wormhole/config"
 )
 
 func main() {

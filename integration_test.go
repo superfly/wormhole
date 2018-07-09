@@ -9,8 +9,8 @@ import (
 
 	"github.com/alicebob/miniredis"
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole"
-	"github.com/superfly/wormhole/config"
+	"github.com/oknoah/wormhole"
+	"github.com/oknoah/wormhole/config"
 
 	"github.com/garyburd/redigo/redis"
 )
