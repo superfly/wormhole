@@ -24,10 +24,10 @@ export FLY_REDIS_URL=redis://127.0.0.1:6379
 export FLY_CLUSTER_URL=127.0.0.1
 export FLY_LOCALHOST=localhost
 export FLY_NODE_ID=localhost
-export FLY_TLS_CERT_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts/cert.pem
-export FLY_TLS_PRIVATE_KEY_FILE=$GOPATH/src/github.com/superfly/wormhole/scripts/key.pem
+export FLY_TLS_CERT_FILE=$GOPATH/src/github.com/oknoah/wormhole/scripts/cert.pem
+export FLY_TLS_PRIVATE_KEY_FILE=$GOPATH/src/github.com/oknoah/wormhole/scripts/key.pem
 
 
-WORMHOLE_BIN=$GOPATH/src/github.com/superfly/wormhole/bin/wormhole
+WORMHOLE_BIN=$GOPATH/src/github.com/oknoah/wormhole/bin/wormhole
 
 $WORMHOLE_BIN -server

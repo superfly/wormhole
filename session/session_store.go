@@ -4,8 +4,8 @@ import (
 	"net"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
-	wnet "github.com/superfly/wormhole/net"
+	"github.com/gomodule/redigo/redis"
+	wnet "github.com/oknoah/wormhole/net"
 )
 
 const (

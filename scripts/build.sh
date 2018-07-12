@@ -54,7 +54,7 @@ VERSION=${VERSION:-"latest"}
 
 echo "Compiling version: ${VERSION}"
 
-LDFLAGS="-X 'github.com/superfly/wormhole/config.version=$VERSION' -s -w"
+LDFLAGS="-X 'github.com/oknoah/wormhole/config.version=$VERSION' -s -w"
 GCFLAGS=""
 
 # Cleanup
@@ -73,7 +73,7 @@ for os in ${OSES[@]}; do
 		if [ "$arch" == "arm" ] && [ "$os" != "linux" ]; then
 			continue
 		fi
-		env CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" -o pkg/wormhole_${os}_${arch}${suffix} github.com/superfly/wormhole/cmd/wormhole
+		env CGO_ENABLED=0 GOOS=$os GOARCH=$arch go build -ldflags "$LDFLAGS" -gcflags "$GCFLAGS" -o pkg/wormhole_${os}_${arch}${suffix} github.com/oknoah/wormhole/cmd/wormhole
 		$MD5 pkg/wormhole_${os}_${arch}${suffix}
 	done
 done
@@ -113,7 +113,7 @@ if [ "$CHANNEL" == "stable" ]; then
 
   $GHR $TRAVIS_TAG pkg/* --commit $TRAVIS_COMMIT \
                             --tag $TRAVIS_TAG \
-                            --github-repository "superfly/wormhole" \
+                            --github-repository "oknoah/wormhole" \
                             --github-access-token $GITHUB_ACCESS_TOKEN
 fi
 

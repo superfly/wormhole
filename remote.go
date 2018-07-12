@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/oknoah/wormhole/config"
 	wnet "github.com/oknoah/wormhole/net"

@@ -7,11 +7,11 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/messages"
-	wnet "github.com/superfly/wormhole/net"
+	"github.com/oknoah/wormhole/messages"
+	wnet "github.com/oknoah/wormhole/net"
 )
 
 const (

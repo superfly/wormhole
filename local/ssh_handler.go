@@ -11,10 +11,10 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/config"
-	"github.com/superfly/wormhole/messages"
-	wnet "github.com/superfly/wormhole/net"
-	"github.com/superfly/wormhole/utils"
+	"github.com/oknoah/wormhole/config"
+	"github.com/oknoah/wormhole/messages"
+	wnet "github.com/oknoah/wormhole/net"
+	"github.com/oknoah/wormhole/utils"
 	"golang.org/x/crypto/ssh"
 )
 

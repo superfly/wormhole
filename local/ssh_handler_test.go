@@ -13,8 +13,8 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/superfly/wormhole/config"
-	"github.com/superfly/wormhole/messages"
+	"github.com/oknoah/wormhole/config"
+	"github.com/oknoah/wormhole/messages"
 	"golang.org/x/crypto/ssh"
 
 	"os"

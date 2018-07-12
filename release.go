@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/superfly/wormhole/messages"
+	"github.com/oknoah/wormhole/messages"
 
 	git "gopkg.in/src-d/go-git.v4"
 	"gopkg.in/src-d/go-git.v4/plumbing"

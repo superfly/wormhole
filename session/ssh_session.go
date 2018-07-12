@@ -9,14 +9,14 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/messages"
+	"github.com/oknoah/wormhole/messages"
 	"golang.org/x/crypto/ssh"
 
-	wnet "github.com/superfly/wormhole/net"
+	wnet "github.com/oknoah/wormhole/net"
 )
 
 const (

@@ -37,6 +37,7 @@ setup: ## install dependencies
 	@go get -u github.com/gordonklaus/ineffassign
 	@go get -u github.com/client9/misspell/cmd/misspell
 	@go get -u github.com/Masterminds/glide
+	@go get -u github.com/gomodule/redigo/redis
 	@glide install
 
 # Depends on binaries because vet will silently fail if it can't load compiled

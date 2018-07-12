@@ -14,9 +14,9 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/superfly/tlstest"
-	"github.com/superfly/wormhole/config"
-	"github.com/superfly/wormhole/messages"
-	wnet "github.com/superfly/wormhole/net"
+	"github.com/oknoah/wormhole/config"
+	"github.com/oknoah/wormhole/messages"
+	wnet "github.com/oknoah/wormhole/net"
 	"golang.org/x/net/http2"
 
 	"os"

@@ -32,7 +32,7 @@ func testServerConfig(t *testing.T, redisURL string) *config.ServerConfig {
 		t.Fatal(err)
 	}
 	sc := &config.ServerConfig{
-		RedisURL:      "redis://" + redisURL,
+		RedisURL:      redisURL,
 		SSHPrivateKey: sshKey,
 	}
 	logger := logrus.New()

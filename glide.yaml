@@ -1,4 +1,4 @@
-package: github.com/superfly/wormhole
+package: github.com/oknoah/wormhole
 import:
 - package: github.com/jpillora/backoff
 - package: github.com/x-cray/logrus-prefixed-formatter
