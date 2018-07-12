@@ -1,49 +1,19 @@
-[![Fly.io Community Slack](https://fly.io/slack/badge.svg)](https://fly.io/slack/)
-[![Build Status](https://travis-ci.org/superfly/wormhole.svg?branch=master)](https://travis-ci.org/superfly/wormhole)
+# Wormhole
 
-# wormhole - Fly.io reverse Proxy
+This tries to make a self-hostable load-balancer. Such a service is meant to replace SaaS software that does something similar. The software could cut out nginx and allow load balancing by simple adding an executable and environment variable to deployed Docker swarms across multiple regions.
 
-<p align="center">
-  <img src="wormhole.png">
-</p>
+> ⭐️ This repo lives at [Wormhole on Gitlab](https://gitlab.com/NoahGray/wormhole)
 
-## What is wormhole?
-Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
+Furthermore, this load-balancer may be programmable into a CDN, or other "edge" web service. This is all a matter of learning how this technology can be most easily and securely deployed on off-the-shelf VPS services like [Linode](https://www.linode.com/?r=648a8ae1ae75b0fe6d5753224c20e453a47badaf) (referral links herein). Linode's VPS cloud products are comparable (virtually identical) to [Digital Ocean](https://m.do.co/c/fa21c7c32e3f) droplets in specs and price, take your pick.
 
-## Compiling
-**Wormhole requires Go1.8+**
+## Goal
 
-    go get github.com/superfly/wormhole
-    cd $GOPATH/src/github.com/superfly/wormhole
-    make setup
-    make binaries
+For now, I hope to allow folks to simply deploy load balancing, caching and some other features without subscribing to a fixed-cost SaaS that charges per app or per hour.
 
-## Running locally
+We might also iamgine a simple service like Dokku (a self-hostable Heroku-like toolset) combined with these features either as a plugin or a fork.
 
-    brew install redis
+It would be nice to have 4-5 inexpensive VPS around the world to easily deploy to, with a Heroku-esque workflow, some JS, and caching. That could create a very modern tool for folks who think about the world beyond the West.
 
-    # make sure redis-server is running
+# License and contributors
 
-    # Start server
-    ./scripts/wormhole-server.sh
-
-    # Start clients (defaults to 1)
-    ./scripts/wormhole-local.sh <NUM_CLIENTS>
-
-    # The tunnel will be accessible on a randomly chosen port (look at wormhole-server logs):
-    # [Feb 20 20:43:50]  INFO SSHHandler: Started session 29ff7b66abcc9871cdf1bc551f6e89728202f3e24e48675ecd9b8556a5dbd60b for Mats-MBP.local ([::1]:63169). Listening on: localhost:63170
-
-## Feature Status
-
-| Feature					| Status       |
-| :-----:					| :----:       |
-| SSH Tunnel					| Supported |
-| TCP Tunnel					| Experimental - currently lacking some auth |
-| TLS Tunnel              			| Experimental - currently lacking some auth |
-| HTTP2 Tunnel            			| Experimental - currently lacking some auth |
-| Local Endpoint over TCP			| Supported |
-| Local Endpoint over TLS			| Supported |
-| Single Tunnel Type per WH Server 		| Supported |
-| Multiple Tunnel Types per WH Server 		| Pending [#10](https://github.com/superfly/wormhole/issues/10) |
-| Healthcheck for Local Endpoint 		| Pending [#33](https://github.com/superfly/wormhole/issues/33) |
-| WH Server Shared Port TLS+SNI forwarding 	| Supported |
+Thanks to [Superfly](https://github.com/superfly) for getting things started.

@@ -1,0 +1,21 @@
+FROM amd64/golang:alpine
+
+ENV FLY_PROTO=ssh
+ENV FLY_USE_SHARED_PORT_FORWARDING=1
+ENV FLY_SHARED_TLS_FORWARDING_PORT=5442
+ENV FLY_LOG_LEVEL=debug
+ENV FLY_REDIS_URL=redis://localhost:6379
+ENV FLY_CLUSTER_URL=127.0.0.1
+ENV FLY_LOCALHOST=localhost
+ENV FLY_NODE_ID=localhosts
+ENV FLY_SSH_PRIVATE_KEY_FILE=/keys/id_rsa
+ENV FLY_TLS_CERT_FILE=/keys/cert.pem
+ENV FLY_TLS_PRIVATE_KEY_FILE=/keys/key.pem
+
+COPY . /go/src/github.com/oknoah/wormhole
+RUN mkdir /keys
+WORKDIR /go/src/github.com/oknoah/wormhole
+RUN apk update && apk add ca-certificates make git openssh-keygen && rm -rf /var/cache/apk/*
+RUN make setup
+
+ENTRYPOINT ["go", "run", "/go/src/github.com/oknoah/wormhole/cmd/wormhole/main.go", "--server"]

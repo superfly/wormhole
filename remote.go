@@ -7,13 +7,13 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/config"
-	wnet "github.com/superfly/wormhole/net"
-	handler "github.com/superfly/wormhole/remote"
-	"github.com/superfly/wormhole/session"
-	tlsc "github.com/superfly/wormhole/tls"
+	"github.com/oknoah/wormhole/config"
+	wnet "github.com/oknoah/wormhole/net"
+	handler "github.com/oknoah/wormhole/remote"
+	"github.com/oknoah/wormhole/session"
+	tlsc "github.com/oknoah/wormhole/tls"
 )
 
 var (

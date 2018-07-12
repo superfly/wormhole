@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	. "github.com/superfly/wormhole/testing"
+	. "github.com/oknoah/wormhole/testing"
 )
 
 func TestParseTunnelProto(t *testing.T) {
@@ -33,6 +33,7 @@ func TestDefaultServerConfig(t *testing.T) {
 	Equals(t, cfg.Port, "10000")
 	Equals(t, cfg.Localhost, "localhost")
 	Equals(t, cfg.ClusterURL, "127.0.0.1")
+	// not with --link baby
 	Equals(t, cfg.RedisURL, "redis://localhost:6379")
 	Equals(t, cfg.LogLevel, "info")
 

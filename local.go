@@ -9,8 +9,8 @@ import (
 	"github.com/jpillora/backoff"
 	"github.com/sirupsen/logrus"
 
-	"github.com/superfly/wormhole/config"
-	"github.com/superfly/wormhole/local"
+	"github.com/oknoah/wormhole/config"
+	"github.com/oknoah/wormhole/local"
 )
 
 const (

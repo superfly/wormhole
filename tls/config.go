@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/pkg/errors"
-	"github.com/superfly/wormhole/session"
+	"github.com/oknoah/wormhole/session"
 )
 
 // Config uses session.Registry to generate tls.Config's dynamically for each session.

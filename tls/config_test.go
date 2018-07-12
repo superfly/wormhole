@@ -13,8 +13,8 @@ import (
 	"github.com/go-test/deep"
 	"github.com/stretchr/testify/assert"
 	"github.com/superfly/tlstest"
-	"github.com/superfly/wormhole/messages"
-	"github.com/superfly/wormhole/session"
+	"github.com/oknoah/wormhole/messages"
+	"github.com/oknoah/wormhole/session"
 )
 
 func TestTLSConfig_BadCert(t *testing.T) {

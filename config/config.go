@@ -152,6 +152,7 @@ func NewServerConfig() (*ServerConfig, error) {
 	viper.SetDefault("use_shared_port_forwarding", false)
 	viper.SetDefault("shared_tls_forwarding_port", "443")
 	viper.BindEnv("bugsnag_api_key", "BUGSNAG_API_KEY")
+	viper.BindEnv("REDIS_PORT_6379_TCP", "FLY_REDIS_URL")
 
 	logger := logrus.New()
 	logger.Formatter = new(prefixed.TextFormatter)
@@ -187,7 +188,7 @@ func NewServerConfig() (*ServerConfig, error) {
 
 	cfg := &ServerConfig{
 		ClusterURL:              viper.GetString("cluster_url"),
-		RedisURL:                viper.GetString("redis_url"),
+		RedisURL:                viper.GetString("redis_port_6379_tcp"),
 		NodeID:                  viper.GetString("node_id"),
 		MetricsAPIPort:          viper.GetString("metrics_api_port"),
 		UseSharedPortForwarding: viper.GetBool("use_shared_port_forwarding"),

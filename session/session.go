@@ -8,7 +8,7 @@ import (
 	"net"
 
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/messages"
+	"github.com/oknoah/wormhole/messages"
 )
 
 // Session hold information about connected client

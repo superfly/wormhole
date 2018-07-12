@@ -5,12 +5,12 @@ import (
 	"io"
 	"net"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/config"
-	"github.com/superfly/wormhole/messages"
-	wnet "github.com/superfly/wormhole/net"
-	"github.com/superfly/wormhole/session"
+	"github.com/oknoah/wormhole/config"
+	"github.com/oknoah/wormhole/messages"
+	wnet "github.com/oknoah/wormhole/net"
+	"github.com/oknoah/wormhole/session"
 )
 
 // HTTP2Handler type represents the handler that accepts incoming wormhole connections

@@ -6,11 +6,11 @@ import (
 	"net"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
-	"github.com/superfly/wormhole/config"
-	wnet "github.com/superfly/wormhole/net"
-	"github.com/superfly/wormhole/session"
+	"github.com/oknoah/wormhole/config"
+	wnet "github.com/oknoah/wormhole/net"
+	"github.com/oknoah/wormhole/session"
 	"github.com/ulule/limiter"
 	"golang.org/x/crypto/ssh"
 )
