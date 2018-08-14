@@ -37,12 +37,12 @@ else
   BUILD_UPLOAD=${BUILD_UPLOAD:-false}
 fi
 
-# download glide if it's not available
-if [ ! -x "$(command -v glide)" ]; then
-  go get github.com/Masterminds/glide
+# download dep if it's not available
+if [ ! -x "$(command -v dep)" ]; then
+  go get github.com/golang/dep/cmd/dep
 fi
 
-glide --debug install
+dep ensure
 
 MD5='md5sum'
 unamestr=`uname`

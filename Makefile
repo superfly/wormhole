@@ -36,8 +36,8 @@ setup: ## install dependencies
 	@go get -u github.com/golang/lint/golint
 	@go get -u github.com/gordonklaus/ineffassign
 	@go get -u github.com/client9/misspell/cmd/misspell
-	@go get -u github.com/Masterminds/glide
-	@glide install
+	@go get -u github.com/golang/dep/cmd/dep
+	@dep ensure
 
 # Depends on binaries because vet will silently fail if it can't load compiled
 # imports
