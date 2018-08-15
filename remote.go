@@ -7,7 +7,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	wnet "github.com/superfly/wormhole/net"
@@ -82,6 +82,7 @@ func listenerFactoryFromConfig(registry *session.Registry, cfg *config.ServerCon
 			Address:   ":" + cfg.SharedTLSForwardingPort,
 			Logger:    cfg.Logger,
 			TLSConfig: tlsconf.GetDefaultConfig(),
+			RedisPool: redisPool,
 		}
 		sharedL, err := wnet.NewSharedPortTLSListenerFactory(sharedArgs)
 		if err != nil {

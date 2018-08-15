@@ -149,8 +149,17 @@
     "internal",
     "redis"
   ]
-  revision = "8873b2f1995f59d4bcdd2b0dc9858e2cb9bf0c13"
-  version = "v1.0.0"
+  revision = "a69d19351219b6dd56f274f96d85a7014a2ec34e"
+  version = "v1.6.0"
+
+[[projects]]
+  name = "github.com/go-chi/chi"
+  packages = [
+    ".",
+    "middleware"
+  ]
+  revision = "e83ac2304db3c50cf03d96a2fcd39009d458bc35"
+  version = "v3.3.2"
 
 [[projects]]
   name = "github.com/go-test/deep"
@@ -167,6 +176,15 @@
   name = "github.com/golang/protobuf"
   packages = ["proto"]
   revision = "1e59b77b52bf8e4b449a57e6f79f21226d571845"
+
+[[projects]]
+  name = "github.com/gomodule/redigo"
+  packages = [
+    "internal",
+    "redis"
+  ]
+  revision = "9c11da706d9b7902c6da69c592f75637793fe121"
+  version = "v2.0.0"
 
 [[projects]]
   name = "github.com/hashicorp/hcl"
@@ -328,6 +346,12 @@
     "xfs"
   ]
   revision = "b15cd069a83443be3154b719d0cc9fe8117f09fb"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/rafaeljusto/redigomock"
+  packages = ["."]
+  revision = "1d32475ae23cbe2e221e166e452da3279d3dc7bf"
 
 [[projects]]
   name = "github.com/rs/xid"
@@ -562,6 +586,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "1321f75613e8a6f3bea86773d23e9c581fb363cb90b2f3b8bc6fbe30c99f8a4b"
+  inputs-digest = "f1f2ef58b20f8e47001ff0fad7b2a2c46a68d481df7cffb96ab75161d4d2cc30"
   solver-name = "gps-cdcl"
   solver-version = 1

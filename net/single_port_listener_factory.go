@@ -4,10 +4,13 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net"
+	"net/http"
 	"strings"
 	"sync"
 
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
+	"github.com/superfly/wormhole/api"
 )
 
 type sharedPortTLSListenerFactory struct {
@@ -17,7 +20,8 @@ type sharedPortTLSListenerFactory struct {
 	fLock   sync.Mutex
 	logger  *logrus.Entry
 
-	stopC chan struct{}
+	stopC      chan struct{}
+	apiHandler *api.Handler
 }
 
 // SharedPortTLSListenerFactoryArgs provides the data needed to create a SharedPortTLSListenerFactory
@@ -25,6 +29,7 @@ type SharedPortTLSListenerFactoryArgs struct {
 	TLSConfig *tls.Config
 	Address   string
 	Logger    *logrus.Logger
+	RedisPool *redis.Pool
 }
 
 // NewSharedPortTLSListenerFactory creates a new listener factory for shared port TLS
@@ -38,10 +43,11 @@ func NewSharedPortTLSListenerFactory(args *SharedPortTLSListenerFactoryArgs) (Li
 	}
 
 	f := &sharedPortTLSListenerFactory{
-		listener: listener,
-		forward:  make(map[string]*sharedPortTLSListener),
-		stopC:    make(chan struct{}),
-		logger:   args.Logger.WithFields(logrus.Fields{"prefix": "shared_port_tls_listener_factory"}),
+		listener:   listener,
+		forward:    make(map[string]*sharedPortTLSListener),
+		stopC:      make(chan struct{}),
+		logger:     args.Logger.WithFields(logrus.Fields{"prefix": "shared_port_tls_listener_factory"}),
+		apiHandler: api.NewHandler(args.Logger.WithFields(logrus.Fields{"prefix": "api_handler"}), args.RedisPool),
 	}
 
 	go func() {
@@ -119,6 +125,12 @@ func (sl *sharedPortTLSListenerFactory) populateCh() error {
 					sl.logger.Errorf("Error finding ID from SNI: %+v", err)
 					return
 				}
+
+				if id == "api" {
+					http.Serve(api.NewSingleConnListener(sl.listener, c), sl.apiHandler)
+					return
+				}
+
 				sl.fLock.Lock()
 				ch, ok := sl.forward[id]
 				sl.fLock.Unlock()
