@@ -3,27 +3,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/Azure/go-ansiterm"
-  packages = [
-    ".",
-    "winterm"
-  ]
-  revision = "d6e3b3328b783f23731bc4d058875b0371ff8109"
-
-[[projects]]
-  name = "github.com/Microsoft/go-winio"
-  packages = ["."]
-  revision = "b7c3cf0d1286c7b62b140ed960a00b154c1b6fcc"
-  version = "v0.4.6"
-
-[[projects]]
-  branch = "master"
-  name = "github.com/Nvveen/Gotty"
-  packages = ["."]
-  revision = "cd527374f1e5bff4938207604a14f2e38a9cf512"
-
-[[projects]]
-  branch = "master"
   name = "github.com/Shopify/logrus-bugsnag"
   packages = ["."]
   revision = "577dee27f20dd8f1a529f82210094af593be12bd"
@@ -65,83 +44,16 @@
   revision = "dd8df9a3778aaebc569794383e5c4ce87d6fd89e"
 
 [[projects]]
-  name = "github.com/cenk/backoff"
-  packages = ["."]
-  revision = "2ea60e5f094469f9e65adb9cd103795b73ae743e"
-  version = "v2.0.0"
-
-[[projects]]
-  name = "github.com/containerd/continuity"
-  packages = ["pathdriver"]
-  revision = "b2b946a77f5973f420514090d6f6dd58b08303f0"
-
-[[projects]]
   name = "github.com/davecgh/go-spew"
   packages = ["spew"]
   revision = "346938d642f2ec3594ed81d874461961cd0faa76"
   version = "v1.1.0"
 
 [[projects]]
-  name = "github.com/docker/docker"
-  packages = [
-    "api/types",
-    "api/types/blkiodev",
-    "api/types/container",
-    "api/types/filters",
-    "api/types/mount",
-    "api/types/network",
-    "api/types/registry",
-    "api/types/strslice",
-    "api/types/swarm",
-    "api/types/swarm/runtime",
-    "api/types/versions",
-    "opts",
-    "pkg/fileutils",
-    "pkg/homedir",
-    "pkg/idtools",
-    "pkg/ioutils",
-    "pkg/longpath",
-    "pkg/mount",
-    "pkg/pools",
-    "pkg/stdcopy",
-    "pkg/system"
-  ]
-  revision = "3dfb26ab3cbf961298f8ce3f94659b5fe4146ceb"
-
-[[projects]]
-  name = "github.com/docker/go-connections"
-  packages = ["nat"]
-  revision = "3ede32e2033de7505e6500d6c868c2b9ed9f169d"
-  version = "v0.3.0"
-
-[[projects]]
-  name = "github.com/docker/go-units"
-  packages = ["."]
-  revision = "47565b4f722fb6ceae66b95f853feed578a4a51c"
-  version = "v0.3.3"
-
-[[projects]]
-  name = "github.com/docker/libnetwork"
-  packages = ["ipamutils"]
-  revision = "6d23f11e681f24ee31802939e243fe8be41a75eb"
-  version = "v0.8.0-dev.2"
-
-[[projects]]
   name = "github.com/fsnotify/fsnotify"
   packages = ["."]
   revision = "c2828203cd70a50dcccfb2761f8b1f8ceef9a8e9"
   version = "v1.4.7"
-
-[[projects]]
-  name = "github.com/fsouza/go-dockerclient"
-  packages = [
-    ".",
-    "internal/archive",
-    "internal/jsonmessage",
-    "internal/term"
-  ]
-  revision = "8842d40dbf5ee062d80f9dc429db31a0fe0cdc73"
-  version = "v1.2.2"
 
 [[projects]]
   name = "github.com/garyburd/redigo"
@@ -166,11 +78,6 @@
   packages = ["."]
   revision = "9898238679c264cfb10411539f14a0553dc8b295"
   version = "v1.0.0"
-
-[[projects]]
-  name = "github.com/gogo/protobuf"
-  packages = ["proto"]
-  revision = "160de10b2537169b5ae3e7e221d28269ef40d311"
 
 [[projects]]
   name = "github.com/golang/protobuf"
@@ -262,25 +169,6 @@
   name = "github.com/mitchellh/mapstructure"
   packages = ["."]
   revision = "b4575eea38cca1123ec2dc90c26529b5c5acfcff"
-
-[[projects]]
-  name = "github.com/opencontainers/go-digest"
-  packages = ["."]
-  revision = "279bed98673dd5bef374d3b6e4b09e2af76183bf"
-  version = "v1.0.0-rc1"
-
-[[projects]]
-  name = "github.com/opencontainers/image-spec"
-  packages = [
-    "specs-go",
-    "specs-go/v1"
-  ]
-  revision = "577479e4dc273d3779f00c223c7e0dba4cd6b8b0"
-
-[[projects]]
-  name = "github.com/opencontainers/runc"
-  packages = ["libcontainer/user"]
-  revision = "ab4a8191679806893207d9c1e507a77ff46dafaa"
 
 [[projects]]
   name = "github.com/patrickmn/go-cache"
@@ -507,12 +395,6 @@
   revision = "e19ae1496984b1c655b8044a65c0300a3c878dd3"
 
 [[projects]]
-  name = "gopkg.in/ory-am/dockertest.v3"
-  packages = ["."]
-  revision = "6d57cd43b964e928111542771659af6a3a58521f"
-  version = "3.0.9"
-
-[[projects]]
   name = "gopkg.in/src-d/go-billy.v4"
   packages = [
     ".",
@@ -586,6 +468,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "f1f2ef58b20f8e47001ff0fad7b2a2c46a68d481df7cffb96ab75161d4d2cc30"
+  inputs-digest = "76c6d2d59ded23d6e01b7281ff04a23ec8ae6666705f99bce8b13e61be3601d2"
   solver-name = "gps-cdcl"
   solver-version = 1
