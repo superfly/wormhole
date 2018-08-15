@@ -129,7 +129,7 @@ func TestAPIHandlerEndpoints(t *testing.T) {
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, "application/json", res.Header.Get("content-type"))
 	body, _ := ioutil.ReadAll(res.Body)
-	expectedBody, _ := json.Marshal([]map[string]string{map[string]string{
+	expectedBody, _ := json.Marshal([]map[string]string{{
 		"address":      "helloworld.wormhole.test:1234",
 		"cluster":      "wormhole.test",
 		"connected_at": now,
