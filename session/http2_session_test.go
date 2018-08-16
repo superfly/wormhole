@@ -18,7 +18,7 @@ import (
 )
 
 func newServerClientTLSConns(alpn bool) (serverTLSConn *tls.Conn, clientTLSConn *tls.Conn, err error) {
-	sConnCh := make(chan *net.TCPConn)
+	sConnCh := make(chan net.Conn)
 	lnAddr := &net.TCPAddr{
 		IP:   net.IPv4(127, 0, 0, 1),
 		Port: 8085,

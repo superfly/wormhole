@@ -1,6 +1,7 @@
 package wormhole
 
 import (
+	"crypto/tls"
 	"net"
 	"net/url"
 	"os"
@@ -46,7 +47,7 @@ func StartRemote(cfg *config.ServerConfig) {
 	}
 
 	m := cmux.New(l)
-	httpL := m.Match(cmux.HTTP1())
+	httpL := m.Match(cmux.TLS())
 	tcpL := m.Match(cmux.Any())
 
 	switch cfg.Protocol {
@@ -70,8 +71,17 @@ func StartRemote(cfg *config.ServerConfig) {
 	}
 
 	go handleDeath(h, registry)
+
+	crt, err := tls.X509KeyPair(cfg.SharedPortTLSCert, cfg.SharedPortTLSPrivateKey)
+	if err != nil {
+		log.Fatal("could not parse tls key/value pair", err)
+	}
+	tlsl := tls.NewListener(httpL, &tls.Config{
+		Certificates: []tls.Certificate{crt},
+	})
+
 	go func() {
-		err := api.NewServer(cfg.Logger.WithFields(logrus.Fields{"prefix": "api"}), redisPool).Serve(httpL)
+		err := api.NewServer(cfg.Logger.WithFields(logrus.Fields{"prefix": "api"}), redisPool).Serve(tlsl)
 		log.Println("API Server is done, err?", err)
 	}()
 	go server.Serve(tcpL, h)
