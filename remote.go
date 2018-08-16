@@ -1,6 +1,7 @@
 package wormhole
 
 import (
+	"net"
 	"net/url"
 	"os"
 	"os/signal"
@@ -9,6 +10,8 @@ import (
 
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
+	"github.com/soheilhy/cmux"
+	"github.com/superfly/wormhole/api"
 	"github.com/superfly/wormhole/config"
 	wnet "github.com/superfly/wormhole/net"
 	handler "github.com/superfly/wormhole/remote"
@@ -37,6 +40,15 @@ func StartRemote(cfg *config.ServerConfig) {
 		log.Fatalf("Could not create listener factory: %+v", err)
 	}
 
+	l, err := net.Listen("tcp", ":"+cfg.Port)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	m := cmux.New(l)
+	httpL := m.Match(cmux.HTTP1())
+	tcpL := m.Match(cmux.Any())
+
 	switch cfg.Protocol {
 	case config.SSH:
 		h, err = handler.NewSSHHandler(cfg, registry, redisPool, listenerFactory)
@@ -58,7 +70,12 @@ func StartRemote(cfg *config.ServerConfig) {
 	}
 
 	go handleDeath(h, registry)
-	server.ListenAndServe(":"+cfg.Port, h)
+	go func() {
+		err := api.NewServer(cfg.Logger.WithFields(logrus.Fields{"prefix": "api"}), redisPool).Serve(httpL)
+		log.Println("API Server is done, err?", err)
+	}()
+	go server.Serve(tcpL, h)
+	m.Serve()
 }
 
 func listenerFactoryFromConfig(registry *session.Registry, cfg *config.ServerConfig) (wnet.ListenerFactory, error) {
@@ -82,7 +99,6 @@ func listenerFactoryFromConfig(registry *session.Registry, cfg *config.ServerCon
 			Address:   ":" + cfg.SharedTLSForwardingPort,
 			Logger:    cfg.Logger,
 			TLSConfig: tlsconf.GetDefaultConfig(),
-			RedisPool: redisPool,
 		}
 		sharedL, err := wnet.NewSharedPortTLSListenerFactory(sharedArgs)
 		if err != nil {

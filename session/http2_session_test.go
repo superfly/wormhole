@@ -56,14 +56,14 @@ func newServerClientTLSConns(alpn bool) (serverTLSConn *tls.Conn, clientTLSConn 
 
 	sTLSConnCh := make(chan *tls.Conn)
 
-	var wrapFunc func(*net.TCPConn, *tls.Config, wnet.TLSWrapperFunc) (*tls.Conn, error)
+	var wrapFunc func(net.Conn, *tls.Config, wnet.TLSWrapperFunc) (*tls.Conn, error)
 	if alpn {
 		wrapFunc = wnet.HTTP2ALPNTLSWrap
 	} else {
 		wrapFunc = wnet.GenericTLSWrap
 	}
 
-	go func(sConn *net.TCPConn) {
+	go func(sConn net.Conn) {
 		sTLSConn, err := wrapFunc(sConn, serverTLSConfig, tls.Server)
 		if err != nil {
 			log.Errorf("Error creating tls wrap server")

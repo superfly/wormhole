@@ -3,12 +3,13 @@ package net
 import (
 	"crypto/tls"
 	"fmt"
-	"golang.org/x/net/http2"
 	"io"
 	"net"
 	"reflect"
 	"strings"
 	"time"
+
+	"golang.org/x/net/http2"
 )
 
 // CopyDirection describes the direction of data copying in full-duplex link
@@ -52,7 +53,7 @@ type TLSWrapperFunc func(conn net.Conn, cfg *tls.Config) *tls.Conn
 
 // GenericTLSWrap takes a TCP connection, a tls config, and an upgrade function
 // and returns the new connection
-func GenericTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
+func GenericTLSWrap(conn net.Conn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
 	var tConn *tls.Conn
 
 	tCfg := cfg.Clone()
@@ -92,7 +93,7 @@ func GenericTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*
 // While technically the golang implementation will allow us not to perform ALPN,
 // this breaks the http/2 spec. The goal here is to follow the RFC to the letter
 // as documented in http://httpwg.org/specs/rfc7540.html#starting
-func HTTP2ALPNTLSWrap(conn *net.TCPConn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
+func HTTP2ALPNTLSWrap(conn net.Conn, cfg *tls.Config, tFunc TLSWrapperFunc) (*tls.Conn, error) {
 	protoCfg := cfg.Clone()
 	// TODO: append here
 	protoCfg.NextProtos = []string{http2.NextProtoTLS}

@@ -51,7 +51,7 @@ func NewHTTP2Handler(cfg *config.ServerConfig, registry *session.Registry, pool 
 // We are explicit with the *net.TCPConn since we need to be this way - and let the handler and
 // sessions handle wrapping in TLS. Having a TCPConn all the way down will highlight the dangers
 // of sending data over the socket without first wrapping in TLS
-func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
+func (h *HTTP2Handler) Serve(conn net.Conn) {
 	tlsConn, err := h.genericTLSWrap(conn)
 	if err != nil {
 		h.logger.Errorf("error establishing tls session: " + err.Error())
@@ -119,7 +119,7 @@ func (h *HTTP2Handler) Serve(conn *net.TCPConn) {
 	}
 }
 
-func (h *HTTP2Handler) genericTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
+func (h *HTTP2Handler) genericTLSWrap(conn net.Conn) (*tls.Conn, error) {
 	return wnet.GenericTLSWrap(conn, h.tlsConfig, tls.Server)
 }
 
@@ -127,7 +127,7 @@ func (h *HTTP2Handler) genericTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
 // While technically the golang implementation will allow us not to perform ALPN,
 // this breaks the http/2 spec. The goal here is to follow the RFC to the letter
 // as documented in http://httpwg.org/specs/rfc7540.html#starting
-func (h *HTTP2Handler) http2ALPNTLSWrap(conn *net.TCPConn) (*tls.Conn, error) {
+func (h *HTTP2Handler) http2ALPNTLSWrap(conn net.Conn) (*tls.Conn, error) {
 	return wnet.HTTP2ALPNTLSWrap(conn, h.tlsConfig, tls.Server)
 }
 

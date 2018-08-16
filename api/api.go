@@ -40,6 +40,11 @@ type Handler struct {
 	redisPool *redis.Pool
 }
 
+// NewServer ...
+func NewServer(logger *logrus.Entry, redisPool *redis.Pool) *http.Server {
+	return &http.Server{Handler: NewHandler(logger, redisPool)}
+}
+
 // NewHandler creates a new API handler
 func NewHandler(logger *logrus.Entry, redisPool *redis.Pool) *Handler {
 	r := chi.NewRouter()
