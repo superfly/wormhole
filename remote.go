@@ -89,15 +89,7 @@ func StartRemote(cfg *config.ServerConfig) {
 }
 
 func listenerFactoryFromConfig(registry *session.Registry, cfg *config.ServerConfig) (wnet.ListenerFactory, error) {
-	multiPortFactoryArgs := &wnet.MultiPortTCPListenerFactoryArgs{
-		BindAddr: "0.0.0.0",
-		Logger:   cfg.Logger,
-	}
-
-	listenerFactory, err := wnet.NewMultiPortTCPListenerFactory(multiPortFactoryArgs)
-	if err != nil {
-		return nil, err
-	}
+	var listenerFactory wnet.ListenerFactory
 
 	if cfg.UseSharedPortForwarding {
 		tlsconf, err := tlsc.NewConfig(cfg.SharedPortTLSCert, cfg.SharedPortTLSPrivateKey, registry)
@@ -119,10 +111,6 @@ func listenerFactoryFromConfig(registry *session.Registry, cfg *config.ServerCon
 			Factories: []wnet.FanInListenerFactoryEntry{
 				{
 					Factory:       sharedL,
-					ShouldCleanup: true,
-				},
-				{
-					Factory:       listenerFactory,
 					ShouldCleanup: true,
 				},
 			},
