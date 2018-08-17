@@ -47,6 +47,7 @@ func (r *RedisStore) RegisterConnection(s Session) error {
 		"node_id":      s.NodeID(),
 		"backend_id":   s.BackendID(),
 		"cluster":      s.Cluster(),
+		"region":       s.Region(),
 		"client_addr":  s.Client(),
 		"agent":        s.Agent(),
 		"connected_at": t.String(),
@@ -101,6 +102,7 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 			"session_id":   s.ID(),
 			"backend_id":   s.BackendID(),
 			"cluster":      s.Cluster(),
+			"region":       s.Region(),
 			"connected_at": t.String(),
 			"last_seen_at": t.String(),
 		}

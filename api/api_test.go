@@ -106,6 +106,7 @@ func TestAPIHandlerEndpoints(t *testing.T) {
 	now := time.Now().String()
 	cmdEndpoint := mockRedisConn.Command("HGETALL", "backend:123:endpoint:tls:helloworld.wormhole.test:1234").ExpectMap(map[string]string{
 		"cluster":      "wormhole.test",
+		"region":       "test region",
 		"connected_at": now,
 		"last_seen_at": now,
 	})
@@ -132,6 +133,7 @@ func TestAPIHandlerEndpoints(t *testing.T) {
 	expectedBody, _ := json.Marshal([]map[string]string{{
 		"address":      "helloworld.wormhole.test:1234",
 		"cluster":      "wormhole.test",
+		"region":       "test region",
 		"connected_at": now,
 		"last_seen_at": now,
 	}})

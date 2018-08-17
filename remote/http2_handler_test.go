@@ -295,23 +295,8 @@ func wrapClientConn(cConn *net.TCPConn, tlsConf *tls.Config, alpn bool) (*tls.Co
 	return tlsClientConn, nil
 }
 
-type anyString struct {
-	stored string
-}
-
-func (matcher *anyString) Match(input interface{}) bool {
-	switch v := input.(type) {
-	case string:
-		matcher.stored = v
-		return true
-	default:
-		return false
-	}
-}
-
 func TestCreatesFullSession(t *testing.T) {
-	stringMatcher := &anyString{""}
-	redisConn.Command("HMSET", stringMatcher, redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
+	redisConn.Command("HMSET", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
 
 	redisConn.Command("ZADD", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
 
@@ -321,7 +306,7 @@ func TestCreatesFullSession(t *testing.T) {
 
 	redisConn.Command("HSET", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
 
-	redisConn.Command("HMSET", stringMatcher, redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
+	redisConn.Command("HMSET", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
 
 	redisConn.Command("EXEC")
 

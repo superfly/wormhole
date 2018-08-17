@@ -154,6 +154,10 @@ func (ts *testSession) Cluster() string {
 	return ""
 }
 
+func (ts *testSession) Region() string {
+	return ""
+}
+
 func (ts *testSession) Endpoints() []net.Addr {
 	return []net.Addr{}
 }

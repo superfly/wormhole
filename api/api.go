@@ -146,6 +146,7 @@ func (h *Handler) endpoints(w http.ResponseWriter, req *http.Request) {
 					goodEndpoints = append(goodEndpoints, map[string]string{
 						"address":      strings.TrimPrefix(ep, tlsEndpointPrefix),
 						"cluster":      m["cluster"],
+						"region":       m["region"],
 						"connected_at": m["connected_at"],
 						"last_seen_at": m["last_seen_at"],
 					})
