@@ -26,6 +26,7 @@ type Store interface {
 	BackendRequiresClientAuth(backendID string) (bool, error)
 	ValidCertificate(backendID, fingerprint string) (bool, error)
 	GetClientCAs(backendID string) ([]byte, error)
+	Announce(rep []byte)
 }
 
 // RedisStore is session persistence using Redis
@@ -206,6 +207,25 @@ func (r *RedisStore) ValidCertificate(backendID, fingerprint string) (bool, erro
 	defer redisConn.Close()
 
 	return redis.Bool(redisConn.Do("SISMEMBER", "backend:"+backendID+":valid_certificates", fingerprint))
+}
+
+// Announce announces the server on redis
+// rep is a serialized representation of the current server
+func (r *RedisStore) Announce(rep []byte) {
+	announce(r.pool, rep)
+	ticker := time.NewTicker(10 * time.Second)
+	for range ticker.C {
+		announce(r.pool, rep)
+	}
+}
+
+const announceKey = "servers"
+
+func announce(pool *redis.Pool, rep []byte) {
+	redisConn := pool.Get()
+	defer redisConn.Close()
+
+	redisConn.Do("ZADD", announceKey, time.Now().Unix(), rep)
 }
 
 func timeToScore(t time.Time) int64 {
