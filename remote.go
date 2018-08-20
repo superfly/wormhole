@@ -16,6 +16,7 @@ import (
 	"github.com/superfly/wormhole/config"
 	wnet "github.com/superfly/wormhole/net"
 	handler "github.com/superfly/wormhole/remote"
+	wserver "github.com/superfly/wormhole/server"
 	"github.com/superfly/wormhole/session"
 	tlsc "github.com/superfly/wormhole/tls"
 )
@@ -80,12 +81,18 @@ func StartRemote(cfg *config.ServerConfig) {
 		Certificates: []tls.Certificate{crt},
 	})
 
-	go func() {
-		err := api.NewServer(cfg.Logger.WithFields(logrus.Fields{"prefix": "api"}), redisPool).Serve(tlsl)
-		log.Println("API Server is done, err?", err)
-	}()
+	rep, err := wserver.Representation{Address: cfg.ClusterURL, Port: cfg.Port, Region: cfg.Region}.MarshalMsg(nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	go api.NewServer(cfg.Logger, redisPool).Serve(tlsl)
 	go server.Serve(tcpL, h)
-	m.Serve()
+	go session.NewRedisStore(redisPool).Announce(rep)
+	if err := m.Serve(); err != nil {
+		log.Error("server error", err)
+		exitGracefully(h, registry)
+	}
 }
 
 func listenerFactoryFromConfig(registry *session.Registry, cfg *config.ServerConfig) (wnet.ListenerFactory, error) {
@@ -179,11 +186,15 @@ func handleDeath(h handler.Handler, r *session.Registry) {
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
 	go func(c <-chan os.Signal) {
 		for range c {
-			log.Print("Cleaning up before exit...")
-			h.Close()
-			r.Close()
-			log.Print("Cleaned up connections.")
-			os.Exit(1)
+			exitGracefully(h, r)
 		}
 	}(c)
+}
+
+func exitGracefully(h handler.Handler, r *session.Registry) {
+	log.Print("Cleaning up before exit...")
+	h.Close()
+	r.Close()
+	log.Print("Cleaned up connections.")
+	os.Exit(1)
 }

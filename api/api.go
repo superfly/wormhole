@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/chi/middleware"
 	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
+	"github.com/superfly/wormhole/server"
 )
 
 const (
@@ -41,14 +43,14 @@ type Handler struct {
 }
 
 // NewServer ...
-func NewServer(logger *logrus.Entry, redisPool *redis.Pool) *http.Server {
+func NewServer(logger *logrus.Logger, redisPool *redis.Pool) *http.Server {
 	return &http.Server{Handler: NewHandler(logger, redisPool)}
 }
 
 // NewHandler creates a new API handler
-func NewHandler(logger *logrus.Entry, redisPool *redis.Pool) *Handler {
+func NewHandler(logger *logrus.Logger, redisPool *redis.Pool) *Handler {
 	r := chi.NewRouter()
-	h := &Handler{logger: logger, router: r, redisPool: redisPool}
+	h := &Handler{logger: logger.WithFields(logrus.Fields{"prefix": "api"}), router: r, redisPool: redisPool}
 	r.Use(middleware.RequestLogger(&middleware.DefaultLogFormatter{
 		Logger: logger,
 	}))
@@ -56,7 +58,9 @@ func NewHandler(logger *logrus.Entry, redisPool *redis.Pool) *Handler {
 	r.Route("/api/v1", func(r chi.Router) {
 		r.Use(jsonMiddleware)
 		r.Use(h.authMiddleware)
-		r.Get("/endpoints", h.endpoints)
+
+		r.Get("/servers", h.servers)
+		r.Get("/backend/endpoints", h.endpoints)
 	})
 
 	return h
@@ -117,6 +121,36 @@ func jsonResponse(w http.ResponseWriter, j interface{}, code int) {
 // ServeHTTP serves the wormhole API
 func (h *Handler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	h.router.ServeHTTP(w, req)
+}
+
+func (h *Handler) servers(w http.ResponseWriter, req *http.Request) {
+	redisConn := h.redisPool.Get()
+	defer redisConn.Close()
+
+	t := time.Now().Unix()
+	rawServers, err := redis.ByteSlices(redisConn.Do("ZREVRANGEBYSCORE", "servers", "+inf", t-30))
+	if err != nil {
+		if err == redis.ErrNil {
+			jsonResponse(w, []struct{}{}, http.StatusOK)
+			return
+		}
+		h.logger.Error(err)
+		jsonResponse(w, errGenericServerProblem, http.StatusInternalServerError)
+		return
+	}
+
+	servers := make([]server.Representation, 0)
+	for _, rs := range rawServers {
+		var s server.Representation
+		_, err := s.UnmarshalMsg(rs)
+		if err != nil {
+			h.logger.Error(err)
+		}
+		servers = append(servers, s)
+	}
+
+	jsonResponse(w, servers, http.StatusOK)
+
 }
 
 func (h *Handler) endpoints(w http.ResponseWriter, req *http.Request) {

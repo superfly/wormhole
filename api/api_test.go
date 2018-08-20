@@ -112,7 +112,7 @@ func TestAPIHandlerEndpoints(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/endpoints", nil)
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/backend/endpoints", nil)
 	req.Header.Set("authorization", "Token testendpoints")
 	handler.ServeHTTP(rr, req)
 	res := rr.Result()
@@ -145,5 +145,5 @@ func init() {
 	mockRedisPool = redis.NewPool(func() (redis.Conn, error) {
 		return mockRedisConn, nil
 	}, 10)
-	handler = NewHandler(logrus.NewEntry(logrus.New()), mockRedisPool)
+	handler = NewHandler(logrus.New(), mockRedisPool)
 }
