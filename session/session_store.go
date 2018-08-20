@@ -51,8 +51,8 @@ func (r *RedisStore) RegisterConnection(s Session) error {
 		"region":       s.Region(),
 		"client_addr":  s.Client(),
 		"agent":        s.Agent(),
-		"connected_at": t.String(),
-		"last_seen_at": t.String(),
+		"connected_at": t.Format(time.RFC3339),
+		"last_seen_at": t.Format(time.RFC3339),
 	}
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
@@ -104,8 +104,8 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 			"backend_id":   s.BackendID(),
 			"cluster":      s.Cluster(),
 			"region":       s.Region(),
-			"connected_at": t.String(),
-			"last_seen_at": t.String(),
+			"connected_at": t.Format(time.RFC3339),
+			"last_seen_at": t.Format(time.RFC3339),
 		}
 
 		if extended, ok := endpointAddr.(wnet.ExtendedAddr); ok {
