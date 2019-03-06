@@ -127,13 +127,11 @@ chmod +x ./mc
 echo "Pushing to s3/flyio-wormhole-builds/$VERSION/"
 
 ./mc -q mirror --overwrite pkg/ s3/flyio-wormhole-builds/$VERSION
-./mc policy public s3/flyio-wormhole-builds/$VERSION/wormhole_linux_amd64
 
 echo "Pushing to s3/flyio-wormhole-builds/$CHANNEL/"
 # also set the version as the latest
 # TODO: there must be a better way to copy/symlink objects in S3 instead of uploading again
 ./mc -q mirror --overwrite pkg/ s3/flyio-wormhole-builds/$CHANNEL
-./mc policy public s3/flyio-wormhole-builds/$CHANNEL/wormhole_linux_amd64
 
 echo "Building and pushing to Docker Hub"
 
