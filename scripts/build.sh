@@ -119,20 +119,21 @@ fi
 
 echo "Pushing binaries to S3"
 
-curl -Lk https://dl.minio.io/client/mc/release/linux-amd64/mc > /usr/local/bin/mc
+curl -Lk https://dl.minio.io/client/mc/release/linux-amd64/mc > ./mc
+chmod +x ./mc
 
-mc config host add s3 https://s3.amazonaws.com $AWS_S3_ACCESS_KEY_ID $AWS_S3_SECRET_ACCESS_KEY
+./mc config host add s3 https://s3.amazonaws.com $AWS_S3_ACCESS_KEY_ID $AWS_S3_SECRET_ACCESS_KEY
 
 echo "Pushing to s3/flyio-wormhole-builds/$VERSION/"
 
-mc -q mirror --overwrite pkg/ s3/flyio-wormhole-builds/$VERSION
-mc policy public s3/flyio-wormhole-builds/$VERSION
+./mc -q mirror --overwrite pkg/ s3/flyio-wormhole-builds/$VERSION
+./mc policy public s3/flyio-wormhole-builds/$VERSION
 
 echo "Pushing to s3/flyio-wormhole-builds/$CHANNEL/"
 # also set the version as the latest
 # TODO: there must be a better way to copy/symlink objects in S3 instead of uploading again
-mc -q mirror --overwrite pkg/ s3/flyio-wormhole-builds/$CHANNEL
-mc policy public s3/flyio-wormhole-builds/$CHANNEL
+./mc -q mirror --overwrite pkg/ s3/flyio-wormhole-builds/$CHANNEL
+./mc policy public s3/flyio-wormhole-builds/$CHANNEL
 
 echo "Building and pushing to Docker Hub"
 
