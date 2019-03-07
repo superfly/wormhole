@@ -145,9 +145,9 @@ func (r *RedisStore) RegisterHeartbeat(s Session) error {
 	defer redisConn.Close()
 
 	redisConn.Send("MULTI")
-	redisConn.Send("HSET", s.Key(), "last_seen_at", t.String())
+	redisConn.Send("HSET", s.Key(), "last_seen_at", t.Format(time.RFC3339))
 	for _, endpointAddr := range s.Endpoints() {
-		redisConn.Send("HSET", endpointKey(s, endpointAddr), "last_seen_at", t.String())
+		redisConn.Send("HSET", endpointKey(s, endpointAddr), "last_seen_at", t.Format(time.RFC3339))
 	}
 	_, err := redisConn.Do("EXEC")
 	return err
