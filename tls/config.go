@@ -52,10 +52,16 @@ func (c *Config) GetDefaultConfig() *tls.Config {
 }
 
 func (c *Config) getConfigForClient(helloInfo *tls.ClientHelloInfo) (*tls.Config, error) {
+
 	id := strings.Split(helloInfo.ServerName, ".")[0]
 	if len(id) == 0 {
 		return nil, fmt.Errorf("SNI has no ID")
 	}
+
+	if id == "api" {
+		return c.GetDefaultConfig(), nil
+	}
+
 	session := c.registry.GetSession(id)
 	if session == nil {
 		return nil, fmt.Errorf("Session (ID='%s') cannot be found", id)

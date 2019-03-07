@@ -19,6 +19,9 @@ script:
 - GOOS=linux   GOARCH=386   make binaries
 - make ci
 - make crossbuild
+cache:
+  directories:
+    - vendor
 env:
   global:
   - secure: hQ9wa4Wx5eWfG4q8yySldLFrHMGfXnMz2JBB8YyHIxkXraDpr+ltqrraVSN2LaTdSAQcDxDKnCwnqRDZ34PX64UDZe8941qwPTFSjFmdz0VcOwStInPxioaLBJg14xcAUl55vLpx5Qkc3XcyRaKBSRJdi+cUqSjQL6MzlrR8ERIOJQzJ4l2VJ+e5X7D917dPEV5K4Z3Rha3ILTLCIQY6fygPnjRD8hNJjwMlW30vavUYs+fg9adK3M+o4vm0IXWqy7aqpaAWhfkJXH+tVM7dzXuql6l/dgFkN2uIB2WK4XJZbHrLirt8ceoL3SYLolMdm6ldG5exYROhuhh6jMlJ+Gx05/088URNxTMEmZpAdJHVYX4BvHIvkNb6x/TCYW+/+mbtGVtg27obsnXXrZERT8Jxe6V6NMhAUQYFjqcvOu8ATp4h2xwmBHhx3sMP8t9Y1owuqrPciSujzeG+XoDguxHwjun41YJJZx030kARV53EsM2wFoePVV1h9YXXCglUAyaVkQMBLeui3O11zFunpz4limPIXTNK9zDeW+krPaJWx3qi8Yn3DwUV1aozDfMHPCKg4nhwLfGPwQNwuzZPjvTAoVmW+YY5b9ZrLRFn7ndKlFFQp8nk3ssWxX5bPJrWd9UZQ1eu+gAV4u1DLpGLvGo1eqM1RWdXWl6jSpLRiHY=

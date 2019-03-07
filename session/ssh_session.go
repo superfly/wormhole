@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/xid"
 	"github.com/sirupsen/logrus"
@@ -164,12 +164,13 @@ func (io instrumentedIO) Write(p []byte) (int, error) {
 }
 
 // NewSSHSession creates new SshSession struct
-func NewSSHSession(logger *logrus.Logger, clusterURL, nodeID string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
+func NewSSHSession(logger *logrus.Logger, clusterURL, nodeID string, region string, redisPool *redis.Pool, tcpConn net.Conn, config *ssh.ServerConfig) *SSHSession {
 	base := baseSession{
 		id:         xid.New().String(),
 		nodeID:     nodeID,
 		store:      NewRedisStore(redisPool),
 		ClusterURL: clusterURL,
+		RegionID:   region,
 		logger:     logger.WithFields(logrus.Fields{"prefix": "SSHSession"}),
 	}
 	s := &SSHSession{

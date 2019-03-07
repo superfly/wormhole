@@ -4,7 +4,7 @@ import (
 	"crypto/tls"
 	"net"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	"github.com/superfly/wormhole/messages"
@@ -53,7 +53,7 @@ func NewTCPHandler(cfg *config.ServerConfig, registry *session.Registry, pool *r
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
-func (h *TCPHandler) Serve(conn *net.TCPConn) {
+func (h *TCPHandler) Serve(conn net.Conn) {
 	var useConn net.Conn
 	if h.tlsConfig != nil {
 		var err error

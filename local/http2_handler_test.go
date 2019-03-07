@@ -134,7 +134,7 @@ func TestHTTP2Handler(t *testing.T) {
 	assert.NoError(t, err, "Should be no error creating test handler")
 
 	t.Run("Test_dial", func(t *testing.T) {
-		sConnCh := make(chan *net.TCPConn)
+		sConnCh := make(chan net.Conn)
 
 		go func(ln *net.TCPListener) {
 			s, err := ln.AcceptTCP()

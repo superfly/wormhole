@@ -4,7 +4,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	wnet "github.com/superfly/wormhole/net"
 )
 
@@ -26,6 +26,7 @@ type Store interface {
 	BackendRequiresClientAuth(backendID string) (bool, error)
 	ValidCertificate(backendID, fingerprint string) (bool, error)
 	GetClientCAs(backendID string) ([]byte, error)
+	Announce(rep []byte)
 }
 
 // RedisStore is session persistence using Redis
@@ -47,10 +48,11 @@ func (r *RedisStore) RegisterConnection(s Session) error {
 		"node_id":      s.NodeID(),
 		"backend_id":   s.BackendID(),
 		"cluster":      s.Cluster(),
+		"region":       s.Region(),
 		"client_addr":  s.Client(),
 		"agent":        s.Agent(),
-		"connected_at": t.String(),
-		"last_seen_at": t.String(),
+		"connected_at": t.Format(time.RFC3339),
+		"last_seen_at": t.Format(time.RFC3339),
 	}
 	redisConn := r.pool.Get()
 	defer redisConn.Close()
@@ -101,8 +103,9 @@ func (r *RedisStore) RegisterEndpoint(s Session) error {
 			"session_id":   s.ID(),
 			"backend_id":   s.BackendID(),
 			"cluster":      s.Cluster(),
-			"connected_at": t.String(),
-			"last_seen_at": t.String(),
+			"region":       s.Region(),
+			"connected_at": t.Format(time.RFC3339),
+			"last_seen_at": t.Format(time.RFC3339),
 		}
 
 		if extended, ok := endpointAddr.(wnet.ExtendedAddr); ok {
@@ -142,9 +145,9 @@ func (r *RedisStore) RegisterHeartbeat(s Session) error {
 	defer redisConn.Close()
 
 	redisConn.Send("MULTI")
-	redisConn.Send("HSET", s.Key(), "last_seen_at", t.String())
+	redisConn.Send("HSET", s.Key(), "last_seen_at", t.Format(time.RFC3339))
 	for _, endpointAddr := range s.Endpoints() {
-		redisConn.Send("HSET", endpointKey(s, endpointAddr), "last_seen_at", t.String())
+		redisConn.Send("HSET", endpointKey(s, endpointAddr), "last_seen_at", t.Format(time.RFC3339))
 	}
 	_, err := redisConn.Do("EXEC")
 	return err
@@ -204,6 +207,25 @@ func (r *RedisStore) ValidCertificate(backendID, fingerprint string) (bool, erro
 	defer redisConn.Close()
 
 	return redis.Bool(redisConn.Do("SISMEMBER", "backend:"+backendID+":valid_certificates", fingerprint))
+}
+
+// Announce announces the server on redis
+// rep is a serialized representation of the current server
+func (r *RedisStore) Announce(rep []byte) {
+	announce(r.pool, rep)
+	ticker := time.NewTicker(10 * time.Second)
+	for range ticker.C {
+		announce(r.pool, rep)
+	}
+}
+
+const announceKey = "servers"
+
+func announce(pool *redis.Pool, rep []byte) {
+	redisConn := pool.Get()
+	defer redisConn.Close()
+
+	redisConn.Do("ZADD", announceKey, time.Now().Unix(), rep)
 }
 
 func timeToScore(t time.Time) int64 {

@@ -20,6 +20,7 @@ type Session interface {
 	Client() string
 	ClientIP() string
 	Cluster() string
+	Region() string
 	Endpoints() []net.Addr
 	AddEndpoint(endpoint net.Addr)
 	Key() string
@@ -42,6 +43,7 @@ type baseSession struct {
 	clientAddr         string
 	endpoints          []net.Addr
 	ClusterURL         string
+	RegionID           string
 	requiresClientAuth bool
 
 	release *messages.Release
@@ -83,6 +85,11 @@ func (s *baseSession) ClientIP() string {
 // Cluster returns a cluster identifier
 func (s *baseSession) Cluster() string {
 	return s.ClusterURL
+}
+
+// Region returns a region identifier
+func (s *baseSession) Region() string {
+	return s.RegionID
 }
 
 // Endpoints returns a list of endpoint addresses that have been registered for

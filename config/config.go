@@ -139,6 +139,9 @@ type ServerConfig struct {
 	// MetricsAPIPort used by HTTP server to serve metrics
 	// Used by Prometheus to scrape wormhole server endpoint
 	MetricsAPIPort string
+
+	// Region represents the location of the wormhole server
+	Region string
 }
 
 // NewServerConfig parses config values collected from Viper and validates them
@@ -152,6 +155,8 @@ func NewServerConfig() (*ServerConfig, error) {
 	viper.SetDefault("use_shared_port_forwarding", false)
 	viper.SetDefault("shared_tls_forwarding_port", "443")
 	viper.BindEnv("bugsnag_api_key", "BUGSNAG_API_KEY")
+
+	viper.BindEnv("region")
 
 	logger := logrus.New()
 	logger.Formatter = new(prefixed.TextFormatter)
@@ -192,6 +197,7 @@ func NewServerConfig() (*ServerConfig, error) {
 		MetricsAPIPort:          viper.GetString("metrics_api_port"),
 		UseSharedPortForwarding: viper.GetBool("use_shared_port_forwarding"),
 		SharedTLSForwardingPort: viper.GetString("shared_tls_forwarding_port"),
+		Region:                  viper.GetString("region"),
 		Config:                  shared,
 	}
 

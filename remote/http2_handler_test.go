@@ -14,8 +14,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/pkg/errors"
+	"github.com/rafaeljusto/redigomock"
 	log "github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/superfly/tlstest"
@@ -24,18 +25,20 @@ import (
 	wnet "github.com/superfly/wormhole/net"
 	"github.com/superfly/wormhole/session"
 	"golang.org/x/net/http2"
-	"gopkg.in/ory-am/dockertest.v3"
 )
 
-var redisPool *redis.Pool
-var registry *session.Registry
-var serverTLSConfig *tls.Config
-var clientTLSConfig *tls.Config
-var listenerFactory wnet.ListenerFactory
+var (
+	redisConn       *redigomock.Conn
+	redisPool       *redis.Pool
+	registry        *session.Registry
+	serverTLSConfig *tls.Config
+	clientTLSConfig *tls.Config
+	listenerFactory wnet.ListenerFactory
 
-var serverTLSCert tls.Certificate
-var serverCrtPEM []byte
-var serverKeyPEM []byte
+	serverTLSCert tls.Certificate
+	serverCrtPEM  []byte
+	serverKeyPEM  []byte
+)
 
 type testListenerFactory struct{}
 
@@ -74,35 +77,35 @@ func TestMain(m *testing.M) {
 
 	registry = session.NewRegistry(log.New())
 
-	pool, err := dockertest.NewPool("")
-	if err != nil {
-		log.Fatalf("Dockertest could not connect to docker: %s", err)
-	}
+	// pool, err := dockertest.NewPool("")
+	// if err != nil {
+	// 	log.Fatalf("Dockertest could not connect to docker: %s", err)
+	// }
 
-	redisResource, err := pool.Run("redis", "4.0.1", []string{})
-	if err != nil {
-		log.Fatalf("Could not create redis container")
-	}
+	// redisResource, err := pool.Run("redis", "4.0.1", []string{})
+	// if err != nil {
+	// 	log.Fatalf("Could not create redis container")
+	// }
 
-	if err := pool.Retry(func() error {
-		var err error
-		c, err := redis.DialURL(fmt.Sprintf("redis://127.0.0.1:%s", redisResource.GetPort("6379/tcp")))
-		if err != nil {
-			return err
-		}
-		_, err = c.Do("PING")
-		return err
-	}); err != nil {
-		log.Fatalf("Could not connect to redis container: %s", err)
-	}
+	// if err := pool.Retry(func() error {
+	// 	var err error
+	// 	c, err := redis.DialURL(fmt.Sprintf("redis://127.0.0.1:%s", redisResource.GetPort("6379/tcp")))
+	// 	if err != nil {
+	// 		return err
+	// 	}
+	// 	_, err = c.Do("PING")
+	// 	return err
+	// }); err != nil {
+	// 	log.Fatalf("Could not connect to redis container: %s", err)
+	// }
 
-	redisPool = newRedisPool(fmt.Sprintf("redis://localhost:%s", redisResource.GetPort("6379/tcp")))
+	// redisPool = newRedisPool(fmt.Sprintf("redis://localhost:%s", redisResource.GetPort("6379/tcp")))
 
 	code := m.Run()
 
-	if err := pool.Purge(redisResource); err != nil {
-		log.Fatalf("Could not purge redis: %s", err)
-	}
+	// if err := pool.Purge(redisResource); err != nil {
+	// 	log.Fatalf("Could not purge redis: %s", err)
+	// }
 
 	os.Exit(code)
 }
@@ -293,6 +296,20 @@ func wrapClientConn(cConn *net.TCPConn, tlsConf *tls.Config, alpn bool) (*tls.Co
 }
 
 func TestCreatesFullSession(t *testing.T) {
+	redisConn.Command("HMSET", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
+
+	redisConn.Command("ZADD", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
+
+	redisConn.Command("SADD", redigomock.NewAnyData(), redigomock.NewAnyData())
+
+	redisConn.Command("MULTI")
+
+	redisConn.Command("HSET", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
+
+	redisConn.Command("HMSET", redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData(), redigomock.NewAnyData())
+
+	redisConn.Command("EXEC")
+
 	h, err := newTestHTTP2Handler()
 	assert.NoError(t, err, "Should be no error creating new HTTP2Handler")
 	assert.NotNil(t, h, "Handler shouldn't be nil")
@@ -363,4 +380,11 @@ func TestCreatesFullSession(t *testing.T) {
 
 	// TODO: Test throughput
 	//	 This is dependent on registering backend IDs with token upon creation like the SSH handler currently does
+}
+
+func init() {
+	redisConn = redigomock.NewConn()
+	redisPool = redis.NewPool(func() (redis.Conn, error) {
+		return redisConn, nil
+	}, 10)
 }

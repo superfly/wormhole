@@ -12,7 +12,7 @@ import (
 	"github.com/superfly/wormhole"
 	"github.com/superfly/wormhole/config"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 )
 
 var fakeRedis *miniredis.Miniredis

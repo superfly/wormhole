@@ -6,7 +6,7 @@ import (
 	"net"
 	"time"
 
-	"github.com/garyburd/redigo/redis"
+	"github.com/gomodule/redigo/redis"
 	"github.com/sirupsen/logrus"
 	"github.com/superfly/wormhole/config"
 	wnet "github.com/superfly/wormhole/net"
@@ -26,6 +26,7 @@ type SSHHandler struct {
 	nodeID     string
 	localhost  string
 	clusterURL string
+	region     string
 	registry   *session.Registry
 	pool       *redis.Pool
 	logger     *logrus.Entry
@@ -54,6 +55,7 @@ func NewSSHHandler(cfg *config.ServerConfig, registry *session.Registry, pool *r
 		registry:   registry,
 		localhost:  cfg.Localhost,
 		clusterURL: cfg.ClusterURL,
+		region:     cfg.Region,
 		pool:       pool,
 		config:     config,
 		logger:     cfg.Logger.WithFields(logrus.Fields{"prefix": "SSHHandler"}),
@@ -64,7 +66,7 @@ func NewSSHHandler(cfg *config.ServerConfig, registry *session.Registry, pool *r
 }
 
 // Serve accepts incoming wormhole connections and passes them to the handler
-func (s *SSHHandler) Serve(conn *net.TCPConn) {
+func (s *SSHHandler) Serve(conn net.Conn) {
 	conn.RemoteAddr()
 	ctx, err := s.limiter.Get(ipForConn(conn))
 	if err != nil {
@@ -92,7 +94,7 @@ func makeConfig(key []byte) (*ssh.ServerConfig, error) {
 
 func (s *SSHHandler) sshSessionHandler(conn net.Conn) {
 	// Before use, a handshake must be performed on the incoming net.Conn.
-	sess := session.NewSSHSession(s.logger.Logger, s.clusterURL, s.nodeID, s.pool, conn, s.config)
+	sess := session.NewSSHSession(s.logger.Logger, s.clusterURL, s.nodeID, s.region, s.pool, conn, s.config)
 	err := sess.RequireStream()
 	if err != nil {
 		s.logger.WithField("client_addr", conn.RemoteAddr().String()).Errorln("error getting a stream:", err)

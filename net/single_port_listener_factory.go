@@ -119,6 +119,7 @@ func (sl *sharedPortTLSListenerFactory) populateCh() error {
 					sl.logger.Errorf("Error finding ID from SNI: %+v", err)
 					return
 				}
+
 				sl.fLock.Lock()
 				ch, ok := sl.forward[id]
 				sl.fLock.Unlock()
