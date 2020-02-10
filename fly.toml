@@ -1,0 +1,21 @@
+app = "wormhole"
+
+
+[[services]]
+  internal_port = 10000
+  protocol = "tcp"
+
+  [services.concurrency]
+    hard_limit = 25
+    soft_limit = 20
+
+  [[services.ports]]
+    handlers = []
+    port = "443"
+  [[services.ports]]
+    handlers = []
+    port = "10000"
+
+  [[services.tcp_checks]]
+    interval = 10000
+    timeout = 2000
