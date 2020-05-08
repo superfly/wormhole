@@ -1,5 +1,6 @@
 [![Fly.io Community Slack](https://fly.io/slack/badge.svg)](https://fly.io/slack/)
 [![Build Status](https://travis-ci.org/superfly/wormhole.svg?branch=master)](https://travis-ci.org/superfly/wormhole)
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fsuperfly%2Fwormhole.svg?type=shield)](https://app.fossa.io/projects/git%2Bgithub.com%2Fsuperfly%2Fwormhole?ref=badge_shield)
 
 # wormhole - Fly.io reverse Proxy
 
@@ -47,3 +48,7 @@ Wormhole is a reverse proxy that creates a secure tunnel between two endpoints.
 | Multiple Tunnel Types per WH Server 		| Pending [#10](https://github.com/superfly/wormhole/issues/10) |
 | Healthcheck for Local Endpoint 		| Pending [#33](https://github.com/superfly/wormhole/issues/33) |
 | WH Server Shared Port TLS+SNI forwarding 	| Supported |
+
+
+## License
+[![FOSSA Status](https://app.fossa.io/api/projects/git%2Bgithub.com%2Fsuperfly%2Fwormhole.svg?type=large)](https://app.fossa.io/projects/git%2Bgithub.com%2Fsuperfly%2Fwormhole?ref=badge_large)
